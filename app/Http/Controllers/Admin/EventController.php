@@ -162,15 +162,15 @@ class EventController extends Controller
         ]);
 
         if ($request->hasFile('poster')) {
-            $data['poster_path'] = $request->file('poster')->store('event-posters', 'public');
+            $data['poster_path'] = $request->file('poster')->store('event-posters', 'uploads');
         }
 
         if ($request->hasFile('ticket_image')) {
-            $data['ticket_image_path'] = $request->file('ticket_image')->store('ticket-art', 'public');
+            $data['ticket_image_path'] = $request->file('ticket_image')->store('ticket-art', 'uploads');
         }
 
         if ($request->hasFile('qr_payment_image')) {
-            $data['qr_payment_image_path'] = $request->file('qr_payment_image')->store('payment-qr', 'public');
+            $data['qr_payment_image_path'] = $request->file('qr_payment_image')->store('payment-qr', 'uploads');
         }
 
         $data['is_published'] = $request->boolean('is_published');

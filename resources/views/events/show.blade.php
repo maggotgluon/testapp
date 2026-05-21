@@ -10,7 +10,7 @@
             <div class="overflow-hidden rounded-lg border border-white/10 bg-white/[0.04]">
                 <div class="aspect-[4/5] bg-gradient-to-br from-emerald-500 via-sky-500 to-zinc-800">
                     @if($event->poster_path)
-                        <img class="h-full w-full object-cover" src="{{ asset('storage/'.$event->poster_path) }}" alt="{{ $event->name }}">
+                        <img class="h-full w-full object-cover" src="{{ asset('uploads/'.$event->poster_path) }}" alt="{{ $event->name }}">
                     @endif
                 </div>
                 <div class="p-5">
@@ -35,7 +35,7 @@
                 'bank_account_number' => $event->bank_account_number,
                 'qr_payment_account_name' => $event->qr_payment_account_name,
                 'qr_payment_account' => $event->qr_payment_account,
-                'qr_payment_image' => $event->qr_payment_image_path ? asset('storage/'.$event->qr_payment_image_path) : null,
+                'qr_payment_image' => $event->qr_payment_image_path ? asset('uploads/'.$event->qr_payment_image_path) : null,
                 'instructions' => $event->payment_instructions,
             ]),
         })">

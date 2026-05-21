@@ -19,7 +19,7 @@
                 <form method="POST" action="{{ route('admin.orders.refund', $order) }}">@csrf<button class="rounded-md border border-white/10 px-4 py-2 font-semibold text-zinc-100">Refund</button></form>
             </div>
             @if($order->payment_slip_path)
-                <img class="mt-6 max-h-96 rounded-lg border border-white/10 object-contain" src="{{ asset('storage/'.$order->payment_slip_path) }}" alt="Payment slip">
+                <img class="mt-6 max-h-96 rounded-lg border border-white/10 object-contain" src="{{ asset('uploads/'.$order->payment_slip_path) }}" alt="Payment slip">
             @endif
         </section>
         <section class="rounded-lg border border-white/10 bg-white/[0.04] p-6">

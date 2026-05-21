@@ -79,14 +79,16 @@ Upload `public/build` with the app.
 These must be writable by the web server user:
 
 ```bash
-chmod -R ug+rw storage bootstrap/cache
+chmod -R ug+rw storage bootstrap/cache public/uploads
 ```
 
 Some shared hosts need:
 
 ```bash
-chmod -R 775 storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache public/uploads
 ```
+
+Uploaded event images and payment slips are stored in `public/uploads` to avoid shared-host symlink restrictions on Laravel's default `public/storage` link.
 
 ## Restart Passenger
 

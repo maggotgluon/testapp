@@ -39,7 +39,7 @@ class OrderController extends Controller
             return back()->withErrors(['items' => 'Please select at least one ticket.'])->withInput();
         }
 
-        $slipPath = $request->file('slip')?->store('payment-slips', 'public');
+        $slipPath = $request->file('slip')?->store('payment-slips', 'uploads');
 
         $order = DB::transaction(function () use ($data, $selected, $slipPath, $request) {
             $ticketTypes = TicketType::query()

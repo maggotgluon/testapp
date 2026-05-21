@@ -3,7 +3,7 @@
         <div class="overflow-hidden rounded-lg border border-white/10 bg-white/[0.04]">
             <div class="aspect-[4/5] bg-gradient-to-br from-emerald-500 via-sky-500 to-zinc-800">
                 @if($ticket->event->ticket_image_path || $ticket->event->poster_path)
-                    <img class="h-full w-full object-cover" src="{{ asset('storage/'.($ticket->event->ticket_image_path ?: $ticket->event->poster_path)) }}" alt="{{ $ticket->event->name }}">
+                    <img class="h-full w-full object-cover" src="{{ asset('uploads/'.($ticket->event->ticket_image_path ?: $ticket->event->poster_path)) }}" alt="{{ $ticket->event->name }}">
                 @endif
             </div>
         </div>
