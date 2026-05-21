@@ -101,7 +101,16 @@ touch tmp/restart.txt
 
 Upload `deploy/host-check.php` temporarily and open it in the browser. It checks PHP version, required extensions, `.env`, `vendor`, writable folders, and built assets.
 
+It also attempts to bootstrap Laravel and connect to the database. If the outer checks pass but the homepage still fails, look closely at:
+
+- `Document root`
+- `Laravel bootstrap`
+- `Database connection`
+- missing table checks
+
 Delete it immediately after debugging.
+
+If Laravel can bootstrap but the homepage still fails and no `storage/logs/laravel.log` file appears, upload `deploy/home-debug.php` into the public directory and open `/home-debug.php`. It catches the homepage exception directly. Delete it immediately after debugging.
 
 ## If You Cannot Point the Domain to `public/`
 
