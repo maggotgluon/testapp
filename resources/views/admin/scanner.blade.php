@@ -1,0 +1,16 @@
+<x-layouts.app title="Scanner">
+    <div class="mx-auto max-w-2xl rounded-lg border border-white/10 bg-white/[0.04] p-6" x-data="scanner()">
+        <h1 class="text-3xl font-semibold text-white">Gate scanner</h1>
+        <p class="mt-2 text-sm text-zinc-400">Paste a ticket URL or UUID. Browsers with BarcodeDetector can use the camera button.</p>
+        <div class="mt-5 grid gap-3">
+            <input x-model="code" class="rounded-md border border-white/10 bg-zinc-950 px-3 py-3 font-mono text-white" placeholder="Ticket UUID or scanned URL">
+            <div class="flex flex-wrap gap-2">
+                <button @click="submit('check_in')" class="rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950">Check in</button>
+                <button @click="submit('check_out')" class="rounded-md border border-white/10 px-4 py-2 font-semibold text-zinc-100">Check out</button>
+                <button @click="startCamera()" class="rounded-md border border-white/10 px-4 py-2 text-zinc-100" type="button">Camera</button>
+            </div>
+            <video x-ref="video" class="hidden aspect-video w-full rounded-lg bg-black" autoplay muted playsinline></video>
+            <template x-if="message"><div class="rounded-md border border-white/10 bg-zinc-900 p-4 text-sm" :class="ok ? 'text-emerald-200' : 'text-rose-200'" x-text="message"></div></template>
+        </div>
+    </div>
+</x-layouts.app>
