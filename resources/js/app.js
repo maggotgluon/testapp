@@ -140,11 +140,18 @@ Alpine.data('lineLiffLogin', (config) => ({
             this.liff = await this.loadSdk();
             await this.liff.init({ liffId });
 
+            if (config.auto && this.liff.isInClient()) {
+                await this.login();
+                return;
+            }
+
             if (this.liff.isLoggedIn() && sessionStorage.getItem('line_liff_login_pending') === '1') {
                 await this.login();
             }
         } catch (error) {
-            this.message = 'LINE LIFF could not start. Please check the LIFF ID and endpoint URL.';
+            if (!config.auto) {
+                this.message = 'LINE LIFF could not start. Please check the LIFF ID and endpoint URL.';
+            }
         }
     },
     loadSdk() {
@@ -202,6 +209,7 @@ Alpine.data('lineLiffLogin', (config) => ({
                 body: JSON.stringify({
                     id_token: idToken,
                     profile,
+                    redirect: config.redirectUrl || config.profileUrl || window.location.href,
                 }),
             });
 

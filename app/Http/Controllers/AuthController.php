@@ -166,6 +166,7 @@ class AuthController extends Controller
             'profile.userId' => ['nullable', 'string'],
             'profile.displayName' => ['nullable', 'string', 'max:255'],
             'profile.pictureUrl' => ['nullable', 'url', 'max:2048'],
+            'redirect' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $clientId = config('services.line.client_id')
@@ -232,8 +233,28 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return response()->json([
-            'redirect' => redirect()->intended(route('profile'))->getTargetUrl(),
+            'redirect' => $this->safeLiffRedirect($data['redirect'] ?? null),
         ]);
+    }
+
+    private function safeLiffRedirect(?string $redirect): string
+    {
+        if (! $redirect) {
+            return route('profile');
+        }
+
+        if (str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//')) {
+            return $redirect;
+        }
+
+        $appHost = parse_url(config('app.url'), PHP_URL_HOST);
+        $redirectHost = parse_url($redirect, PHP_URL_HOST);
+
+        if ($appHost && $redirectHost && hash_equals($appHost, $redirectHost)) {
+            return $redirect;
+        }
+
+        return route('profile');
     }
 
     public function logout(Request $request): RedirectResponse

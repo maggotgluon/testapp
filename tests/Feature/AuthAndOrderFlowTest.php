@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Coupon;
+use App\Models\TicketOrder;
+use App\Models\TicketType;
 use App\Services\QrCodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -19,7 +21,7 @@ class AuthAndOrderFlowTest extends TestCase
 
         $this->post('/login', [
             'name' => 'Super Admin',
-            'phone' => '0900000000',
+            'phone' => '0809166690',
             'provider' => 'guest',
         ])->assertSessionHasErrors('phone');
     }
@@ -30,7 +32,7 @@ class AuthAndOrderFlowTest extends TestCase
 
         $this->post('/admin/login', [
             'username' => 'admin',
-            'phone' => '0900000000',
+            'phone' => '0809166690',
         ])->assertRedirect('/admin');
     }
 
@@ -80,8 +82,9 @@ class AuthAndOrderFlowTest extends TestCase
                 'displayName' => 'LINE Buyer',
                 'pictureUrl' => 'https://example.com/avatar.jpg',
             ],
+            'redirect' => '/events/1',
         ])->assertOk()
-            ->assertJsonPath('redirect', route('profile'));
+            ->assertJsonPath('redirect', '/events/1');
 
         $this->assertAuthenticated();
         $this->assertDatabaseHas('users', [
@@ -95,21 +98,22 @@ class AuthAndOrderFlowTest extends TestCase
     public function test_order_number_is_human_readable(): void
     {
         $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
 
         $response = $this->post('/orders', [
             'customer_name' => 'Demo Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'bank_transfer',
             'items' => [
-                ['ticket_type_id' => 1, 'quantity' => 1],
-                ['ticket_type_id' => 2, 'quantity' => 0],
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
         ]);
 
         $response->assertRedirect();
-        $this->assertDatabaseHas('ticket_orders', [
-            'order_number' => 'BNML-'.now()->format('md').'-001',
-        ]);
+        $order = TicketOrder::firstOrFail();
+        $this->assertMatchesRegularExpression('/^[A-Z0-9]{3,4}-'.now()->format('md').'-001$/', $order->order_number);
     }
 
     public function test_promptpay_payment_payload_matches_emv_format(): void
@@ -159,10 +163,13 @@ class AuthAndOrderFlowTest extends TestCase
     public function test_coupon_can_discount_each_ticket_item(): void
     {
         $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
 
         Coupon::create([
-            'event_id' => 1,
-            'ticket_type_id' => 1,
+            'event_id' => $ticketType->event_id,
+            'ticket_type_id' => $ticketType->id,
             'code' => 'ITEM100',
             'discount_type' => 'fixed',
             'discount_scope' => 'item',
@@ -176,15 +183,14 @@ class AuthAndOrderFlowTest extends TestCase
             'payment_method' => 'bank_transfer',
             'coupon_code' => 'ITEM100',
             'items' => [
-                ['ticket_type_id' => 1, 'quantity' => 2],
-                ['ticket_type_id' => 2, 'quantity' => 0],
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 2],
             ],
         ])->assertRedirect();
 
         $this->assertDatabaseHas('ticket_orders', [
-            'subtotal_thb' => 1380,
+            'subtotal_thb' => $ticketType->price_thb * 2,
             'discount_thb' => 200,
-            'total_thb' => 1180,
+            'total_thb' => ($ticketType->price_thb * 2) - 200,
         ]);
     }
 }

@@ -8,6 +8,18 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 antialiased">
+    @guest
+        @if(config('services.line.liff_id') && ! request()->is('admin*'))
+            <div class="hidden" x-data="lineLiffLogin({
+                auto: true,
+                liffId: @js(config('services.line.liff_id')),
+                loginUrl: @js(route('auth.line.liff')),
+                profileUrl: @js(route('profile')),
+                redirectUrl: @js(request()->fullUrl()),
+            })" x-init="init()"></div>
+        @endif
+    @endguest
+
     <div class="border-b border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950/85 backdrop-blur">
         <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
             <a href="{{ route('events.index') }}" class="text-lg font-semibold tracking-tight">TicketFlow</a>
