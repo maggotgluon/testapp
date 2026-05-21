@@ -45,6 +45,11 @@ class AuthAndOrderFlowTest extends TestCase
 
     public function test_missing_social_credentials_show_a_clear_message(): void
     {
+        config([
+            'services.line.client_id' => null,
+            'services.line.client_secret' => null,
+        ]);
+
         $this->get('/auth/line')
             ->assertRedirect('/login')
             ->assertSessionHas('status');

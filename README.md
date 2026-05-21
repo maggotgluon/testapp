@@ -57,3 +57,7 @@ Add provider credentials to `.env` using the variables shown in `.env.example`, 
 4. Swap the local AI ops assistant heuristics with an OpenAI-backed service for event copy, fraud/risk review, and demand forecasting.
 5. Add notification delivery for approved tickets through LINE Messaging API, email, or SMS.
 6. Add stronger scanner offline mode.
+
+## Passenger / Shared Hosting
+
+If the host shows "Web application could not be started by Phusion Passenger", see [docs/PASSENGER_DEPLOYMENT.md](docs/PASSENGER_DEPLOYMENT.md).
