@@ -18,6 +18,7 @@ Route::get('/login', [AuthController::class, 'show'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.store');
 Route::get('/admin/login', [AuthController::class, 'adminShow'])->name('admin.login');
 Route::post('/admin/login', [AuthController::class, 'adminLogin'])->name('admin.login.store');
+Route::post('/auth/line/liff', [AuthController::class, 'lineLiff'])->name('auth.line.liff');
 Route::get('/auth/{provider}', [AuthController::class, 'social'])->name('auth.social');
 Route::get('/auth/{provider}/callback', [AuthController::class, 'socialCallback'])->name('auth.social.callback');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');

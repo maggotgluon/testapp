@@ -125,4 +125,100 @@ Alpine.data('checkout', (config) => ({
     },
 }));
 
+Alpine.data('lineLiffLogin', (config) => ({
+    loading: false,
+    message: '',
+    liff: null,
+    async init() {
+        const liffId = config.liffId || import.meta.env.VITE_LINE_LIFF_ID;
+
+        if (!liffId) {
+            return;
+        }
+
+        try {
+            this.liff = await this.loadSdk();
+            await this.liff.init({ liffId });
+
+            if (this.liff.isLoggedIn() && sessionStorage.getItem('line_liff_login_pending') === '1') {
+                await this.login();
+            }
+        } catch (error) {
+            this.message = 'LINE LIFF could not start. Please check the LIFF ID and endpoint URL.';
+        }
+    },
+    loadSdk() {
+        if (window.liff) {
+            return Promise.resolve(window.liff);
+        }
+
+        return new Promise((resolve, reject) => {
+            const existingScript = document.querySelector('script[data-line-liff-sdk]');
+
+            if (existingScript) {
+                existingScript.addEventListener('load', () => resolve(window.liff));
+                existingScript.addEventListener('error', reject);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+            script.async = true;
+            script.dataset.lineLiffSdk = 'true';
+            script.onload = () => resolve(window.liff);
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    },
+    async login() {
+        this.loading = true;
+        this.message = '';
+
+        try {
+            if (!this.liff) {
+                await this.init();
+            }
+
+            if (!this.liff.isLoggedIn()) {
+                sessionStorage.setItem('line_liff_login_pending', '1');
+                this.liff.login({ redirectUri: window.location.href });
+                return;
+            }
+
+            const idToken = this.liff.getIDToken();
+
+            if (!idToken) {
+                throw new Error('Missing LINE id token.');
+            }
+
+            const profile = await this.liff.getProfile().catch(() => null);
+            const response = await fetch(config.loginUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    id_token: idToken,
+                    profile,
+                }),
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok) {
+                const errors = payload.errors || {};
+                throw new Error(errors.line?.[0] || payload.message || 'LINE login failed.');
+            }
+
+            sessionStorage.removeItem('line_liff_login_pending');
+            window.location.href = payload.redirect || config.profileUrl;
+        } catch (error) {
+            this.loading = false;
+            this.message = error.message || 'LINE login failed. Please try again.';
+        }
+    },
+}));
+
 Alpine.start();

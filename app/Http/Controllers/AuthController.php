@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +20,7 @@ class AuthController extends Controller
         return view('auth.login', [
             'socialProviders' => collect(['line' => 'LINE', 'facebook' => 'Facebook', 'instagram' => 'Instagram'])
                 ->filter(fn ($label, $provider) => config("services.{$provider}.client_id") && config("services.{$provider}.client_secret")),
+            'lineLiffId' => config('services.line.liff_id'),
         ]);
     }
 
@@ -153,6 +156,84 @@ class AuthController extends Controller
         Auth::login($user, true);
 
         return redirect()->intended(route('profile'))->with('status', 'Logged in with '.strtoupper($provider).'.');
+    }
+
+    public function lineLiff(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'id_token' => ['required', 'string'],
+            'profile' => ['nullable', 'array'],
+            'profile.userId' => ['nullable', 'string'],
+            'profile.displayName' => ['nullable', 'string', 'max:255'],
+            'profile.pictureUrl' => ['nullable', 'url', 'max:2048'],
+        ]);
+
+        $clientId = config('services.line.client_id')
+            ?: Str::before((string) config('services.line.liff_id'), '-');
+
+        if (! $clientId) {
+            throw ValidationException::withMessages([
+                'line' => 'LINE LIFF needs LINE_CLIENT_ID or a valid LINE_LIFF_ID in .env.',
+            ]);
+        }
+
+        $response = Http::asForm()->post('https://api.line.me/oauth2/v2.1/verify', [
+            'id_token' => $data['id_token'],
+            'client_id' => $clientId,
+        ]);
+
+        if ($response->failed()) {
+            throw ValidationException::withMessages([
+                'line' => 'LINE login could not be verified. Please try again.',
+            ]);
+        }
+
+        $verified = $response->json();
+        $profile = $data['profile'] ?? [];
+        $lineUserId = $verified['sub'] ?? $profile['userId'] ?? null;
+
+        if (! $lineUserId) {
+            throw ValidationException::withMessages([
+                'line' => 'LINE did not return a user id. Please try again.',
+            ]);
+        }
+
+        $email = $verified['email'] ?? null;
+
+        $user = User::query()
+            ->where(fn ($query) => $query
+                ->where([['provider', 'line'], ['provider_id', $lineUserId]])
+                ->when($email, fn ($query) => $query->orWhere('email', $email)))
+            ->first();
+
+        $user ??= User::create([
+            'name' => $verified['name'] ?? $profile['displayName'] ?? 'LINE User',
+            'email' => $email,
+            'provider' => 'line',
+            'provider_id' => $lineUserId,
+            'avatar' => $verified['picture'] ?? $profile['pictureUrl'] ?? null,
+        ]);
+
+        if ($user->isAdmin()) {
+            throw ValidationException::withMessages([
+                'line' => 'Admin accounts must use the admin login page.',
+            ]);
+        }
+
+        $user->update([
+            'name' => $verified['name'] ?? $profile['displayName'] ?? $user->name,
+            'email' => $email ?: $user->email,
+            'provider' => 'line',
+            'provider_id' => $lineUserId,
+            'avatar' => $verified['picture'] ?? $profile['pictureUrl'] ?? $user->avatar,
+        ]);
+
+        Auth::login($user, true);
+        $request->session()->regenerate();
+
+        return response()->json([
+            'redirect' => redirect()->intended(route('profile'))->getTargetUrl(),
+        ]);
     }
 
     public function logout(Request $request): RedirectResponse

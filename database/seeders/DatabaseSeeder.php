@@ -12,47 +12,54 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         User::updateOrCreate(
-            ['phone' => '0900000000'],
+            ['phone' => '0809166690'],
             ['name' => 'Super Admin', 'username' => 'admin', 'email' => null, 'role' => 'super_admin', 'provider' => 'guest', 'provider_id' => 'seed-admin']
         );
 
         User::updateOrCreate(
-            ['phone' => '0911111111'],
+            ['phone' => '0809166691'],
             ['name' => 'Gate Scanner', 'username' => 'scanner', 'email' => null, 'role' => 'gate_scanner', 'provider' => 'guest', 'provider_id' => 'seed-scanner']
         );
 
         User::updateOrCreate(
-            ['phone' => '0922222222'],
+            ['phone' => '0809166692'],
             ['name' => 'Event Admin', 'username' => 'eventadmin', 'email' => null, 'role' => 'event_admin', 'provider' => 'guest', 'provider_id' => 'seed-event-admin']
         );
 
         $event = Event::updateOrCreate(
-            ['name' => 'Bangkok Night Market Live'],
+            ['name' => 'SHIMMER & SHINE'],
             [
-                'venue' => 'Warehouse 30',
-                'location' => 'Charoen Krung, Bangkok',
-                'hosted_by' => 'TicketFlow Demo',
-                'description' => 'A food, music, and art night with timed early bird and VIP ticket inventory.',
+                'venue' => 'Meeting Room, Golden Sea Hotel',
+                'location' => 'Golden Sea Hotel Hua Hin',
+                'hosted_by' => 'Zumba Hua Hin',
+                'description' => 'Zumba Hua Hin is thrilled to present SHIMMER & SHINE, a vibrant Zumba event that promises an unforgettable experience filled with energy, music, and dance. Join us for an exhilarating day of movement and fun as we bring together the best of Zumba in a lively and colorful atmosphere. Whether you\'re a seasoned Zumba enthusiast or new to the world of dance fitness, SHIMMER & SHINE offers something for everyone. Get ready to dance, sweat, and shine with us at this one-of-a-kind event!',
                 'starts_at' => now()->addWeeks(3)->setTime(18, 0),
                 'ends_at' => now()->addWeeks(3)->setTime(23, 0),
-                'bank_name' => 'Siam Commercial Bank',
-                'bank_account_name' => 'TicketFlow Demo Co., Ltd.',
-                'bank_account_number' => '123-456-7890',
-                'qr_payment_account_name' => 'TicketFlow PromptPay',
-                'qr_payment_account' => '081-234-5678',
+                'bank_name' => 'Krungthai Bank',
+                'bank_account_name' => 'Worasuda Worachartudomphong',
+                'bank_account_number' => '956-0-56414-5',
+                'qr_payment_account_name' => 'Worasuda PromptPay',
+                'qr_payment_account' => '063-147-9799',
                 'payment_instructions' => 'Transfer the exact amount and upload your slip for admin approval.',
                 'is_published' => true,
             ]
         );
 
         $event->ticketTypes()->updateOrCreate(
-            ['name' => 'Early Bird'],
-            ['description' => 'Limited early entry ticket.', 'price_thb' => 690, 'capacity' => 100, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now()->addWeek(), 'status' => 'active']
+            ['name' => 'Flash Sale'],
+            ['description' => 'Limited early entry ticket.', 
+            'price_thb' => 199, 'capacity' => 50, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now(), 'status' => 'active']
         );
 
         $event->ticketTypes()->updateOrCreate(
-            ['name' => 'VIP Table'],
-            ['description' => 'Priority lane and table reservation.', 'price_thb' => 2500, 'capacity' => 20, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now()->addWeeks(2), 'status' => 'active']
+            ['name' => 'Early Bird'],
+            ['description' => 'Limited early entry ticket.', 
+            'price_thb' => 399, 'capacity' => 100, 'sale_starts_at' => now(), 'sale_ends_at' => now()->addWeek(), 'status' => 'active']
+        );
+
+        $event->ticketTypes()->updateOrCreate(
+            ['name' => 'Regular entry'],
+            ['description' => 'General admission ticket.', 'price_thb' => 499, 'capacity' => 200, 'sale_starts_at' => now()->addWeek(), 'sale_ends_at' => now()->addWeeks(2), 'status' => 'active']
         );
 
         Coupon::updateOrCreate(

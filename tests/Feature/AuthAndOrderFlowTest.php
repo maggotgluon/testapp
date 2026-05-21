@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Coupon;
 use App\Services\QrCodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AuthAndOrderFlowTest extends TestCase
@@ -54,6 +55,41 @@ class AuthAndOrderFlowTest extends TestCase
         $this->get('/auth/line')
             ->assertRedirect('/login')
             ->assertSessionHas('status');
+    }
+
+    public function test_line_liff_login_verifies_token_and_logs_customer_in(): void
+    {
+        config([
+            'services.line.client_id' => '1234567890',
+            'services.line.liff_id' => '1234567890-demo',
+        ]);
+
+        Http::fake([
+            'api.line.me/oauth2/v2.1/verify' => Http::response([
+                'sub' => 'U123456789',
+                'name' => 'LINE Buyer',
+                'picture' => 'https://example.com/avatar.jpg',
+                'email' => 'buyer@example.com',
+            ]),
+        ]);
+
+        $this->postJson('/auth/line/liff', [
+            'id_token' => 'valid-line-id-token',
+            'profile' => [
+                'userId' => 'U123456789',
+                'displayName' => 'LINE Buyer',
+                'pictureUrl' => 'https://example.com/avatar.jpg',
+            ],
+        ])->assertOk()
+            ->assertJsonPath('redirect', route('profile'));
+
+        $this->assertAuthenticated();
+        $this->assertDatabaseHas('users', [
+            'name' => 'LINE Buyer',
+            'email' => 'buyer@example.com',
+            'provider' => 'line',
+            'provider_id' => 'U123456789',
+        ]);
     }
 
     public function test_order_number_is_human_readable(): void
