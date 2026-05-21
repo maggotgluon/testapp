@@ -9,9 +9,11 @@ class Coupon extends Model
 {
     protected $fillable = [
         'event_id',
+        'ticket_type_id',
         'name',
         'code',
         'discount_type',
+        'discount_scope',
         'discount_value',
         'usage_limit',
         'used_count',
@@ -38,6 +40,48 @@ class Coupon extends Model
             && $subtotal > 0;
     }
 
+    public function eligibleSubtotal($items, $ticketTypes): int
+    {
+        return $items->sum(function ($item) use ($ticketTypes) {
+            $ticketType = $ticketTypes[(int) $item['ticket_type_id']] ?? null;
+
+            if (! $ticketType || ($this->ticket_type_id && $this->ticket_type_id !== $ticketType->id)) {
+                return 0;
+            }
+
+            return $ticketType->price_thb * (int) $item['quantity'];
+        });
+    }
+
+    public function discountForItems($items, $ticketTypes): int
+    {
+        $eligibleSubtotal = $this->eligibleSubtotal($items, $ticketTypes);
+
+        if (! $this->isValidFor($eligibleSubtotal)) {
+            return 0;
+        }
+
+        if ($this->discount_scope === 'item') {
+            return $items->sum(function ($item) use ($ticketTypes) {
+                $ticketType = $ticketTypes[(int) $item['ticket_type_id']] ?? null;
+
+                if (! $ticketType || ($this->ticket_type_id && $this->ticket_type_id !== $ticketType->id)) {
+                    return 0;
+                }
+
+                $lineTotal = $ticketType->price_thb * (int) $item['quantity'];
+
+                if ($this->discount_type === 'percent') {
+                    return min($lineTotal, (int) round($lineTotal * ($this->discount_value / 100)));
+                }
+
+                return min($lineTotal, $this->discount_value * (int) $item['quantity']);
+            });
+        }
+
+        return $this->discountFor($eligibleSubtotal);
+    }
+
     public function discountFor(int $subtotal): int
     {
         if (! $this->isValidFor($subtotal)) {
@@ -54,5 +98,10 @@ class Coupon extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
+    }
+
+    public function ticketType(): BelongsTo
+    {
+        return $this->belongsTo(TicketType::class);
     }
 }

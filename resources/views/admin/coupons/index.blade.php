@@ -9,7 +9,7 @@
                 <a class="flex flex-wrap items-center justify-between gap-4 p-4 hover:bg-white/[0.03]" href="{{ route('admin.coupons.edit', $coupon) }}">
                     <div>
                         <div class="font-semibold text-white">{{ $coupon->code }}</div>
-                        <div class="text-sm text-zinc-400">{{ $coupon->event?->name ?? 'All events' }} · {{ $coupon->discount_type === 'percent' ? $coupon->discount_value.'%' : 'THB '.number_format($coupon->discount_value) }}</div>
+                        <div class="text-sm text-zinc-400">{{ $coupon->event?->name ?? 'All events' }} · {{ $coupon->ticketType?->name ?? 'Any ticket' }} · {{ $coupon->discount_scope === 'item' ? 'per item' : 'per order' }} · {{ $coupon->discount_type === 'percent' ? $coupon->discount_value.'%' : 'THB '.number_format($coupon->discount_value) }}</div>
                     </div>
                     <span class="rounded bg-white/10 px-3 py-1 text-sm {{ $coupon->is_active ? 'text-emerald-200' : 'text-zinc-400' }}">{{ $coupon->is_active ? 'active' : 'inactive' }}</span>
                 </a>

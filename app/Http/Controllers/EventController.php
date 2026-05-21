@@ -13,7 +13,10 @@ class EventController extends Controller
     {
         $events = Event::query()
             ->visible()
-            ->with(['ticketTypes' => fn ($query) => $query->where('status', 'active')])
+            ->with(['ticketTypes' => fn ($query) => $query
+                ->where('status', 'active')
+                ->where(fn ($query) => $query->whereNull('sale_starts_at')->orWhere('sale_starts_at', '<=', now()))
+                ->where(fn ($query) => $query->whereNull('sale_ends_at')->orWhere('sale_ends_at', '>=', now()))])
             ->orderBy('starts_at')
             ->get();
 
@@ -24,7 +27,22 @@ class EventController extends Controller
     {
         abort_if(! $event->is_published || $event->ends_at->isPast(), 404);
 
-        $event->load(['ticketTypes', 'coupons' => fn ($query) => $query->where('is_active', true)]);
+        $event->load([
+            'ticketTypes' => fn ($query) => $query
+                ->where('status', 'active')
+                ->where(fn ($query) => $query->whereNull('sale_starts_at')->orWhere('sale_starts_at', '<=', now()))
+                ->where(fn ($query) => $query->whereNull('sale_ends_at')->orWhere('sale_ends_at', '>=', now())),
+            'coupons' => fn ($query) => $query
+                ->where('is_active', true)
+                ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+                ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>=', now()))
+                ->where(fn ($query) => $query->whereNull('usage_limit')->orWhereColumn('used_count', '<', 'usage_limit')),
+        ]);
+
+        $availableTicketTypeIds = $event->ticketTypes->pluck('id');
+        $event->setRelation('coupons', $event->coupons->filter(
+            fn ($coupon) => $coupon->ticket_type_id === null || $availableTicketTypeIds->contains($coupon->ticket_type_id)
+        )->values());
 
         return view('events.show', compact('event'));
     }

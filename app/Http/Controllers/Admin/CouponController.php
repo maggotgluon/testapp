@@ -14,7 +14,7 @@ class CouponController extends Controller
     public function index(): View
     {
         return view('admin.coupons.index', [
-            'coupons' => Coupon::with('event')->latest()->paginate(20),
+            'coupons' => Coupon::with(['event', 'ticketType'])->latest()->paginate(20),
         ]);
     }
 
@@ -22,7 +22,7 @@ class CouponController extends Controller
     {
         return view('admin.coupons.form', [
             'coupon' => new Coupon,
-            'events' => Event::orderBy('starts_at')->get(),
+            'events' => Event::with('ticketTypes')->orderBy('starts_at')->get(),
         ]);
     }
 
@@ -37,7 +37,7 @@ class CouponController extends Controller
     {
         return view('admin.coupons.form', [
             'coupon' => $coupon,
-            'events' => Event::orderBy('starts_at')->get(),
+            'events' => Event::with('ticketTypes')->orderBy('starts_at')->get(),
         ]);
     }
 
@@ -52,9 +52,11 @@ class CouponController extends Controller
     {
         $data = $request->validate([
             'event_id' => ['nullable', 'exists:events,id'],
+            'ticket_type_id' => ['nullable', 'exists:ticket_types,id'],
             'name' => ['nullable', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:40'],
             'discount_type' => ['required', 'in:fixed,percent'],
+            'discount_scope' => ['required', 'in:order,item'],
             'discount_value' => ['required', 'integer', 'min:1'],
             'usage_limit' => ['nullable', 'integer', 'min:1'],
             'starts_at' => ['nullable', 'date'],

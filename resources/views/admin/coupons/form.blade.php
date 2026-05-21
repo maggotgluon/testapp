@@ -12,9 +12,21 @@
                     <option value="{{ $event->id }}" @selected((string) old('event_id', $coupon->event_id) === (string) $event->id)>{{ $event->name }}</option>
                 @endforeach
             </select></label>
+            <label class="text-sm text-zinc-300 sm:col-span-2">Apply to ticket type<select class="mt-1 w-full rounded-md border border-white/10 bg-zinc-950 px-3 py-2 text-white" name="ticket_type_id">
+                <option value="">Any ticket type</option>
+                @foreach($events as $event)
+                    @foreach($event->ticketTypes as $ticketType)
+                        <option value="{{ $ticketType->id }}" @selected((string) old('ticket_type_id', $coupon->ticket_type_id) === (string) $ticketType->id)>{{ $event->name }} - {{ $ticketType->name }}</option>
+                    @endforeach
+                @endforeach
+            </select></label>
             <label class="text-sm text-zinc-300">Discount type<select class="mt-1 w-full rounded-md border border-white/10 bg-zinc-950 px-3 py-2 text-white" name="discount_type">
                 <option value="fixed" @selected(old('discount_type', $coupon->discount_type ?: 'fixed') === 'fixed')>Fixed THB</option>
                 <option value="percent" @selected(old('discount_type', $coupon->discount_type) === 'percent')>Percent</option>
+            </select></label>
+            <label class="text-sm text-zinc-300">Discount scope<select class="mt-1 w-full rounded-md border border-white/10 bg-zinc-950 px-3 py-2 text-white" name="discount_scope">
+                <option value="order" @selected(old('discount_scope', $coupon->discount_scope ?: 'order') === 'order')>Once per order</option>
+                <option value="item" @selected(old('discount_scope', $coupon->discount_scope) === 'item')>Per ticket item</option>
             </select></label>
             <label class="text-sm text-zinc-300">Discount value<input class="mt-1 w-full rounded-md border border-white/10 bg-zinc-950 px-3 py-2 text-white" type="number" name="discount_value" value="{{ old('discount_value', $coupon->discount_value) }}" required></label>
             <label class="text-sm text-zinc-300">Usage limit<input class="mt-1 w-full rounded-md border border-white/10 bg-zinc-950 px-3 py-2 text-white" type="number" name="usage_limit" value="{{ old('usage_limit', $coupon->usage_limit) }}"></label>

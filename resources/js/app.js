@@ -54,12 +54,71 @@ Alpine.data('scanner', () => ({
 
 Alpine.data('checkout', (config) => ({
     paymentMethod: 'bank_transfer',
+    couponCode: '',
+    slipName: '',
     quantities: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, 0])),
     payment: config.payment,
-    total() {
+    increment(ticketId) {
+        this.quantities[ticketId] = Math.min(20, Number(this.quantities[ticketId] || 0) + 1);
+    },
+    decrement(ticketId) {
+        this.quantities[ticketId] = Math.max(0, Number(this.quantities[ticketId] || 0) - 1);
+    },
+    subtotal() {
         return config.tickets.reduce((sum, ticket) => {
             return sum + (Number(this.quantities[ticket.id] || 0) * Number(ticket.price));
         }, 0);
+    },
+    activeCoupon() {
+        const code = String(this.couponCode || '').trim().toUpperCase();
+
+        if (!code) {
+            return null;
+        }
+
+        return config.coupons.find((coupon) => coupon.code === code) || null;
+    },
+    eligibleSubtotal(coupon) {
+        return config.tickets.reduce((sum, ticket) => {
+            if (coupon.ticket_type_id && Number(coupon.ticket_type_id) !== Number(ticket.id)) {
+                return sum;
+            }
+
+            return sum + (Number(this.quantities[ticket.id] || 0) * Number(ticket.price));
+        }, 0);
+    },
+    discount() {
+        const coupon = this.activeCoupon();
+
+        if (!coupon) {
+            return 0;
+        }
+
+        if (coupon.scope === 'item') {
+            return config.tickets.reduce((sum, ticket) => {
+                if (coupon.ticket_type_id && Number(coupon.ticket_type_id) !== Number(ticket.id)) {
+                    return sum;
+                }
+
+                const quantity = Number(this.quantities[ticket.id] || 0);
+                const lineTotal = quantity * Number(ticket.price);
+                const lineDiscount = coupon.type === 'percent'
+                    ? Math.round(lineTotal * (Number(coupon.value) / 100))
+                    : quantity * Number(coupon.value);
+
+                return sum + Math.min(lineTotal, lineDiscount);
+            }, 0);
+        }
+
+        const eligibleSubtotal = this.eligibleSubtotal(coupon);
+        const discount = coupon.type === 'percent'
+            ? Math.round(eligibleSubtotal * (Number(coupon.value) / 100))
+            : Number(coupon.value);
+
+        return Math.min(eligibleSubtotal, discount);
+    },
+    total() {
+        return Math.max(0, this.subtotal() - this.discount());
     },
     paymentQrUrl() {
         return `/payments/events/${config.eventId}/qr?amount=${this.total()}`;

@@ -57,7 +57,7 @@ class DatabaseSeeder extends Seeder
 
         Coupon::updateOrCreate(
             ['code' => 'EARLYBIRD'],
-            ['event_id' => $event->id, 'name' => 'Early bird launch', 'discount_type' => 'percent', 'discount_value' => 15, 'usage_limit' => 100, 'is_active' => true, 'starts_at' => now()->subDay(), 'expires_at' => now()->addWeeks(2)]
+            ['event_id' => $event->id, 'ticket_type_id' => null, 'name' => 'Early bird launch', 'discount_type' => 'percent', 'discount_scope' => 'order', 'discount_value' => 15, 'usage_limit' => 100, 'is_active' => true, 'starts_at' => now()->subDay(), 'expires_at' => now()->addWeeks(2)]
         );
     }
 }

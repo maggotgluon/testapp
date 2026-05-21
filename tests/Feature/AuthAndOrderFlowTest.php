@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\Coupon;
 use App\Services\QrCodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -117,5 +118,37 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertSee('Event operations')
             ->assertSee('Ticket/check-in status')
             ->assertSee('Orders for this event');
+    }
+
+    public function test_coupon_can_discount_each_ticket_item(): void
+    {
+        $this->seed();
+
+        Coupon::create([
+            'event_id' => 1,
+            'ticket_type_id' => 1,
+            'code' => 'ITEM100',
+            'discount_type' => 'fixed',
+            'discount_scope' => 'item',
+            'discount_value' => 100,
+            'is_active' => true,
+        ]);
+
+        $this->post('/orders', [
+            'customer_name' => 'Demo Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'coupon_code' => 'ITEM100',
+            'items' => [
+                ['ticket_type_id' => 1, 'quantity' => 2],
+                ['ticket_type_id' => 2, 'quantity' => 0],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'subtotal_thb' => 1380,
+            'discount_thb' => 200,
+            'total_thb' => 1180,
+        ]);
     }
 }

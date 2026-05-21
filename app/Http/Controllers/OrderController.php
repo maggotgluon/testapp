@@ -66,8 +66,10 @@ class OrderController extends Controller
                     ->where(fn ($query) => $query->whereNull('event_id')->orWhereIn('event_id', $eventIds))
                     ->first();
                 if ($coupon) {
-                    $discount = $coupon->discountFor($subtotal);
-                    $coupon->increment('used_count');
+                    $discount = $coupon->discountForItems($selected, $ticketTypes);
+                    if ($discount > 0) {
+                        $coupon->increment('used_count');
+                    }
                 }
             }
 

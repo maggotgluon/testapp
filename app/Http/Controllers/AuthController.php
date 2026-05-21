@@ -15,7 +15,10 @@ class AuthController extends Controller
 {
     public function show(): View
     {
-        return view('auth.login');
+        return view('auth.login', [
+            'socialProviders' => collect(['line' => 'LINE', 'facebook' => 'Facebook', 'instagram' => 'Instagram'])
+                ->filter(fn ($label, $provider) => config("services.{$provider}.client_id") && config("services.{$provider}.client_secret")),
+        ]);
     }
 
     public function adminShow(): View
