@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Coupon;
+use App\Models\Event;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Services\QrCodeService;
@@ -24,6 +25,16 @@ class AuthAndOrderFlowTest extends TestCase
             'phone' => '0809166690',
             'provider' => 'guest',
         ])->assertSessionHasErrors('phone');
+    }
+
+    public function test_home_redirects_to_the_event_when_only_one_event_is_visible(): void
+    {
+        $this->seed();
+
+        $event = Event::query()->visible()->firstOrFail();
+
+        $this->get('/')
+            ->assertRedirect(route('events.show', $event, false));
     }
 
     public function test_admin_login_accepts_username_and_phone(): void
@@ -94,6 +105,36 @@ class AuthAndOrderFlowTest extends TestCase
             'provider_id' => 'U123456789',
             'avatar' => 'https://example.com/avatar.jpg',
         ]);
+    }
+
+    public function test_login_page_does_not_show_manual_liff_button(): void
+    {
+        config([
+            'services.line.client_id' => 'line-client',
+            'services.line.client_secret' => 'line-secret',
+            'services.line.liff_id' => 'line-client-demo',
+        ]);
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('LINE')
+            ->assertDontSee('LINE LIFF');
+    }
+
+    public function test_event_checkout_guest_line_button_uses_oauth_flow(): void
+    {
+        $this->seed();
+        config([
+            'services.line.client_id' => 'line-client',
+            'services.line.client_secret' => 'line-secret',
+            'services.line.liff_id' => 'line-client-demo',
+        ]);
+
+        $this->get('/events/1')
+            ->assertOk()
+            ->assertSee('Login with LINE')
+            ->assertSee('/auth/line?redirect=%2Fevents%2F1', false)
+            ->assertDontSee('LINE LIFF');
     }
 
     public function test_order_number_is_human_readable(): void

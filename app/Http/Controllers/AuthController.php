@@ -20,7 +20,6 @@ class AuthController extends Controller
         return view('auth.login', [
             'socialProviders' => collect(['line' => 'LINE', 'facebook' => 'Facebook', 'instagram' => 'Instagram'])
                 ->filter(fn ($label, $provider) => config("services.{$provider}.client_id") && config("services.{$provider}.client_secret")),
-            'lineLiffId' => config('services.line.liff_id'),
         ]);
     }
 
@@ -105,7 +104,7 @@ class AuthController extends Controller
         return redirect()->intended(route('admin.dashboard'))->with('status', 'Welcome back, '.$user->name.'.');
     }
 
-    public function social(string $provider): RedirectResponse
+    public function social(Request $request, string $provider): RedirectResponse
     {
         abort_unless(in_array($provider, ['line', 'facebook', 'instagram'], true), 404);
 
@@ -113,6 +112,10 @@ class AuthController extends Controller
             return redirect()
                 ->route('login')
                 ->with('status', strtoupper($provider).' credentials are not configured yet. Add them to .env to enable real OAuth login.');
+        }
+
+        if ($request->filled('redirect')) {
+            $request->session()->put('url.intended', $this->safeRedirect((string) $request->query('redirect')));
         }
 
         return Socialite::driver($provider)->redirect();
@@ -233,11 +236,11 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return response()->json([
-            'redirect' => $this->safeLiffRedirect($data['redirect'] ?? null),
+            'redirect' => $this->safeRedirect($data['redirect'] ?? null),
         ]);
     }
 
-    private function safeLiffRedirect(?string $redirect): string
+    private function safeRedirect(?string $redirect): string
     {
         if (! $redirect) {
             return route('profile');

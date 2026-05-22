@@ -11,6 +11,10 @@
 }
 
 @layer base {
+    [x-cloak] {
+        display: none !important;
+    }
+
     :root {
         color-scheme: light;
     }

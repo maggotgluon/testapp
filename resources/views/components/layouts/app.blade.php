@@ -24,7 +24,7 @@
         <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
             <a href="{{ route('events.index') }}" class="text-lg font-semibold tracking-tight">TicketFlow</a>
             <nav class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('events.index') }}">Events / อีเวนต์</a>
+                <!-- <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('events.index') }}">Events / อีเวนต์</a> -->
                 <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('orders.lookup') }}">Find order / ค้นหาออเดอร์</a>
                 @auth
                     <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('profile') }}">Profile / โปรไฟล์</a>

@@ -2,18 +2,6 @@
     <div class="mx-auto max-w-xl rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
         <h1 class="text-2xl font-semibold text-zinc-950 dark:text-white">Client login / เข้าสู่ระบบลูกค้า</h1>
         <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Use social login or phone quick login for customers. / เข้าสู่ระบบด้วยโซเชียลหรือชื่อและเบอร์โทร</p>
-        @if($lineLiffId)
-            <div class="mt-5" x-data="lineLiffLogin({
-                liffId: @js($lineLiffId),
-                loginUrl: @js(route('auth.line.liff')),
-                profileUrl: @js(route('profile')),
-            })" x-init="init()">
-                <button type="button" class="flex w-full items-center justify-center rounded-md bg-[#06c755] px-4 py-3 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60" x-bind:disabled="loading" x-on:click="login()">
-                    <span x-text="loading ? 'Connecting to LINE... / กำลังเชื่อมต่อ LINE...' : 'Continue with LINE LIFF / เข้าสู่ระบบด้วย LINE LIFF'"></span>
-                </button>
-                <p class="mt-2 text-sm text-rose-700 dark:text-rose-200" x-show="message" x-text="message"></p>
-            </div>
-        @endif
         @if($socialProviders->isNotEmpty())
             <div class="mt-5 grid gap-3 sm:grid-cols-3" style="grid-template-columns: repeat({{ $socialProviders->count() }}, minmax(0, 1fr));">
                 @foreach($socialProviders as $provider => $label)

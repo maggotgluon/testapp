@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Models\TicketOrder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class EventController extends Controller
 {
-    public function index(): View
+    public function index(): View|RedirectResponse
     {
         $events = Event::query()
             ->visible()
@@ -19,6 +20,10 @@ class EventController extends Controller
                 ->where(fn ($query) => $query->whereNull('sale_ends_at')->orWhere('sale_ends_at', '>=', now()))])
             ->orderBy('starts_at')
             ->get();
+
+        if ($events->count() === 1) {
+            return redirect()->route('events.show', $events->first());
+        }
 
         return view('events.index', compact('events'));
     }
