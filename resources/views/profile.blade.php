@@ -8,14 +8,14 @@
         <div>
             <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">{{ auth()->user()->name }}</h1>
             <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
-                <span>{{ auth()->user()->phone ?: 'No phone yet' }}</span>
-                <span>{{ auth()->user()->email ?: 'No email yet' }}</span>
+                <span>{{ auth()->user()->phone ?: 'No phone yet / ยังไม่มีเบอร์โทร' }}</span>
+                <span>{{ auth()->user()->email ?: 'No email yet / ยังไม่มีอีเมล' }}</span>
                 <span>{{ strtoupper(auth()->user()->provider ?: 'guest') }}</span>
             </div>
         </div>
     </section>
 
-    <h2 class="mt-8 text-2xl font-semibold text-zinc-950 dark:text-white">My orders and tickets</h2>
+    <h2 class="mt-8 text-2xl font-semibold text-zinc-950 dark:text-white">My orders and tickets / ออเดอร์และตั๋วของฉัน</h2>
     <div class="mt-6 grid gap-4">
         @forelse($orders as $order)
             <div class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
@@ -33,7 +33,7 @@
                 </div>
             </div>
         @empty
-            <div class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-8 text-zinc-700 dark:text-zinc-300">No orders yet.</div>
+            <div class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-8 text-zinc-700 dark:text-zinc-300">No orders yet. / ยังไม่มีออเดอร์</div>
         @endforelse
     </div>
 </x-layouts.app>

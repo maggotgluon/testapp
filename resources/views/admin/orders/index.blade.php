@@ -1,5 +1,5 @@
 <x-layouts.app title="Orders">
-    <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">Orders</h1>
+    <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">Orders / ออเดอร์</h1>
     <div class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
         <div class="divide-y divide-white/10">
             @foreach($orders as $order)

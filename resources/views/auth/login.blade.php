@@ -1,7 +1,7 @@
 <x-layouts.app title="Login">
     <div class="mx-auto max-w-xl rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
-        <h1 class="text-2xl font-semibold text-zinc-950 dark:text-white">Client login</h1>
-        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Use social login or phone quick login for customers. Admin users have a separate admin login page.</p>
+        <h1 class="text-2xl font-semibold text-zinc-950 dark:text-white">Client login / เข้าสู่ระบบลูกค้า</h1>
+        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Use social login or phone quick login for customers. / เข้าสู่ระบบด้วยโซเชียลหรือชื่อและเบอร์โทร</p>
         @if($lineLiffId)
             <div class="mt-5" x-data="lineLiffLogin({
                 liffId: @js($lineLiffId),
@@ -9,7 +9,7 @@
                 profileUrl: @js(route('profile')),
             })" x-init="init()">
                 <button type="button" class="flex w-full items-center justify-center rounded-md bg-[#06c755] px-4 py-3 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60" x-bind:disabled="loading" x-on:click="login()">
-                    <span x-text="loading ? 'Connecting to LINE...' : 'Continue with LINE LIFF'"></span>
+                    <span x-text="loading ? 'Connecting to LINE... / กำลังเชื่อมต่อ LINE...' : 'Continue with LINE LIFF / เข้าสู่ระบบด้วย LINE LIFF'"></span>
                 </button>
                 <p class="mt-2 text-sm text-rose-700 dark:text-rose-200" x-show="message" x-text="message"></p>
             </div>
@@ -24,10 +24,10 @@
         <form method="POST" action="{{ route('login.store') }}" class="mt-6 grid gap-4">
             @csrf
             <input type="hidden" name="provider" value="guest">
-            <label class="text-sm text-zinc-700 dark:text-zinc-300">Name<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="name" required></label>
-            <label class="text-sm text-zinc-700 dark:text-zinc-300">Phone<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="phone" required></label>
-            <label class="text-sm text-zinc-700 dark:text-zinc-300">Email <span class="text-zinc-500">(optional)</span><input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="email"></label>
-            <button class="rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950">Continue</button>
+            <label class="text-sm text-zinc-700 dark:text-zinc-300">Name / ชื่อ<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="name" required></label>
+            <label class="text-sm text-zinc-700 dark:text-zinc-300">Phone / เบอร์โทร<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="phone" required></label>
+            <label class="text-sm text-zinc-700 dark:text-zinc-300">Email / อีเมล <span class="text-zinc-500">(optional / ไม่บังคับ)</span><input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="email"></label>
+            <button class="rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950">Continue / ดำเนินการต่อ</button>
         </form>
     </div>
 </x-layouts.app>

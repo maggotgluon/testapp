@@ -7,7 +7,7 @@ Alpine.data('scanner', () => ({
     message: '',
     ok: false,
     async submit(action) {
-        this.message = 'Scanning...';
+        this.message = 'Scanning... / กำลังสแกน...';
 
         const response = await fetch('/admin/scanner', {
             method: 'POST',
@@ -28,7 +28,7 @@ Alpine.data('scanner', () => ({
     async startCamera() {
         if (!('BarcodeDetector' in window)) {
             this.ok = false;
-            this.message = 'Camera barcode detection is not supported in this browser.';
+            this.message = 'Camera barcode detection is not supported in this browser. / เบราว์เซอร์นี้ยังไม่รองรับการสแกนบาร์โค้ดด้วยกล้อง';
             return;
         }
 
@@ -150,7 +150,7 @@ Alpine.data('lineLiffLogin', (config) => ({
             }
         } catch (error) {
             if (!config.auto) {
-                this.message = 'LINE LIFF could not start. Please check the LIFF ID and endpoint URL.';
+                this.message = 'LINE LIFF could not start. Please check the LIFF ID and endpoint URL. / ไม่สามารถเริ่ม LINE LIFF ได้ กรุณาตรวจสอบ LIFF ID และ Endpoint URL';
             }
         }
     },
@@ -195,7 +195,7 @@ Alpine.data('lineLiffLogin', (config) => ({
             const idToken = this.liff.getIDToken();
 
             if (!idToken) {
-                throw new Error('Missing LINE id token.');
+                throw new Error('Missing LINE id token. / ไม่พบ LINE id token');
             }
 
             const profile = await this.liff.getProfile().catch(() => null);
@@ -217,14 +217,14 @@ Alpine.data('lineLiffLogin', (config) => ({
 
             if (!response.ok) {
                 const errors = payload.errors || {};
-                throw new Error(errors.line?.[0] || payload.message || 'LINE login failed.');
+                throw new Error(errors.line?.[0] || payload.message || 'LINE login failed. / เข้าสู่ระบบ LINE ไม่สำเร็จ');
             }
 
             sessionStorage.removeItem('line_liff_login_pending');
             window.location.href = payload.redirect || config.profileUrl;
         } catch (error) {
             this.loading = false;
-            this.message = error.message || 'LINE login failed. Please try again.';
+            this.message = error.message || 'LINE login failed. Please try again. / เข้าสู่ระบบ LINE ไม่สำเร็จ กรุณาลองอีกครั้ง';
         }
     },
 }));

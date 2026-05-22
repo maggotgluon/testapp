@@ -25,12 +25,12 @@
                     <p class="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">{{ $event->description }}</p>
                     <div class="mt-4 flex items-center justify-between text-sm">
                         <span class="text-zinc-700 dark:text-zinc-300">{{ $event->venue }}</span>
-                        <span class="font-semibold text-emerald-600 dark:text-emerald-300">From THB {{ number_format($event->ticketTypes->min('price_thb') ?? 0) }}</span>
+                        <span class="font-semibold text-emerald-600 dark:text-emerald-300">From / เริ่มที่ THB {{ number_format($event->ticketTypes->min('price_thb') ?? 0) }}</span>
                     </div>
                 </div>
             </a>
         @empty
-            <div class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-8 text-zinc-700 dark:text-zinc-300">No published events are on sale right now.</div>
+            <div class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-8 text-zinc-700 dark:text-zinc-300">No published events are on sale right now. / ยังไม่มีอีเวนต์ที่เปิดขายในขณะนี้</div>
         @endforelse
     </div>
 </x-layouts.app>

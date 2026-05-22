@@ -24,20 +24,20 @@
         <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
             <a href="{{ route('events.index') }}" class="text-lg font-semibold tracking-tight">TicketFlow</a>
             <nav class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('events.index') }}">Events</a>
-                <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('orders.lookup') }}">Find order</a>
+                <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('events.index') }}">Events / อีเวนต์</a>
+                <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('orders.lookup') }}">Find order / ค้นหาออเดอร์</a>
                 @auth
-                    <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('profile') }}">Profile</a>
+                    <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('profile') }}">Profile / โปรไฟล์</a>
                     @if(auth()->user()->isAdmin())
-                        <a class="rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('admin.dashboard') }}">Admin</a>
+                        <a class="rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('admin.dashboard') }}">Admin / ผู้ดูแล</a>
                     @endif
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10">Logout</button>
+                        <button class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10">Logout / ออกจากระบบ</button>
                     </form>
                 @else
-                    <a class="rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('login') }}">Login</a>
-                    <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('admin.login') }}">Admin</a>
+                    <a class="rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('login') }}">Login / เข้าสู่ระบบ</a>
+                    <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('admin.login') }}">Admin / ผู้ดูแล</a>
                 @endauth
             </nav>
         </div>
@@ -45,15 +45,15 @@
             @if(auth()->user()->isAdmin() && request()->is('admin*'))
                 <div class="border-t border-zinc-200 dark:border-white/10">
                     <div class="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 text-sm sm:px-6 lg:px-8">
-                        <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.dashboard') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.dashboard') }}">Dashboard</a>
+                        <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.dashboard') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.dashboard') }}">Dashboard / ภาพรวม</a>
                         @if(in_array(auth()->user()->role, ['super_admin', 'event_admin'], true))
-                            <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.events.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.events.index') }}">Events</a>
-                            <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.coupons.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.coupons.index') }}">Coupons</a>
-                            <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.orders.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.orders.index') }}">Orders</a>
+                            <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.events.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.events.index') }}">Events / อีเวนต์</a>
+                            <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.coupons.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.coupons.index') }}">Coupons / คูปอง</a>
+                            <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.orders.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.orders.index') }}">Orders / ออเดอร์</a>
                         @endif
-                        <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.scanner') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.scanner') }}">Scanner</a>
+                        <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.scanner') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.scanner') }}">Scanner / สแกนตั๋ว</a>
                         @if(auth()->user()->role === 'super_admin')
-                            <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.users.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.users.index') }}">Users</a>
+                            <a class="rounded-md px-3 py-2 {{ request()->routeIs('admin.users.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.users.index') }}">Users / ผู้ใช้</a>
                         @endif
                     </div>
                 </div>

@@ -17,14 +17,14 @@
             <span class="rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-200">{{ str_replace('_', ' ', $ticket->status) }}</span>
         </div>
         <div class="mt-6 grid place-items-center rounded-lg bg-white p-5 text-zinc-950">
-            <img class="h-56 w-56" src="{{ route('tickets.qr', $ticket->uuid) }}" alt="Ticket QR code">
+            <img class="h-56 w-56" src="{{ route('tickets.qr', $ticket->uuid) }}" alt="Ticket QR code / QR ตั๋ว">
             <div class="mt-4 font-mono text-xs">{{ $ticket->uuid }}</div>
         </div>
         <dl class="mt-6 grid gap-3 text-sm">
-            <div><dt class="text-zinc-500">Holder</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->holder_name }}</dd></div>
-            <div><dt class="text-zinc-500">Order</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->order->order_number }}</dd></div>
-            <div><dt class="text-zinc-500">Check in</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->checked_in_at?->format('M j, Y H:i') ?? 'Not yet' }}</dd></div>
-            <div><dt class="text-zinc-500">Check out</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->checked_out_at?->format('M j, Y H:i') ?? 'Not yet' }}</dd></div>
+            <div><dt class="text-zinc-500">Holder / ผู้ถือบัตร</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->holder_name }}</dd></div>
+            <div><dt class="text-zinc-500">Order / ออเดอร์</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->order->order_number }}</dd></div>
+            <div><dt class="text-zinc-500">Check in / เช็กอิน</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->checked_in_at?->format('M j, Y H:i') ?? 'Not yet / ยังไม่เช็กอิน' }}</dd></div>
+            <div><dt class="text-zinc-500">Check out / เช็กเอาต์</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->checked_out_at?->format('M j, Y H:i') ?? 'Not yet / ยังไม่เช็กเอาต์' }}</dd></div>
         </dl>
         </div>
     </div>

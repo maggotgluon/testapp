@@ -27,11 +27,11 @@ class ScannerController extends Controller
         $ticket = Ticket::with(['event', 'ticketType'])->where('uuid', $uuid)->first();
 
         if (! $ticket) {
-            return response()->json(['ok' => false, 'message' => 'Ticket not found.'], 404);
+            return response()->json(['ok' => false, 'message' => 'Ticket not found. / ไม่พบตั๋ว'], 404);
         }
 
         if (! in_array($ticket->status, ['approved', 'checked_in'], true)) {
-            return response()->json(['ok' => false, 'message' => 'Ticket is '.$ticket->status.'.'], 422);
+            return response()->json(['ok' => false, 'message' => 'Ticket is '.$ticket->status.'. / สถานะตั๋วคือ '.$ticket->status], 422);
         }
 
         if ($data['action'] === 'check_in') {
@@ -48,7 +48,7 @@ class ScannerController extends Controller
 
         return response()->json([
             'ok' => true,
-            'message' => str_replace('_', ' ', $data['action']).' complete.',
+            'message' => str_replace('_', ' ', $data['action']).' complete. / ทำรายการสำเร็จ',
             'ticket' => [
                 'holder' => $ticket->holder_name,
                 'event' => $ticket->event->name,

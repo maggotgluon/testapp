@@ -37,7 +37,7 @@ class OrderController extends Controller
         $selected = collect($data['items'])->filter(fn ($item) => (int) $item['quantity'] > 0);
 
         if ($selected->isEmpty()) {
-            return back()->withErrors(['items' => 'Please select at least one ticket.'])->withInput();
+            return back()->withErrors(['items' => 'Please select at least one ticket. / กรุณาเลือกตั๋วอย่างน้อย 1 ใบ'])->withInput();
         }
 
         $slipPath = $request->file('slip')?->store('payment-slips', 'uploads');
@@ -54,8 +54,8 @@ class OrderController extends Controller
             $subtotal = 0;
             foreach ($selected as $item) {
                 $ticketType = $ticketTypes[(int) $item['ticket_type_id']];
-                abort_unless($ticketType->isOnSale(), 422, 'Ticket type is not available.');
-                abort_if($ticketType->availableQuantity() < (int) $item['quantity'], 422, 'Not enough tickets available.');
+                abort_unless($ticketType->isOnSale(), 422, 'Ticket type is not available. / ประเภทตั๋วนี้ยังไม่เปิดขาย');
+                abort_if($ticketType->availableQuantity() < (int) $item['quantity'], 422, 'Not enough tickets available. / จำนวนตั๋วไม่เพียงพอ');
                 $subtotal += $ticketType->price_thb * (int) $item['quantity'];
             }
 
@@ -127,7 +127,7 @@ class OrderController extends Controller
             return $order;
         });
 
-        return redirect()->route('orders.show', $order)->with('status', 'Order created. Admin approval will activate tickets.');
+        return redirect()->route('orders.show', $order)->with('status', 'Order created. Admin approval will activate tickets. / สร้างออเดอร์แล้ว รอแอดมินอนุมัติเพื่อเปิดใช้งานตั๋ว');
     }
 
     private function syncCustomerProfile(?User $user, array $data): ?User
