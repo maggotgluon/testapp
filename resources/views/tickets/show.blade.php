@@ -1,5 +1,6 @@
 @php
     $ticketUrl = route('tickets.show', ['uuid' => $ticket->uuid, 'phone' => $ticket->holder_phone]);
+    $ticketIsActive = $ticket->order->status === 'approved' && in_array($ticket->status, ['approved', 'checked_in', 'checked_out'], true);
     $calendarUrl = 'https://calendar.google.com/calendar/render?'.http_build_query([
         'action' => 'TEMPLATE',
         'text' => $ticket->event->name,
@@ -32,10 +33,17 @@
             </div>
             <span class="rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-200">{{ str_replace('_', ' ', $ticket->status) }}</span>
         </div>
-        <div class="mt-6 grid place-items-center rounded-lg bg-white p-5 text-zinc-950">
-            <img class="h-56 w-56" src="{{ route('tickets.qr', $ticket->uuid) }}" alt="Ticket QR code / QR ตั๋ว">
-            <div class="mt-4 font-mono text-xs">{{ $ticket->uuid }}</div>
-        </div>
+        @if($ticketIsActive)
+            <div class="mt-6 grid place-items-center rounded-lg bg-white p-5 text-zinc-950">
+                <img class="h-56 w-56" src="{{ route('tickets.qr', $ticket->uuid) }}" alt="Ticket QR code / QR ตั๋ว">
+                <div class="mt-4 font-mono text-xs">{{ $ticket->uuid }}</div>
+            </div>
+        @else
+            <div class="mt-6 rounded-lg border border-amber-400/30 bg-amber-400/10 p-5 text-amber-900 dark:text-amber-100">
+                <div class="text-lg font-semibold">Ticket not active yet / ตั๋วยังไม่พร้อมใช้งาน</div>
+                <p class="mt-2 text-sm">QR code will show after payment is approved. Current status: {{ str_replace('_', ' ', $ticket->order->status) }} / {{ str_replace('_', ' ', $ticket->status) }}.</p>
+            </div>
+        @endif
         <dl class="mt-6 grid gap-3 text-sm">
             <div><dt class="text-zinc-500">Holder / ผู้ถือบัตร</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->holder_name }}</dd></div>
             <div><dt class="text-zinc-500">Location / ที่ตั้ง</dt><dd class="text-zinc-950 dark:text-white">

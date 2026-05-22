@@ -131,7 +131,13 @@ class OrderController extends Controller
             return $order;
         });
 
-        return redirect()->route('orders.show', $order)->with('status', 'Order created. Admin approval will activate tickets. / สร้างออเดอร์แล้ว รอแอดมินอนุมัติเพื่อเปิดใช้งานตั๋ว');
+        $parameters = ['order' => $order];
+
+        if (! $request->user()) {
+            $parameters['phone'] = $order->customer_phone;
+        }
+
+        return redirect()->route('orders.show', $parameters)->with('status', 'Order created. Admin approval will activate tickets. / สร้างออเดอร์แล้ว รอแอดมินอนุมัติเพื่อเปิดใช้งานตั๋ว');
     }
 
     private function syncCustomerProfile(?User $user, array $data): ?User

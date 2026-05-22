@@ -56,9 +56,12 @@ Alpine.data('checkout', (config) => ({
     paymentMethod: 'qr_payment',
     couponCode: '',
     slipName: '',
+    errorMessage: '',
+    customerName: config.customerName || '',
     tickets: config.tickets,
     quantities: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, 0])),
     holderNames: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, []])),
+    holderTouched: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, []])),
     payment: config.payment,
     increment(ticketId) {
         this.quantities[ticketId] = Math.min(20, Number(this.quantities[ticketId] || 0) + 1);
@@ -71,9 +74,26 @@ Alpine.data('checkout', (config) => ({
     syncHolderNames(ticketId) {
         const quantity = Number(this.quantities[ticketId] || 0);
         this.holderNames[ticketId] = this.holderNames[ticketId] || [];
+        this.holderTouched[ticketId] = this.holderTouched[ticketId] || [];
         while (this.holderNames[ticketId].length < quantity) {
-            this.holderNames[ticketId].push('');
+            this.holderNames[ticketId].push(this.customerName);
+            this.holderTouched[ticketId].push(false);
         }
+    },
+    syncDefaultHolderNames() {
+        this.tickets.forEach((ticket) => {
+            this.syncHolderNames(ticket.id);
+            this.holderNames[ticket.id].forEach((name, index) => {
+                if (!this.holderTouched[ticket.id][index] || !String(name || '').trim()) {
+                    this.holderNames[ticket.id][index] = this.customerName;
+                    this.holderTouched[ticket.id][index] = false;
+                }
+            });
+        });
+    },
+    markHolderTouched(ticketId, index) {
+        this.holderTouched[ticketId] = this.holderTouched[ticketId] || [];
+        this.holderTouched[ticketId][index] = true;
     },
     holderSlots(ticketId) {
         this.syncHolderNames(ticketId);
@@ -93,6 +113,12 @@ Alpine.data('checkout', (config) => ({
         }
 
         return config.coupons.find((coupon) => coupon.code === code) || null;
+    },
+    applicableCoupons() {
+        return config.coupons.filter((coupon) => this.eligibleSubtotal(coupon) > 0);
+    },
+    applyCoupon(code) {
+        this.couponCode = String(code || '').trim().toUpperCase();
     },
     eligibleSubtotal(coupon) {
         return config.tickets.reduce((sum, ticket) => {
@@ -139,7 +165,57 @@ Alpine.data('checkout', (config) => ({
     paymentQrUrl() {
         return `/payments/events/${config.eventId}/qr?amount=${this.total()}`;
     },
+    prepareSubmit(event) {
+        this.errorMessage = '';
+        this.syncDefaultHolderNames();
+
+        if (this.subtotal() <= 0) {
+            event.preventDefault();
+            this.errorMessage = 'Please select at least one ticket. / กรุณาเลือกตั๋วอย่างน้อย 1 ใบ';
+            return;
+        }
+
+        if (!event.target.reportValidity()) {
+            event.preventDefault();
+            this.errorMessage = 'Please complete all required fields. / กรุณากรอกข้อมูลที่จำเป็นให้ครบ';
+        }
+    },
 }));
+
+Alpine.data('adminTicketTypes', (config) => {
+    const blankRow = () => ({
+        id: '',
+        name: '',
+        description: '',
+        price_thb: 0,
+        capacity: 0,
+        sale_starts_at: '',
+        sale_ends_at: '',
+        status: 'active',
+    });
+
+    return {
+        rows: config.rows.length ? config.rows : [blankRow(), blankRow()],
+        inactiveIds: [],
+        blankRow,
+        addRow() {
+            this.rows.push(this.blankRow());
+        },
+        removeRow(index) {
+            const row = this.rows[index];
+
+            if (row?.id) {
+                this.inactiveIds.push(row.id);
+            }
+
+            this.rows.splice(index, 1);
+
+            if (this.rows.length === 0) {
+                this.addRow();
+            }
+        },
+    };
+});
 
 Alpine.data('lineLiffLogin', (config) => ({
     loading: false,

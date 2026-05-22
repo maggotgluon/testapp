@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\TicketOrder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,8 +16,19 @@ use Illuminate\View\View;
 
 class AuthController extends Controller
 {
-    public function show(): View
+    public function show(Request $request): View
     {
+        if ($request->filled('redirect')) {
+            $request->session()->put('url.intended', $this->safeRedirect((string) $request->query('redirect')));
+        }
+
+        if ($request->filled(['claim_order', 'phone'])) {
+            $request->session()->put('claim_order', [
+                'id' => (int) $request->query('claim_order'),
+                'phone' => (string) $request->query('phone'),
+            ]);
+        }
+
         return view('auth.login', [
             'socialProviders' => collect(['line' => 'LINE', 'facebook' => 'Facebook', 'instagram' => 'Instagram'])
                 ->filter(fn ($label, $provider) => config("services.{$provider}.client_id") && config("services.{$provider}.client_secret")),
@@ -71,6 +83,7 @@ class AuthController extends Controller
         ]);
 
         Auth::login($user, true);
+        $this->attachGuestOrdersToUser($user);
 
         return redirect()->intended(route('profile'))->with('status', 'Welcome back.');
     }
@@ -118,10 +131,17 @@ class AuthController extends Controller
             $request->session()->put('url.intended', $this->safeRedirect((string) $request->query('redirect')));
         }
 
+        if ($request->filled(['claim_order', 'phone'])) {
+            $request->session()->put('claim_order', [
+                'id' => (int) $request->query('claim_order'),
+                'phone' => (string) $request->query('phone'),
+            ]);
+        }
+
         return Socialite::driver($provider)->redirect();
     }
 
-    public function socialCallback(string $provider): RedirectResponse
+    public function socialCallback(Request $request, string $provider): RedirectResponse
     {
         abort_unless(in_array($provider, ['line', 'facebook', 'instagram'], true), 404);
 
@@ -157,6 +177,7 @@ class AuthController extends Controller
         ]);
 
         Auth::login($user, true);
+        $this->attachGuestOrdersToUser($user, $request);
 
         return redirect()->intended(route('profile'))->with('status', 'Logged in with '.strtoupper($provider).'.');
     }
@@ -234,10 +255,57 @@ class AuthController extends Controller
 
         Auth::login($user, true);
         $request->session()->regenerate();
+        $this->attachGuestOrdersToUser($user, $request);
 
         return response()->json([
             'redirect' => $this->safeRedirect($data['redirect'] ?? null),
         ]);
+    }
+
+    private function attachGuestOrdersToUser(User $user, ?Request $request = null): void
+    {
+        if ($user->isAdmin()) {
+            return;
+        }
+
+        $claim = $request?->session()->pull('claim_order');
+
+        if ($claim && ! empty($claim['id']) && ! empty($claim['phone'])) {
+            $order = TicketOrder::query()
+                ->whereKey($claim['id'])
+                ->where('customer_phone', $claim['phone'])
+                ->whereNull('user_id')
+                ->first();
+
+            if ($order) {
+                $order->update(['user_id' => $user->id]);
+                $order->tickets()->update(['user_id' => $user->id]);
+            }
+        }
+
+        if ($user->phone) {
+            $orders = TicketOrder::query()
+                ->whereNull('user_id')
+                ->where('customer_phone', $user->phone)
+                ->get();
+
+            foreach ($orders as $order) {
+                $order->update(['user_id' => $user->id]);
+                $order->tickets()->update(['user_id' => $user->id]);
+            }
+        }
+
+        if ($user->email) {
+            $orders = TicketOrder::query()
+                ->whereNull('user_id')
+                ->where('customer_email', $user->email)
+                ->get();
+
+            foreach ($orders as $order) {
+                $order->update(['user_id' => $user->id]);
+                $order->tickets()->update(['user_id' => $user->id]);
+            }
+        }
     }
 
     private function safeRedirect(?string $redirect): string

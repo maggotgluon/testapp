@@ -160,6 +160,73 @@ class AuthAndOrderFlowTest extends TestCase
         $this->assertMatchesRegularExpression('/^[A-Z0-9]{3,4}-'.now()->format('md').'-001$/', $order->order_number);
     }
 
+    public function test_guest_order_redirect_includes_lookup_phone_and_confirmation_guidance(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Guest Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+
+        $this->get('/orders/'.$order->id.'?phone=0812345678')
+            ->assertOk()
+            ->assertSee($order->order_number)
+            ->assertSee('Save this order to your account')
+            ->assertSee('claim_order='.$order->id, false);
+    }
+
+    public function test_guest_order_can_be_attached_after_customer_login(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Guest Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+
+        $this->get('/login?'.http_build_query([
+            'redirect' => '/orders/'.$order->id.'?phone=0812345678',
+            'claim_order' => $order->id,
+            'phone' => '0812345678',
+        ]))->assertOk();
+
+        $this->post('/login', [
+            'name' => 'Guest Buyer',
+            'phone' => '0812345678',
+            'provider' => 'guest',
+        ])->assertRedirect('/orders/'.$order->id.'?phone=0812345678');
+
+        $user = User::where('phone', '0812345678')->firstOrFail();
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'id' => $order->id,
+            'user_id' => $user->id,
+        ]);
+        $this->assertDatabaseHas('tickets', [
+            'ticket_order_id' => $order->id,
+            'user_id' => $user->id,
+        ]);
+    }
+
     public function test_event_page_renders_social_meta_and_optional_links(): void
     {
         $this->seed();
@@ -209,6 +276,61 @@ class AuthAndOrderFlowTest extends TestCase
 
         $this->assertDatabaseHas('tickets', ['holder_name' => 'Guest One']);
         $this->assertDatabaseHas('tickets', ['holder_name' => 'Guest Two']);
+    }
+
+    public function test_checkout_uses_buyer_name_when_ticket_holder_is_blank(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Main Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'items' => [
+                [
+                    'ticket_type_id' => $ticketType->id,
+                    'quantity' => 1,
+                    'holders' => [''],
+                ],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('tickets', ['holder_name' => 'Main Buyer']);
+    }
+
+    public function test_pending_ticket_hides_qr_until_payment_is_approved(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Pending Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::with('tickets')->firstOrFail();
+        $ticket = $order->tickets->first();
+
+        $this->get('/tickets/'.$ticket->uuid.'?phone=0812345678')
+            ->assertOk()
+            ->assertSee('Ticket not active yet')
+            ->assertDontSee('/tickets/'.$ticket->uuid.'/qr', false);
+
+        $order->update(['status' => 'approved']);
+        $ticket->update(['status' => 'approved']);
+
+        $this->get('/tickets/'.$ticket->uuid.'?phone=0812345678')
+            ->assertOk()
+            ->assertSee('/tickets/'.$ticket->uuid.'/qr', false);
     }
 
     public function test_promptpay_payment_payload_matches_emv_format(): void
@@ -306,6 +428,57 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertSee('Select bank / เลือกธนาคาร')
             ->assertSee('Krungthai Bank / ธนาคารกรุงไทย')
             ->assertSee('ktb.svg', false);
+    }
+
+    public function test_event_admin_can_add_and_remove_ticket_types(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'eventadmin')->firstOrFail();
+        $event = Event::firstOrFail();
+        $ticketType = $event->ticketTypes()->firstOrFail();
+
+        $this->actingAs($admin)
+            ->put('/admin/events/'.$event->id, [
+                'name' => $event->name,
+                'description' => $event->description,
+                'social_description' => $event->social_description,
+                'venue' => $event->venue,
+                'location' => $event->location,
+                'location_url' => $event->location_url,
+                'hosted_by' => $event->hosted_by,
+                'hosted_by_url' => $event->hosted_by_url,
+                'starts_at' => $event->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $event->ends_at->format('Y-m-d H:i:s'),
+                'is_published' => '1',
+                'bank_name' => $event->bank_name,
+                'bank_account_name' => $event->bank_account_name,
+                'bank_account_number' => $event->bank_account_number,
+                'qr_payment_account_name' => $event->qr_payment_account_name,
+                'qr_payment_account' => $event->qr_payment_account,
+                'payment_instructions' => $event->payment_instructions,
+                'inactive_ticket_type_ids' => [$ticketType->id],
+                'tickets' => [
+                    [
+                        'name' => 'Door ticket',
+                        'description' => 'At-door admission',
+                        'price_thb' => 599,
+                        'capacity' => 25,
+                        'status' => 'active',
+                    ],
+                ],
+            ])
+            ->assertRedirect('/admin/events');
+
+        $this->assertDatabaseHas('ticket_types', [
+            'id' => $ticketType->id,
+            'status' => 'inactive',
+        ]);
+        $this->assertDatabaseHas('ticket_types', [
+            'event_id' => $event->id,
+            'name' => 'Door ticket',
+            'status' => 'active',
+        ]);
     }
 
     public function test_event_admin_can_email_approved_attendees_with_email(): void

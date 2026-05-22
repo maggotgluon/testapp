@@ -36,7 +36,10 @@ class EventController extends Controller
 
     public function edit(Event $event): View
     {
-        return view('admin.events.form', ['event' => $event, 'ticketTypes' => $event->ticketTypes]);
+        return view('admin.events.form', [
+            'event' => $event,
+            'ticketTypes' => $event->ticketTypes()->where('status', '!=', 'inactive')->get(),
+        ]);
     }
 
     public function overview(Event $event, Request $request): View
@@ -212,6 +215,18 @@ class EventController extends Controller
 
     private function syncTicketTypes(Request $request, Event $event): void
     {
+        $inactiveIds = collect($request->input('inactive_ticket_type_ids', []))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($inactiveIds->isNotEmpty()) {
+            $event->ticketTypes()
+                ->whereIn('id', $inactiveIds)
+                ->update(['status' => 'inactive']);
+        }
+
         foreach ($request->input('tickets', []) as $ticket) {
             if (empty($ticket['name'])) {
                 continue;

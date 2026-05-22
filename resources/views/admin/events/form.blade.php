@@ -54,24 +54,44 @@
                 </div>
             </div>
         </section>
-        <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
+        @php
+            $ticketRows = collect(old('tickets', $ticketTypes->map(fn ($ticket) => [
+                'id' => $ticket->id,
+                'name' => $ticket->name,
+                'description' => $ticket->description,
+                'price_thb' => $ticket->price_thb,
+                'capacity' => $ticket->capacity,
+                'sale_starts_at' => $ticket->sale_starts_at?->format('Y-m-d\TH:i'),
+                'sale_ends_at' => $ticket->sale_ends_at?->format('Y-m-d\TH:i'),
+                'status' => $ticket->status,
+            ])->values()->all()))->values();
+        @endphp
+        <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6" x-data="adminTicketTypes({ rows: @js($ticketRows) })">
             <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Ticket types / ประเภทตั๋ว</h2>
-            @php($rows = $ticketTypes->count() ? $ticketTypes : collect([null, null]))
+            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Add rows for new ticket types. Remove existing rows to hide them from sale without deleting old orders. / เพิ่มแถวสำหรับประเภทตั๋วใหม่ ลบแถวเดิมเพื่อปิดขายโดยไม่ลบออเดอร์เก่า</p>
+            <template x-for="id in inactiveIds" :key="`inactive-${id}`">
+                <input type="hidden" name="inactive_ticket_type_ids[]" :value="id">
+            </template>
             <div class="mt-4 grid gap-4">
-                @foreach($rows as $i => $ticket)
+                <template x-for="(ticket, index) in rows" :key="ticket.id || `new-${index}`">
                     <div class="rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4">
-                        <input type="hidden" name="tickets[{{ $i }}][id]" value="{{ $ticket?->id }}">
-                        <label class="text-sm text-zinc-700 dark:text-zinc-300">Type / ประเภท<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="tickets[{{ $i }}][name]" value="{{ $ticket?->name }}"></label>
-                        <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Price THB / ราคา<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="number" name="tickets[{{ $i }}][price_thb]" value="{{ $ticket?->price_thb ?? 0 }}"></label>
-                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Capacity / จำนวนจำกัด<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="number" name="tickets[{{ $i }}][capacity]" value="{{ $ticket?->capacity ?? 0 }}"></label>
-                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Sale starts / เริ่มขาย<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" name="tickets[{{ $i }}][sale_starts_at]" value="{{ $ticket?->sale_starts_at?->format('Y-m-d\TH:i') }}"></label>
-                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Sale ends / สิ้นสุดขาย<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" name="tickets[{{ $i }}][sale_ends_at]" value="{{ $ticket?->sale_ends_at?->format('Y-m-d\TH:i') }}"></label>
+                        <input type="hidden" :name="`tickets[${index}][id]`" x-model="ticket.id">
+                        <input type="hidden" :name="`tickets[${index}][status]`" value="active">
+                        <div class="flex items-start justify-between gap-3">
+                            <label class="flex-1 text-sm text-zinc-700 dark:text-zinc-300">Type / ประเภท<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`tickets[${index}][name]`" x-model="ticket.name"></label>
+                            <button class="mt-6 rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:text-rose-200" type="button" @click="removeRow(index)">Remove / ลบ</button>
                         </div>
-                        <label class="mt-3 block text-sm text-zinc-700 dark:text-zinc-300">Description / รายละเอียด<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="tickets[{{ $i }}][description]" rows="2">{{ $ticket?->description }}</textarea></label>
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Price THB / ราคา<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="number" :name="`tickets[${index}][price_thb]`" x-model="ticket.price_thb"></label>
+                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Capacity / จำนวนจำกัด<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="number" :name="`tickets[${index}][capacity]`" x-model="ticket.capacity"></label>
+                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Sale starts / เริ่มขาย<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" :name="`tickets[${index}][sale_starts_at]`" x-model="ticket.sale_starts_at"></label>
+                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Sale ends / สิ้นสุดขาย<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" :name="`tickets[${index}][sale_ends_at]`" x-model="ticket.sale_ends_at"></label>
+                        </div>
+                        <label class="mt-3 block text-sm text-zinc-700 dark:text-zinc-300">Description / รายละเอียด<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`tickets[${index}][description]`" rows="2" x-model="ticket.description"></textarea></label>
                     </div>
-                @endforeach
+                </template>
             </div>
+            <button class="mt-5 w-full rounded-md border border-zinc-200 dark:border-white/10 px-4 py-3 font-semibold text-zinc-800 dark:text-zinc-100 hover:border-emerald-300" type="button" @click="addRow()">Add ticket type / เพิ่มประเภทตั๋ว</button>
             <button class="mt-5 w-full rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950">Save event / บันทึกอีเวนต์</button>
         </section>
     </form>

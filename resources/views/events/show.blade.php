@@ -57,7 +57,7 @@
             </div>
         </section>
 
-        <form method="POST" action="{{ route('orders.store') }}" enctype="multipart/form-data" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5" x-data="checkout({
+        <form method="POST" action="{{ route('orders.store') }}" enctype="multipart/form-data" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5" @submit="prepareSubmit($event)" x-data="checkout({
             eventId: {{ $event->id }},
             tickets: @js($checkoutTickets),
             coupons: @js($checkoutCoupons),
@@ -72,6 +72,7 @@
                 'bank_logo' => $bank ? asset($bank['logo']) : null,
                 'bank_display_name' => $bank ? $bank['name'].' / '.$bank['thai_name'] : $event->bank_name,
             ]),
+            customerName: @js(auth()->user()->name ?? old('customer_name', '')),
         })">
             @csrf
             @guest
@@ -101,7 +102,7 @@
                             <div class="grid grid-cols-[40px_64px_40px] overflow-hidden rounded-md border border-zinc-200 dark:border-white/10">
                                 <button class="bg-white dark:bg-zinc-950 px-3 py-2 text-lg text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="decrement({{ $ticket->id }})">-</button>
                                 <input class="w-16 border-x border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-2 py-2 text-center text-zinc-950 dark:text-white" name="items[{{ $loop->index }}][quantity]" 
-                                    type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]">
+                                    type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]" @input="syncHolderNames({{ $ticket->id }})">
                                 <button class="bg-white dark:bg-zinc-950 px-3 py-2 text-lg text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="increment({{ $ticket->id }})">+</button>
                             </div>
                         </div>
@@ -117,10 +118,11 @@
             <div class="mt-5 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4 text-sm text-zinc-700 dark:text-zinc-300" x-cloak x-show="subtotal() === 0">
                 Select at least one ticket to continue. <br> กรุณาเลือกตั๋วอย่างน้อย 1 ใบเพื่อดำเนินการต่อ
             </div>
+            <div class="mt-4 rounded-md border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-800 dark:text-rose-100" x-cloak x-show="errorMessage" x-text="errorMessage"></div>
 
             <div x-cloak x-show="subtotal() > 0" x-transition>
                 <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                    <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Name / ชื่อ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_name" value="{{ auth()->user()->name ?? old('customer_name') }}" required></label>
+                    <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Name / ชื่อ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_name" x-model="customerName" @input="syncDefaultHolderNames()" required></label>
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Phone / เบอร์โทร <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_phone" value="{{ auth()->user()->phone ?? old('customer_phone') }}" required></label>
                     <label class="text-sm text-zinc-700 dark:text-zinc-300">Email / อีเมล<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="customer_email" value="{{ auth()->user()->email ?? old('customer_email') }}"></label>
                     @if($event->coupons->isNotEmpty())
@@ -128,16 +130,16 @@
                     @endif
                 </div>
                 
-                                @if($event->coupons->isNotEmpty())
-                                    <div class="mt-4 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4 text-sm text-zinc-700 dark:text-zinc-300">
-                                        <div class="font-medium text-zinc-950 dark:text-white">Available coupons / คูปองที่ใช้ได้</div>
-                                        <div class="mt-2 flex flex-wrap gap-2">
-                                            @foreach($event->coupons as $coupon)
-                                                <span class="rounded bg-zinc-100 dark:bg-white/10 px-2 py-1 font-mono text-xs text-emerald-700 dark:text-emerald-200">{{ $coupon->code }}</span>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
+                @if($event->coupons->isNotEmpty())
+                    <div class="mt-4 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4 text-sm text-zinc-700 dark:text-zinc-300" x-cloak x-show="applicableCoupons().length > 0">
+                        <div class="font-medium text-zinc-950 dark:text-white">Available coupons / คูปองที่ใช้ได้</div>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <template x-for="coupon in applicableCoupons()" :key="coupon.code">
+                                <button class="rounded bg-zinc-100 dark:bg-white/10 px-2 py-1 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/20" type="button" @click="applyCoupon(coupon.code)" x-text="coupon.code"></button>
+                            </template>
+                        </div>
+                    </div>
+                @endif
 
                 <div class="mt-5 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4">
                     <h3 class="font-semibold text-zinc-950 dark:text-white">Ticket holders / ชื่อผู้ถือบัตร</h3>
@@ -149,7 +151,7 @@
                                 <template x-for="index in holderSlots(ticket.id)" :key="`${ticket.id}-${index}`">
                                     <label class="text-sm text-zinc-700 dark:text-zinc-300">
                                         <span x-text="`Holder ${index + 1} / ผู้ถือบัตร ${index + 1}`"></span>
-                                        <input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`items[${ticket.itemIndex}][holders][${index}]`" x-model="holderNames[ticket.id][index]" placeholder="Use buyer name / ใช้ชื่อผู้ซื้อ">
+                                        <input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`items[${ticket.itemIndex}][holders][${index}]`" x-model="holderNames[ticket.id][index]" @input="markHolderTouched(ticket.id, index)" placeholder="Use buyer name / ใช้ชื่อผู้ซื้อ" required>
                                     </label>
                                 </template>
                             </div>
@@ -198,7 +200,7 @@
 
                 <div class="mt-4 grid gap-4 sm:grid-cols-2">
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Payment method / วิธีชำระเงิน <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
-                    <select class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_method" x-model="paymentMethod">
+                    <select class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_method" x-model="paymentMethod" required>
                         <option value="qr_payment">QR payment / ชำระด้วย QR</option>
                         <option value="bank_transfer">Direct bank transfer / โอนผ่านธนาคาร</option>
                     </select></label>
