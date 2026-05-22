@@ -92,6 +92,7 @@ class AuthAndOrderFlowTest extends TestCase
             'email' => 'buyer@example.com',
             'provider' => 'line',
             'provider_id' => 'U123456789',
+            'avatar' => 'https://example.com/avatar.jpg',
         ]);
     }
 
@@ -121,6 +122,45 @@ class AuthAndOrderFlowTest extends TestCase
         $payload = app(QrCodeService::class)->promptPayPayload('081-234-5678', 123);
 
         $this->assertSame('00020101021229370016A000000677010111011300668123456785802TH53037645406123.006304B598', $payload);
+    }
+
+    public function test_ticket_qr_payload_is_only_ticket_uuid(): void
+    {
+        $ticket = new \App\Models\Ticket(['uuid' => 'ticket-uuid-123']);
+
+        $this->assertSame('ticket-uuid-123', app(QrCodeService::class)->ticketPayload($ticket));
+    }
+
+    public function test_checkout_updates_logged_in_customer_profile(): void
+    {
+        $this->seed();
+        $user = User::factory()->create([
+            'name' => 'Old Name',
+            'phone' => null,
+            'email' => null,
+            'role' => 'customer',
+        ]);
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->actingAs($user)
+            ->post('/orders', [
+                'customer_name' => 'Updated Buyer',
+                'customer_phone' => '0811111111',
+                'customer_email' => 'updated@example.com',
+                'payment_method' => 'bank_transfer',
+                'items' => [
+                    ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+                ],
+            ])->assertRedirect();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'name' => 'Updated Buyer',
+            'phone' => '0811111111',
+            'email' => 'updated@example.com',
+        ]);
     }
 
     public function test_super_admin_can_manage_user_roles(): void

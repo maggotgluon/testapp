@@ -49,6 +49,28 @@
             ]),
         })">
             @csrf
+            @guest
+                @if(config('services.line.liff_id'))
+                    <div class="mb-5 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4" x-data="lineLiffLogin({
+                        liffId: @js(config('services.line.liff_id')),
+                        loginUrl: @js(route('auth.line.liff')),
+                        profileUrl: @js(request()->fullUrl()),
+                        redirectUrl: @js(request()->fullUrl()),
+                    })" x-init="init()">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <div class="font-semibold text-emerald-950 dark:text-emerald-50">Buy faster with LINE</div>
+                                <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-100">Login with LINE to save your tickets to your profile automatically.</p>
+                            </div>
+                            <button type="button" class="rounded-md bg-[#06c755] px-4 py-2 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60" x-bind:disabled="loading" x-on:click="login()">
+                                <span x-text="loading ? 'Connecting...' : 'Login with LINE'"></span>
+                            </button>
+                        </div>
+                        <p class="mt-2 text-sm text-rose-700 dark:text-rose-200" x-show="message" x-text="message"></p>
+                    </div>
+                @endif
+            @endguest
+
             <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Choose tickets</h2>
             <div class="mt-4 grid gap-3">
                 @forelse($event->ticketTypes as $ticket)
@@ -56,7 +78,6 @@
                         <div class="flex items-center justify-between gap-4">
                             <div>
                                 <h3 class="font-semibold text-zinc-950 dark:text-white">{{ $ticket->name }}</h3>
-                                <p class="text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->description }}</p>
                                 <p class="mt-1 text-sm text-emerald-600 dark:text-emerald-300">THB {{ number_format($ticket->price_thb) }}</p>
                             </div>
                             <input type="hidden" name="items[{{ $loop->index }}][ticket_type_id]" value="{{ $ticket->id }}">
@@ -65,6 +86,9 @@
                                 <input class="w-16 border-x border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-2 py-2 text-center text-zinc-950 dark:text-white" name="items[{{ $loop->index }}][quantity]" type="number" min="0" max="20" value="0" x-model.number="quantities[{{ $ticket->id }}]">
                                 <button class="bg-white dark:bg-zinc-950 px-3 py-2 text-lg text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="increment({{ $ticket->id }})">+</button>
                             </div>
+                        </div>
+                        <div>
+                        <p class="text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->description }}</p>
                         </div>
                     </div>
                 @empty
@@ -92,17 +116,6 @@
                 </div>
             @endif
 
-            <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Payment method <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required</span><select class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_method" x-model="paymentMethod"><option value="bank_transfer">Direct bank transfer</option><option value="qr_payment">QR payment</option></select></label>
-                <div class="text-sm text-zinc-700 dark:text-zinc-300">
-                    Payment slip
-                    <label class="mt-1 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-emerald-400/50 bg-white dark:bg-zinc-950 px-3 py-2 font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/10">
-                        <input class="sr-only" name="slip" type="file" accept="image/*" @change="slipName = $event.target.files[0]?.name || ''">
-                        Attach payment slip
-                    </label>
-                    <p class="mt-1 truncate text-xs text-zinc-500" x-text="slipName || 'No file attached yet'"></p>
-                </div>
-            </div>
             <div class="mt-5 rounded-md border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
                 <div class="flex items-center justify-between gap-3">
                     <strong x-text="paymentMethod === 'qr_payment' ? 'QR payment' : 'Bank transfer'"></strong>
@@ -135,6 +148,22 @@
                     </div>
                 </template>
                 <p class="mt-3 text-emerald-800 dark:text-emerald-100" x-text="payment.instructions || 'Upload your payment slip after transfer. Admin approval will activate tickets.'"></p>
+            </div>
+
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Payment method <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required</span>
+                <select class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_method" x-model="paymentMethod">
+                    <option value="qr_payment">QR payment</option>
+                    <option value="bank_transfer">Direct bank transfer</option>
+                </select></label>
+                <div class="text-sm text-zinc-700 dark:text-zinc-300">
+                    Payment slip
+                    <label class="mt-1 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-emerald-400/50 bg-white dark:bg-zinc-950 px-3 py-2 font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/10">
+                        <input class="sr-only" name="slip" type="file" accept="image/*" @change="slipName = $event.target.files[0]?.name || ''">
+                        Attach payment slip
+                    </label>
+                    <p class="mt-1 truncate text-xs text-zinc-500" x-text="slipName || 'No file attached yet'"></p>
+                </div>
             </div>
             <label class="mt-4 block text-sm text-zinc-700 dark:text-zinc-300">Payment note<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_note" rows="3"></textarea></label>
             <button class="mt-5 w-full rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950 hover:bg-emerald-300">Submit order</button>

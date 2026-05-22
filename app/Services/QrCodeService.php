@@ -40,7 +40,7 @@ class QrCodeService
 
     public function ticketPayload(Ticket $ticket): string
     {
-        return route('tickets.show', ['uuid' => $ticket->uuid]);
+        return $ticket->uuid;
     }
 
     public function paymentPayload(Event $event, int $amountThb): string

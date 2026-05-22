@@ -1,12 +1,12 @@
 <x-layouts.app title="Events">
     <section class="mb-8 grid gap-6 lg:grid-cols-[1.25fr_.75fr]">
-        <div>
+        <!-- <div>
             <p class="text-sm font-medium uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-300">Live events</p>
             <h1 class="mt-3 max-w-3xl text-4xl font-semibold tracking-tight text-zinc-950 dark:text-white sm:text-6xl">Book tickets, pay by QR or transfer, and check in with one scan.</h1>
-        </div>
-        <div class="self-end rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
+        </div> -->
+        <!-- <div class="self-end rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
             <div class="text-sm text-zinc-700 dark:text-zinc-300">Built for LINE-first ticketing with admin approval, coupons, slips, gate roles, and instant ticket status.</div>
-        </div>
+        </div> -->
     </section>
 
     <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">

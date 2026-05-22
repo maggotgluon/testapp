@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
+use App\Models\User;
 use App\Services\QrCodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,6 +43,7 @@ class OrderController extends Controller
         $slipPath = $request->file('slip')?->store('payment-slips', 'uploads');
 
         $order = DB::transaction(function () use ($data, $selected, $slipPath, $request) {
+            $user = $this->syncCustomerProfile($request->user(), $data);
             $ticketTypes = TicketType::query()
                 ->with('event')
                 ->whereIn('id', $selected->pluck('ticket_type_id'))
@@ -75,7 +77,7 @@ class OrderController extends Controller
 
             $order = TicketOrder::create([
                 'order_number' => $this->generateOrderNumber($ticketTypes),
-                'user_id' => $request->user()?->id,
+                'user_id' => $user?->id,
                 'coupon_id' => $coupon?->id,
                 'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'],
@@ -106,7 +108,7 @@ class OrderController extends Controller
                         'order_item_id' => $orderItem->id,
                         'event_id' => $ticketType->event_id,
                         'ticket_type_id' => $ticketType->id,
-                        'user_id' => $request->user()?->id,
+                        'user_id' => $user?->id,
                         'holder_name' => $data['customer_name'],
                         'holder_phone' => $data['customer_phone'],
                     ]);
@@ -126,6 +128,33 @@ class OrderController extends Controller
         });
 
         return redirect()->route('orders.show', $order)->with('status', 'Order created. Admin approval will activate tickets.');
+    }
+
+    private function syncCustomerProfile(?User $user, array $data): ?User
+    {
+        if (! $user || $user->isAdmin()) {
+            return $user;
+        }
+
+        $updates = [
+            'name' => $data['customer_name'],
+            'phone' => $data['customer_phone'],
+        ];
+
+        if (! empty($data['customer_email'])) {
+            $emailIsAvailable = ! User::query()
+                ->where('email', $data['customer_email'])
+                ->whereKeyNot($user->id)
+                ->exists();
+
+            if ($emailIsAvailable) {
+                $updates['email'] = $data['customer_email'];
+            }
+        }
+
+        $user->update($updates);
+
+        return $user->refresh();
     }
 
     public function show(TicketOrder $order): View
