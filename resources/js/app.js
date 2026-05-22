@@ -53,16 +53,32 @@ Alpine.data('scanner', () => ({
 }));
 
 Alpine.data('checkout', (config) => ({
-    paymentMethod: 'bank_transfer',
+    paymentMethod: 'qr_payment',
     couponCode: '',
     slipName: '',
+    tickets: config.tickets,
     quantities: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, 0])),
+    holderNames: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, []])),
     payment: config.payment,
     increment(ticketId) {
         this.quantities[ticketId] = Math.min(20, Number(this.quantities[ticketId] || 0) + 1);
+        this.syncHolderNames(ticketId);
     },
     decrement(ticketId) {
         this.quantities[ticketId] = Math.max(0, Number(this.quantities[ticketId] || 0) - 1);
+        this.syncHolderNames(ticketId);
+    },
+    syncHolderNames(ticketId) {
+        const quantity = Number(this.quantities[ticketId] || 0);
+        this.holderNames[ticketId] = this.holderNames[ticketId] || [];
+        while (this.holderNames[ticketId].length < quantity) {
+            this.holderNames[ticketId].push('');
+        }
+    },
+    holderSlots(ticketId) {
+        this.syncHolderNames(ticketId);
+
+        return Array.from({ length: Number(this.quantities[ticketId] || 0) }, (_, index) => index);
     },
     subtotal() {
         return config.tickets.reduce((sum, ticket) => {

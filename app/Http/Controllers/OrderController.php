@@ -32,6 +32,8 @@ class OrderController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.ticket_type_id' => ['required', 'exists:ticket_types,id'],
             'items.*.quantity' => ['required', 'integer', 'min:0', 'max:20'],
+            'items.*.holders' => ['nullable', 'array'],
+            'items.*.holders.*' => ['nullable', 'string', 'max:255'],
         ]);
 
         $selected = collect($data['items'])->filter(fn ($item) => (int) $item['quantity'] > 0);
@@ -103,13 +105,15 @@ class OrderController extends Controller
                 ]);
 
                 for ($i = 0; $i < $quantity; $i++) {
+                    $holderName = trim((string) ($item['holders'][$i] ?? ''));
+
                     $order->tickets()->create([
                         'uuid' => (string) Str::uuid(),
                         'order_item_id' => $orderItem->id,
                         'event_id' => $ticketType->event_id,
                         'ticket_type_id' => $ticketType->id,
                         'user_id' => $user?->id,
-                        'holder_name' => $data['customer_name'],
+                        'holder_name' => $holderName ?: $data['customer_name'],
                         'holder_phone' => $data['customer_phone'],
                     ]);
                 }

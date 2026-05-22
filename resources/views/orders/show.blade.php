@@ -31,7 +31,7 @@
                 @foreach($order->tickets as $ticket)
                     <a class="rounded-md border border-zinc-200 dark:border-white/10 p-4 hover:border-emerald-300" href="{{ route('tickets.show', ['uuid' => $ticket->uuid, 'phone' => $ticket->holder_phone]) }}">
                         <div class="font-medium text-zinc-950 dark:text-white">{{ $ticket->event->name }}</div>
-                        <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->ticketType->name }} · {{ str_replace('_', ' ', $ticket->status) }}</div>
+                        <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->ticketType->name }} · {{ $ticket->holder_name }} · {{ str_replace('_', ' ', $ticket->status) }}</div>
                     </a>
                 @endforeach
             </div>

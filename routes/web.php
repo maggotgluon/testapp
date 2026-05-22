@@ -42,6 +42,7 @@ Route::middleware(['auth', 'role:super_admin,event_admin,gate_scanner'])->prefix
 
 Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/events/{event}/overview', [AdminEventController::class, 'overview'])->name('events.overview');
+    Route::post('/events/{event}/email-attendees', [AdminEventController::class, 'emailAttendees'])->name('events.email-attendees');
     Route::patch('/events/{event}/tickets/{ticket}/status', [AdminEventController::class, 'updateTicketStatus'])->name('events.tickets.status');
     Route::resource('events', AdminEventController::class)->except(['show', 'destroy']);
     Route::resource('coupons', CouponController::class)->except(['show', 'destroy']);

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Mail\EventAttendeeAnnouncement;
 use App\Models\Coupon;
 use App\Models\Event;
 use App\Models\TicketOrder;
@@ -10,6 +11,7 @@ use App\Models\TicketType;
 use App\Services\QrCodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class AuthAndOrderFlowTest extends TestCase
@@ -158,6 +160,57 @@ class AuthAndOrderFlowTest extends TestCase
         $this->assertMatchesRegularExpression('/^[A-Z0-9]{3,4}-'.now()->format('md').'-001$/', $order->order_number);
     }
 
+    public function test_event_page_renders_social_meta_and_optional_links(): void
+    {
+        $this->seed();
+
+        $event = Event::firstOrFail();
+        $event->update(['social_image_path' => 'social-share/demo.jpg']);
+
+        $this->get('/events/'.$event->id)
+            ->assertOk()
+            ->assertSee('property="og:description"', false)
+            ->assertSee('property="og:image"', false)
+            ->assertSee('social-share/demo.jpg', false)
+            ->assertSee('https://www.google.com/maps/search', false)
+            ->assertSee('href="'.$event->hosted_by_url.'"', false);
+    }
+
+    public function test_event_checkout_includes_bank_logo_metadata(): void
+    {
+        $this->seed();
+
+        $this->get('/events/1')
+            ->assertOk()
+            ->assertSee('Krungthai Bank')
+            ->assertSee('ธนาคารกรุงไทย')
+            ->assertSee('ktb.svg', false);
+    }
+
+    public function test_checkout_can_store_ticket_holder_names(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Main Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'items' => [
+                [
+                    'ticket_type_id' => $ticketType->id,
+                    'quantity' => 2,
+                    'holders' => ['Guest One', 'Guest Two'],
+                ],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('tickets', ['holder_name' => 'Guest One']);
+        $this->assertDatabaseHas('tickets', ['holder_name' => 'Guest Two']);
+    }
+
     public function test_promptpay_payment_payload_matches_emv_format(): void
     {
         $payload = app(QrCodeService::class)->promptPayPayload('081-234-5678', 123);
@@ -239,6 +292,57 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertSee('Event operations')
             ->assertSee('Ticket/check-in status')
             ->assertSee('Orders for this event');
+    }
+
+    public function test_event_admin_bank_name_uses_thai_bank_dropdown(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'eventadmin')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get('/admin/events/1/edit')
+            ->assertOk()
+            ->assertSee('Select bank / เลือกธนาคาร')
+            ->assertSee('Krungthai Bank / ธนาคารกรุงไทย')
+            ->assertSee('ktb.svg', false);
+    }
+
+    public function test_event_admin_can_email_approved_attendees_with_email(): void
+    {
+        $this->seed();
+        Mail::fake();
+
+        $admin = User::where('username', 'eventadmin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Email Buyer',
+            'customer_phone' => '0812345678',
+            'customer_email' => 'attendee@example.com',
+            'payment_method' => 'bank_transfer',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        TicketOrder::firstOrFail()->update(['status' => 'approved']);
+
+        $this->actingAs($admin)
+            ->post('/admin/events/'.$ticketType->event_id.'/email-attendees', [
+                'subject' => 'Event update',
+                'message' => 'Doors open at 6 PM.',
+                'audience' => 'approved',
+            ])
+            ->assertRedirect();
+
+        Mail::assertSent(EventAttendeeAnnouncement::class, function (EventAttendeeAnnouncement $mail) use ($ticketType) {
+            return $mail->hasTo('attendee@example.com')
+                && $mail->event->id === $ticketType->event_id
+                && $mail->subjectLine === 'Event update';
+        });
     }
 
     public function test_coupon_can_discount_each_ticket_item(): void

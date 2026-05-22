@@ -65,6 +65,33 @@
         </section>
     </div>
 
+    <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
+        <div class="grid gap-4 lg:grid-cols-[.7fr_1.3fr]">
+            <div>
+                <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Email attendees / ส่งอีเมลถึงผู้เข้าร่วม</h2>
+                <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Send a message to unique customer emails for this event. Approved audience currently has {{ number_format($emailRecipientCount) }} recipients. / ส่งข้อความถึงอีเมลลูกค้าที่ไม่ซ้ำกันของอีเวนต์นี้ กลุ่มที่อนุมัติแล้วมี {{ number_format($emailRecipientCount) }} คน</p>
+            </div>
+            <form method="POST" action="{{ route('admin.events.email-attendees', $event) }}" class="grid gap-3">
+                @csrf
+                <div class="grid gap-3 sm:grid-cols-[1fr_180px]">
+                    <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Subject / หัวข้อ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
+                        <input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="subject" value="{{ old('subject') }}" required>
+                    </label>
+                    <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Audience / กลุ่มผู้รับ
+                        <select class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="audience">
+                            <option value="approved" @selected(old('audience', 'approved') === 'approved')>Approved only / อนุมัติแล้ว</option>
+                            <option value="all" @selected(old('audience') === 'all')>All with email / ทุกคนที่มีอีเมล</option>
+                        </select>
+                    </label>
+                </div>
+                <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Message / ข้อความ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
+                    <textarea class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="message" rows="5" required>{{ old('message') }}</textarea>
+                </label>
+                <button class="justify-self-start rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300">Send email / ส่งอีเมล</button>
+            </form>
+        </div>
+    </section>
+
     <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 dark:border-white/10 p-4">
             <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Orders for this event / ออเดอร์ของอีเวนต์นี้</h2>

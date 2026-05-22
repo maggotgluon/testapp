@@ -1,7 +1,18 @@
-<x-layouts.app :title="$event->name">
+@php
+    $socialImagePath = $event->social_image_path ?: $event->poster_path;
+    $socialDescription = $event->social_description ?: $event->description;
+@endphp
+<x-layouts.app
+    :title="$event->name"
+    :meta-description="$socialDescription"
+    :meta-image="$socialImagePath ? asset('uploads/'.$socialImagePath) : null"
+    :canonical-url="route('events.show', $event)"
+>
     @php
-        $checkoutTickets = $event->ticketTypes->map(fn ($ticket) => [
+        $bank = collect(config('thai_banks'))->firstWhere('name', $event->bank_name);
+        $checkoutTickets = $event->ticketTypes->values()->map(fn ($ticket, $index) => [
             'id' => $ticket->id,
+            'itemIndex' => $index,
             'name' => $ticket->name,
             'price' => $ticket->price_thb,
         ])->values();
@@ -27,8 +38,20 @@
                     <p class="mt-3 text-zinc-700 dark:text-zinc-300">{{ $event->description }}</p>
                     <dl class="mt-5 grid gap-3 text-sm text-zinc-700 dark:text-zinc-300">
                         <div><dt class="text-zinc-500">Venue / สถานที่</dt><dd>{{ $event->venue }}</dd></div>
-                        <div><dt class="text-zinc-500">Location / ที่ตั้ง</dt><dd>{{ $event->location }}</dd></div>
-                        <div><dt class="text-zinc-500">Hosted by / ผู้จัด</dt><dd>{{ $event->hosted_by }}</dd></div>
+                        <div><dt class="text-zinc-500">Location / ที่ตั้ง</dt><dd>
+                            @if($event->location_url)
+                                <a class="text-emerald-700 underline dark:text-emerald-200" href="{{ $event->location_url }}" target="_blank" rel="noopener">{{ $event->location ?: 'Open map / เปิดแผนที่' }}</a>
+                            @else
+                                {{ $event->location }}
+                            @endif
+                        </dd></div>
+                        <div><dt class="text-zinc-500">Hosted by / ผู้จัด</dt><dd>
+                            @if($event->hosted_by_url)
+                                <a class="text-emerald-700 underline dark:text-emerald-200" href="{{ $event->hosted_by_url }}" target="_blank" rel="noopener">{{ $event->hosted_by ?: 'Host / ผู้จัด' }}</a>
+                            @else
+                                {{ $event->hosted_by }}
+                            @endif
+                        </dd></div>
                     </dl>
                 </div>
             </div>
@@ -46,6 +69,8 @@
                 'qr_payment_account' => $event->qr_payment_account,
                 'qr_payment_image' => $event->qr_payment_image_path ? asset('uploads/'.$event->qr_payment_image_path) : null,
                 'instructions' => $event->payment_instructions,
+                'bank_logo' => $bank ? asset($bank['logo']) : null,
+                'bank_display_name' => $bank ? $bank['name'].' / '.$bank['thai_name'] : $event->bank_name,
             ]),
         })">
             @csrf
@@ -54,8 +79,8 @@
                     <div class="mb-5 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4">
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                                <div class="font-semibold text-emerald-950 dark:text-emerald-50">Buy faster with LINE / ซื้อง่ายขึ้นด้วย LINE</div>
-                                <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-100">Login with LINE to save tickets to your profile automatically. / เข้าสู่ระบบด้วย LINE เพื่อบันทึกตั๋วไว้ในโปรไฟล์</p>
+                                <div class="font-semibold text-emerald-950 dark:text-emerald-50">Buy faster with LINE <br> ซื้อง่ายขึ้นด้วย LINE</div>
+                                <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-100">Login with LINE to save tickets to your profile automatically. <br> เข้าสู่ระบบด้วย LINE เพื่อบันทึกตั๋วไว้ในโปรไฟล์</p>
                             </div>
                             <a class="rounded-md bg-[#06c755] px-4 py-2 text-sm font-semibold text-zinc-950" href="{{ route('auth.social', ['provider' => 'line', 'redirect' => request()->getRequestUri()]) }}">Login with LINE / เข้าสู่ระบบด้วย LINE</a>
                         </div>
@@ -75,7 +100,8 @@
                             <input type="hidden" name="items[{{ $loop->index }}][ticket_type_id]" value="{{ $ticket->id }}">
                             <div class="grid grid-cols-[40px_64px_40px] overflow-hidden rounded-md border border-zinc-200 dark:border-white/10">
                                 <button class="bg-white dark:bg-zinc-950 px-3 py-2 text-lg text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="decrement({{ $ticket->id }})">-</button>
-                                <input class="w-16 border-x border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-2 py-2 text-center text-zinc-950 dark:text-white" name="items[{{ $loop->index }}][quantity]" type="number" min="0" max="20" value="0" x-model.number="quantities[{{ $ticket->id }}]">
+                                <input class="w-16 border-x border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-2 py-2 text-center text-zinc-950 dark:text-white" name="items[{{ $loop->index }}][quantity]" 
+                                    type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]">
                                 <button class="bg-white dark:bg-zinc-950 px-3 py-2 text-lg text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="increment({{ $ticket->id }})">+</button>
                             </div>
                         </div>
@@ -89,7 +115,7 @@
             </div>
 
             <div class="mt-5 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4 text-sm text-zinc-700 dark:text-zinc-300" x-cloak x-show="subtotal() === 0">
-                Select at least one ticket to continue. / กรุณาเลือกตั๋วอย่างน้อย 1 ใบเพื่อดำเนินการต่อ
+                Select at least one ticket to continue. <br> กรุณาเลือกตั๋วอย่างน้อย 1 ใบเพื่อดำเนินการต่อ
             </div>
 
             <div x-cloak x-show="subtotal() > 0" x-transition>
@@ -101,17 +127,35 @@
                         <label class="text-sm text-zinc-700 dark:text-zinc-300">Coupon / คูปอง<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 uppercase text-zinc-950 dark:text-white" name="coupon_code" placeholder="EARLYBIRD" x-model="couponCode"></label>
                     @endif
                 </div>
+                
+                                @if($event->coupons->isNotEmpty())
+                                    <div class="mt-4 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4 text-sm text-zinc-700 dark:text-zinc-300">
+                                        <div class="font-medium text-zinc-950 dark:text-white">Available coupons / คูปองที่ใช้ได้</div>
+                                        <div class="mt-2 flex flex-wrap gap-2">
+                                            @foreach($event->coupons as $coupon)
+                                                <span class="rounded bg-zinc-100 dark:bg-white/10 px-2 py-1 font-mono text-xs text-emerald-700 dark:text-emerald-200">{{ $coupon->code }}</span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
 
-                @if($event->coupons->isNotEmpty())
-                    <div class="mt-4 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4 text-sm text-zinc-700 dark:text-zinc-300">
-                        <div class="font-medium text-zinc-950 dark:text-white">Available coupons / คูปองที่ใช้ได้</div>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            @foreach($event->coupons as $coupon)
-                                <span class="rounded bg-zinc-100 dark:bg-white/10 px-2 py-1 font-mono text-xs text-emerald-700 dark:text-emerald-200">{{ $coupon->code }}</span>
-                            @endforeach
-                        </div>
+                <div class="mt-5 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4">
+                    <h3 class="font-semibold text-zinc-950 dark:text-white">Ticket holders / ชื่อผู้ถือบัตร</h3>
+                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Leave blank to use the buyer name. / เว้นว่างไว้เพื่อใช้ชื่อผู้ซื้อ</p>
+                    <div class="mt-4 grid gap-4">
+                        <template x-for="ticket in tickets" :key="ticket.id">
+                            <div class="grid gap-2" x-show="Number(quantities[ticket.id] || 0) > 0">
+                                <div class="text-sm font-medium text-zinc-700 dark:text-zinc-200" x-text="ticket.name"></div>
+                                <template x-for="index in holderSlots(ticket.id)" :key="`${ticket.id}-${index}`">
+                                    <label class="text-sm text-zinc-700 dark:text-zinc-300">
+                                        <span x-text="`Holder ${index + 1} / ผู้ถือบัตร ${index + 1}`"></span>
+                                        <input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`items[${ticket.itemIndex}][holders][${index}]`" x-model="holderNames[ticket.id][index]" placeholder="Use buyer name / ใช้ชื่อผู้ซื้อ">
+                                    </label>
+                                </template>
+                            </div>
+                        </template>
                     </div>
-                @endif
+                </div>
 
                 <div class="mt-5 rounded-md border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
                     <div class="flex items-center justify-between gap-3">
@@ -124,7 +168,12 @@
                     </dl>
                     <template x-if="paymentMethod === 'bank_transfer'">
                         <dl class="mt-3 grid gap-2">
-                            <div><dt class="text-emerald-700 dark:text-emerald-200">Bank / ธนาคาร</dt><dd x-text="payment.bank_name || 'Set bank name in admin event settings / ตั้งค่าชื่อธนาคารในหน้าแอดมิน'"></dd></div>
+                            <div><dt class="text-emerald-700 dark:text-emerald-200">Bank / ธนาคาร</dt><dd class="mt-1 flex items-center gap-2">
+                                <template x-if="payment.bank_logo">
+                                    <img class="h-9 w-9 rounded-md bg-white object-contain p-1" :src="payment.bank_logo" :alt="payment.bank_display_name || payment.bank_name">
+                                </template>
+                                <span x-text="payment.bank_display_name || payment.bank_name || 'Set bank name in admin event settings / ตั้งค่าชื่อธนาคารในหน้าแอดมิน'"></span>
+                            </dd></div>
                             <div><dt class="text-emerald-700 dark:text-emerald-200">Account name / ชื่อบัญชี</dt><dd x-text="payment.bank_account_name || '-'"></dd></div>
                             <div><dt class="text-emerald-700 dark:text-emerald-200">Account number / เลขบัญชี</dt><dd class="font-mono" x-text="payment.bank_account_number || '-'"></dd></div>
                         </dl>

@@ -1,10 +1,32 @@
+@props([
+    'title' => config('app.name', 'Event Ticket'),
+    'metaDescription' => null,
+    'metaImage' => null,
+    'canonicalUrl' => null,
+])
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? config('app.name', 'Event Ticket') }}</title>
+    <title>{{ $title }}</title>
+    @if($metaDescription)
+        <meta name="description" content="{{ $metaDescription }}">
+        <meta property="og:description" content="{{ $metaDescription }}">
+        <meta name="twitter:description" content="{{ $metaDescription }}">
+    @endif
+    <meta property="og:title" content="{{ $title }}">
+    <meta property="og:type" content="website">
+    @if($canonicalUrl)
+        <link rel="canonical" href="{{ $canonicalUrl }}">
+        <meta property="og:url" content="{{ $canonicalUrl }}">
+    @endif
+    @if($metaImage)
+        <meta property="og:image" content="{{ $metaImage }}">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:image" content="{{ $metaImage }}">
+    @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 antialiased">

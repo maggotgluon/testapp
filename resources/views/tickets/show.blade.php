@@ -1,3 +1,13 @@
+@php
+    $ticketUrl = route('tickets.show', ['uuid' => $ticket->uuid, 'phone' => $ticket->holder_phone]);
+    $calendarUrl = 'https://calendar.google.com/calendar/render?'.http_build_query([
+        'action' => 'TEMPLATE',
+        'text' => $ticket->event->name,
+        'dates' => $ticket->event->starts_at->copy()->utc()->format('Ymd\THis\Z').'/'.$ticket->event->ends_at->copy()->utc()->format('Ymd\THis\Z'),
+        'details' => trim(($ticket->event->description ?? '')."\n\nTicket / ตั๋ว: ".$ticketUrl),
+        'location' => trim($ticket->event->venue.' '.$ticket->event->location),
+    ]);
+@endphp
 <x-layouts.app :title="$ticket->event->name">
     <div class="mx-auto grid max-w-4xl gap-6 lg:grid-cols-[.8fr_1fr]">
         <div class="overflow-hidden rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
@@ -13,6 +23,12 @@
                 <p class="text-sm text-emerald-600 dark:text-emerald-300">{{ $ticket->ticketType->name }}</p>
                 <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">{{ $ticket->event->name }}</h1>
                 <p class="mt-2 text-zinc-600 dark:text-zinc-400">{{ $ticket->event->venue }} · {{ $ticket->event->starts_at->format('M j, Y H:i') }}</p>
+                <div class="mt-3 flex flex-wrap gap-2 text-sm">
+                    @if($ticket->event->location_url)
+                        <a class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-emerald-700 dark:text-emerald-200 hover:border-emerald-300" href="{{ $ticket->event->location_url }}" target="_blank" rel="noopener">Open map / เปิดแผนที่</a>
+                    @endif
+                    <a class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-emerald-700 dark:text-emerald-200 hover:border-emerald-300" href="{{ $calendarUrl }}" target="_blank" rel="noopener">Add to calendar / เพิ่มในปฏิทิน</a>
+                </div>
             </div>
             <span class="rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-200">{{ str_replace('_', ' ', $ticket->status) }}</span>
         </div>
@@ -22,6 +38,13 @@
         </div>
         <dl class="mt-6 grid gap-3 text-sm">
             <div><dt class="text-zinc-500">Holder / ผู้ถือบัตร</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->holder_name }}</dd></div>
+            <div><dt class="text-zinc-500">Location / ที่ตั้ง</dt><dd class="text-zinc-950 dark:text-white">
+                @if($ticket->event->location_url)
+                    <a class="text-emerald-700 underline dark:text-emerald-200" href="{{ $ticket->event->location_url }}" target="_blank" rel="noopener">{{ $ticket->event->location ?: 'Open map / เปิดแผนที่' }}</a>
+                @else
+                    {{ $ticket->event->location ?: '-' }}
+                @endif
+            </dd></div>
             <div><dt class="text-zinc-500">Order / ออเดอร์</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->order->order_number }}</dd></div>
             <div><dt class="text-zinc-500">Check in / เช็กอิน</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->checked_in_at?->format('M j, Y H:i') ?? 'Not yet / ยังไม่เช็กอิน' }}</dd></div>
             <div><dt class="text-zinc-500">Check out / เช็กเอาต์</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->checked_out_at?->format('M j, Y H:i') ?? 'Not yet / ยังไม่เช็กเอาต์' }}</dd></div>

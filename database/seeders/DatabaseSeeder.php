@@ -31,8 +31,11 @@ class DatabaseSeeder extends Seeder
             [
                 'venue' => 'Meeting Room, Golden Sea Hotel',
                 'location' => 'Golden Sea Hotel Hua Hin',
+                'location_url' => 'https://www.google.com/maps/search/?api=1&query=Golden%20Sea%20Hotel%20Hua%20Hin',
                 'hosted_by' => 'Zumba Hua Hin',
+                'hosted_by_url' => 'https://www.facebook.com/search/top?q=zumba%20hua%20hin',
                 'description' => 'Zumba Hua Hin is thrilled to present SHIMMER & SHINE, a vibrant Zumba event that promises an unforgettable experience filled with energy, music, and dance. Join us for an exhilarating day of movement and fun as we bring together the best of Zumba in a lively and colorful atmosphere. Whether you\'re a seasoned Zumba enthusiast or new to the world of dance fitness, SHIMMER & SHINE offers something for everyone. Get ready to dance, sweat, and shine with us at this one-of-a-kind event!',
+                'social_description' => 'A vibrant Zumba night in Hua Hin with music, dance, and SHIMMER & SHINE energy.',
                 'starts_at' => now()->addWeeks(3)->setTime(18, 0),
                 'ends_at' => now()->addWeeks(3)->setTime(23, 0),
                 'bank_name' => 'Krungthai Bank',

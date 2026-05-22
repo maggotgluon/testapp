@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\EventAttendeeAnnouncement;
 use App\Models\Event;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
 class EventController extends Controller
@@ -91,7 +93,29 @@ class EventController extends Controller
             'grossRevenue' => $ticketTypeStats->sum('revenue'),
             'totalTickets' => Ticket::where('event_id', $event->id)->count(),
             'checkedInTickets' => Ticket::where('event_id', $event->id)->whereIn('status', ['checked_in', 'checked_out'])->count(),
+            'emailRecipientCount' => $this->attendeeEmails($event, 'approved')->count(),
         ]);
+    }
+
+    public function emailAttendees(Request $request, Event $event): RedirectResponse
+    {
+        $data = $request->validate([
+            'subject' => ['required', 'string', 'max:255'],
+            'message' => ['required', 'string', 'max:5000'],
+            'audience' => ['required', 'in:approved,all'],
+        ]);
+
+        $emails = $this->attendeeEmails($event, $data['audience']);
+
+        if ($emails->isEmpty()) {
+            return back()->withErrors(['email' => 'No attendee emails found for this event. / ไม่พบอีเมลผู้เข้าร่วมสำหรับอีเวนต์นี้']);
+        }
+
+        foreach ($emails as $email) {
+            Mail::to($email)->send(new EventAttendeeAnnouncement($event, $data['subject'], $data['message']));
+        }
+
+        return back()->with('status', 'Email sent to '.$emails->count().' attendees. / ส่งอีเมลถึงผู้เข้าร่วม '.$emails->count().' คนแล้ว');
     }
 
     public function update(Request $request, Event $event): RedirectResponse
@@ -144,13 +168,17 @@ class EventController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'social_description' => ['nullable', 'string', 'max:500'],
             'venue' => ['required', 'string', 'max:255'],
             'location' => ['nullable', 'string', 'max:255'],
+            'location_url' => ['nullable', 'url', 'max:500'],
             'hosted_by' => ['nullable', 'string', 'max:255'],
+            'hosted_by_url' => ['nullable', 'url', 'max:500'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'poster' => ['nullable', 'image', 'max:4096'],
             'ticket_image' => ['nullable', 'image', 'max:4096'],
+            'social_image' => ['nullable', 'image', 'max:4096'],
             'qr_payment_image' => ['nullable', 'image', 'max:4096'],
             'bank_name' => ['nullable', 'string', 'max:255'],
             'bank_account_name' => ['nullable', 'string', 'max:255'],
@@ -167,6 +195,10 @@ class EventController extends Controller
 
         if ($request->hasFile('ticket_image')) {
             $data['ticket_image_path'] = $request->file('ticket_image')->store('ticket-art', 'uploads');
+        }
+
+        if ($request->hasFile('social_image')) {
+            $data['social_image_path'] = $request->file('social_image')->store('social-share', 'uploads');
         }
 
         if ($request->hasFile('qr_payment_image')) {
@@ -198,5 +230,19 @@ class EventController extends Controller
                 ]
             );
         }
+    }
+
+    private function attendeeEmails(Event $event, string $audience)
+    {
+        return TicketOrder::query()
+            ->whereHas('items', fn ($query) => $query->where('event_id', $event->id))
+            ->when($audience === 'approved', fn ($query) => $query->where('status', 'approved'))
+            ->whereNotNull('customer_email')
+            ->where('customer_email', '!=', '')
+            ->pluck('customer_email')
+            ->map(fn ($email) => strtolower(trim($email)))
+            ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
+            ->unique()
+            ->values();
     }
 }
