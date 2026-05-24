@@ -30,6 +30,10 @@ class ScannerController extends Controller
             return response()->json(['ok' => false, 'message' => 'Ticket not found. / ไม่พบตั๋ว'], 404);
         }
 
+        if (! $request->user()->canManageEvent($ticket->event)) {
+            return response()->json(['ok' => false, 'message' => 'You are not assigned to this event. / คุณไม่ได้รับสิทธิ์สำหรับอีเวนต์นี้'], 403);
+        }
+
         if (! in_array($ticket->status, ['approved', 'checked_in'], true)) {
             return response()->json(['ok' => false, 'message' => 'Ticket is '.$ticket->status.'. / สถานะตั๋วคือ '.$ticket->status], 422);
         }

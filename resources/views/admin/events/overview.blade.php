@@ -123,6 +123,7 @@
                         @endif
                         <form method="POST" action="{{ route('admin.orders.reject', $order) }}">@csrf<button class="rounded-md bg-rose-400 px-3 py-2 text-sm font-semibold text-zinc-950">Reject / ปฏิเสธ</button></form>
                         <form method="POST" action="{{ route('admin.orders.refund', $order) }}">@csrf<button class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100">Refund / คืนเงิน</button></form>
+                        <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200">Delete / ลบ</button></form>
                     </div>
                 </div>
             @empty
@@ -153,16 +154,23 @@
                         <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->ticketType->name }} · {{ $ticket->order->order_number }} · {{ str_replace('_', ' ', $ticket->status) }}</div>
                         <div class="mt-1 text-xs text-zinc-500">In / เข้า: {{ $ticket->checked_in_at?->format('M j H:i') ?? '-' }} · Out / ออก: {{ $ticket->checked_out_at?->format('M j H:i') ?? '-' }}</div>
                     </div>
-                    <form method="POST" action="{{ route('admin.events.tickets.status', [$event, $ticket]) }}" class="flex flex-wrap items-start gap-2">
-                        @csrf
-                        @method('PATCH')
-                        <select class="rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-950 dark:text-white" name="status">
-                            @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'refunded'] as $status)
-                                <option value="{{ $status }}" @selected($ticket->status === $status)>{{ str_replace('_', ' ', $status) }}</option>
-                            @endforeach
-                        </select>
-                        <button class="rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950">Update / อัปเดต</button>
-                    </form>
+                    <div class="flex flex-wrap items-start gap-2">
+                        <form method="POST" action="{{ route('admin.events.tickets.status', [$event, $ticket]) }}" class="flex flex-wrap items-start gap-2">
+                            @csrf
+                            @method('PATCH')
+                            <select class="rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-950 dark:text-white" name="status">
+                                @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'refunded'] as $status)
+                                    <option value="{{ $status }}" @selected($ticket->status === $status)>{{ str_replace('_', ' ', $status) }}</option>
+                                @endforeach
+                            </select>
+                            <button class="rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950">Update / อัปเดต</button>
+                        </form>
+                        <form method="POST" action="{{ route('admin.events.tickets.destroy', [$event, $ticket]) }}" onsubmit="return confirm('Delete this ticket? / ลบตั๋วนี้?')">
+                            @csrf
+                            @method('DELETE')
+                            <button class="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200">Delete / ลบ</button>
+                        </form>
+                    </div>
                 </div>
             @empty
                 <div class="p-6 text-zinc-600 dark:text-zinc-400">No tickets found for this event. / ไม่พบตั๋วของอีเวนต์นี้</div>

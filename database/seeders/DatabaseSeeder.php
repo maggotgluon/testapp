@@ -16,12 +16,12 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Super Admin', 'username' => 'admin', 'email' => null, 'role' => 'super_admin', 'provider' => 'guest', 'provider_id' => 'seed-admin']
         );
 
-        User::updateOrCreate(
+        $scanner = User::updateOrCreate(
             ['phone' => '0809166691'],
             ['name' => 'Gate Scanner', 'username' => 'scanner', 'email' => null, 'role' => 'gate_scanner', 'provider' => 'guest', 'provider_id' => 'seed-scanner']
         );
 
-        User::updateOrCreate(
+        $eventAdmin = User::updateOrCreate(
             ['phone' => '0809166692'],
             ['name' => 'Event Admin', 'username' => 'eventadmin', 'email' => null, 'role' => 'event_admin', 'provider' => 'guest', 'provider_id' => 'seed-event-admin']
         );
@@ -45,19 +45,22 @@ class DatabaseSeeder extends Seeder
                 'qr_payment_account' => '063-147-9799',
                 'payment_instructions' => 'Transfer the exact amount and upload your slip for admin approval.',
                 'is_published' => true,
+                'show_countdown' => true,
             ]
         );
+
+        $event->assignedUsers()->syncWithoutDetaching([$scanner->id, $eventAdmin->id]);
 
         $event->ticketTypes()->updateOrCreate(
             ['name' => 'Flash Sale'],
             ['description' => 'Limited early entry ticket.', 
-            'price_thb' => 199, 'capacity' => 50, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now(), 'status' => 'active']
+            'price_thb' => 199, 'full_price_thb' => 499, 'capacity' => 50, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now(), 'status' => 'active']
         );
 
         $event->ticketTypes()->updateOrCreate(
             ['name' => 'Early Bird'],
             ['description' => 'Limited early entry ticket.', 
-            'price_thb' => 399, 'capacity' => 100, 'sale_starts_at' => now(), 'sale_ends_at' => now()->addWeek(), 'status' => 'active']
+            'price_thb' => 399, 'full_price_thb' => 499, 'capacity' => 100, 'sale_starts_at' => now(), 'sale_ends_at' => now()->addWeek(), 'status' => 'active']
         );
 
         $event->ticketTypes()->updateOrCreate(

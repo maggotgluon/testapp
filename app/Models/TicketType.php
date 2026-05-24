@@ -12,6 +12,7 @@ class TicketType extends Model
         'name',
         'description',
         'price_thb',
+        'full_price_thb',
         'capacity',
         'sold_count',
         'sale_starts_at',

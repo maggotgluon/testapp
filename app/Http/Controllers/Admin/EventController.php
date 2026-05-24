@@ -9,6 +9,7 @@ use App\Models\Ticket;
 use App\Models\TicketOrder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 
@@ -16,8 +17,14 @@ class EventController extends Controller
 {
     public function index(): View
     {
+        $events = Event::with('ticketTypes')->latest('starts_at');
+
+        if (auth()->user()->role !== 'super_admin') {
+            $events->whereHas('assignedUsers', fn ($query) => $query->whereKey(auth()->id()));
+        }
+
         return view('admin.events.index', [
-            'events' => Event::with('ticketTypes')->latest('starts_at')->get(),
+            'events' => $events->get(),
         ]);
     }
 
@@ -29,6 +36,7 @@ class EventController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $event = Event::create($this->validated($request) + ['created_by' => $request->user()->id]);
+        $event->assignedUsers()->syncWithoutDetaching([$request->user()->id]);
         $this->syncTicketTypes($request, $event);
 
         return redirect()->route('admin.events.index')->with('status', 'Event created.');
@@ -36,6 +44,8 @@ class EventController extends Controller
 
     public function edit(Event $event): View
     {
+        abort_unless(request()->user()->canManageEvent($event), 403);
+
         return view('admin.events.form', [
             'event' => $event,
             'ticketTypes' => $event->ticketTypes()->where('status', '!=', 'inactive')->get(),
@@ -44,6 +54,8 @@ class EventController extends Controller
 
     public function overview(Event $event, Request $request): View
     {
+        abort_unless($request->user()->canManageEvent($event), 403);
+
         $event->load('ticketTypes');
 
         $orders = TicketOrder::query()
@@ -102,6 +114,8 @@ class EventController extends Controller
 
     public function emailAttendees(Request $request, Event $event): RedirectResponse
     {
+        abort_unless($request->user()->canManageEvent($event), 403);
+
         $data = $request->validate([
             'subject' => ['required', 'string', 'max:255'],
             'message' => ['required', 'string', 'max:5000'],
@@ -123,6 +137,8 @@ class EventController extends Controller
 
     public function update(Request $request, Event $event): RedirectResponse
     {
+        abort_unless($request->user()->canManageEvent($event), 403);
+
         $event->update($this->validated($request));
         $this->syncTicketTypes($request, $event);
 
@@ -131,6 +147,7 @@ class EventController extends Controller
 
     public function updateTicketStatus(Request $request, Event $event, Ticket $ticket): RedirectResponse
     {
+        abort_unless($request->user()->canManageEvent($event), 403);
         abort_unless($ticket->event_id === $event->id, 404);
 
         $data = $request->validate([
@@ -190,6 +207,7 @@ class EventController extends Controller
             'qr_payment_account' => ['nullable', 'string', 'max:255'],
             'payment_instructions' => ['nullable', 'string'],
             'is_published' => ['nullable', 'boolean'],
+            'show_countdown' => ['nullable', 'boolean'],
         ]);
 
         if ($request->hasFile('poster')) {
@@ -209,8 +227,45 @@ class EventController extends Controller
         }
 
         $data['is_published'] = $request->boolean('is_published');
+        $data['show_countdown'] = $request->boolean('show_countdown');
+        $data['description'] = $this->safeHtml($data['description'] ?? null);
 
         return $data;
+    }
+
+    public function destroy(Request $request, Event $event): RedirectResponse
+    {
+        abort_unless($request->user()->role === 'super_admin', 403);
+
+        DB::transaction(function () use ($event) {
+            TicketOrder::whereHas('items', fn ($query) => $query->where('event_id', $event->id))->delete();
+            $event->delete();
+        });
+
+        return redirect()->route('admin.events.index')->with('status', 'Event deleted.');
+    }
+
+    public function destroyTicket(Request $request, Event $event, Ticket $ticket): RedirectResponse
+    {
+        abort_unless($request->user()->canManageEvent($event), 403);
+        abort_unless($ticket->event_id === $event->id, 404);
+
+        $ticket->delete();
+
+        return back()->with('status', 'Ticket deleted.');
+    }
+
+    private function safeHtml(?string $html): ?string
+    {
+        if ($html === null) {
+            return null;
+        }
+
+        $html = preg_replace('/<\s*(script|style|iframe|object|embed)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html);
+        $html = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/is', '', $html);
+        $html = preg_replace('/\s+(href|src)\s*=\s*("[^"]*javascript:[^"]*"|\'[^\']*javascript:[^\']*\'|[^\s>]*javascript:[^\s>]*)/is', '', $html);
+
+        return strip_tags($html, '<p><br><strong><b><em><i><u><ul><ol><li><a><h2><h3><blockquote>');
     }
 
     private function syncTicketTypes(Request $request, Event $event): void
@@ -238,6 +293,7 @@ class EventController extends Controller
                     'name' => $ticket['name'],
                     'description' => $ticket['description'] ?? null,
                     'price_thb' => (int) ($ticket['price_thb'] ?? 0),
+                    'full_price_thb' => filled($ticket['full_price_thb'] ?? null) ? (int) $ticket['full_price_thb'] : null,
                     'capacity' => (int) ($ticket['capacity'] ?? 0),
                     'sale_starts_at' => $ticket['sale_starts_at'] ?? null,
                     'sale_ends_at' => $ticket['sale_ends_at'] ?? null,

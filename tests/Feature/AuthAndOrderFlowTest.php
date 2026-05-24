@@ -254,6 +254,23 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertSee('ktb.svg', false);
     }
 
+    public function test_event_checkout_can_show_countdown_and_full_ticket_price(): void
+    {
+        $this->seed();
+
+        $event = Event::firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+        $event->update(['show_countdown' => true]);
+        $ticketType->update(['full_price_thb' => $ticketType->price_thb + 200]);
+
+        $this->get('/events/'.$event->id)
+            ->assertOk()
+            ->assertSee('eventCountdown', false)
+            ->assertSee('THB '.number_format($ticketType->full_price_thb));
+    }
+
     public function test_checkout_can_store_ticket_holder_names(): void
     {
         $this->seed();
@@ -385,6 +402,7 @@ class AuthAndOrderFlowTest extends TestCase
 
         $admin = User::where('username', 'admin')->firstOrFail();
         $user = User::factory()->create(['role' => 'customer', 'username' => 'buyer']);
+        $event = Event::firstOrFail();
 
         $this->actingAs($admin)
             ->put('/admin/users/'.$user->id, [
@@ -393,12 +411,17 @@ class AuthAndOrderFlowTest extends TestCase
                 'phone' => '0899999999',
                 'email' => $user->email,
                 'role' => 'event_admin',
+                'event_ids' => [$event->id],
             ])
             ->assertRedirect('/admin/users');
 
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'role' => 'event_admin',
+        ]);
+        $this->assertDatabaseHas('event_user', [
+            'event_id' => $event->id,
+            'user_id' => $user->id,
         ]);
     }
 
@@ -414,6 +437,196 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertSee('Event operations')
             ->assertSee('Ticket/check-in status')
             ->assertSee('Orders for this event');
+    }
+
+    public function test_event_admin_cannot_access_unassigned_event(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'eventadmin')->firstOrFail();
+        $event = Event::create([
+            'name' => 'Private Event',
+            'description' => 'Only another team can manage this.',
+            'venue' => 'Private Venue',
+            'starts_at' => now()->addMonth(),
+            'ends_at' => now()->addMonth()->addHours(2),
+            'is_published' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/admin/events/'.$event->id.'/overview')
+            ->assertForbidden();
+    }
+
+    public function test_event_description_allows_safe_html_and_removes_scripts(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $event = Event::firstOrFail();
+
+        $this->actingAs($admin)
+            ->put('/admin/events/'.$event->id, [
+                'name' => $event->name,
+                'description' => '<h2>Show details</h2><p>Bring <strong>energy</strong>.</p><script>alert("bad")</script><a href="javascript:alert(1)">Bad link</a>',
+                'social_description' => $event->social_description,
+                'venue' => $event->venue,
+                'location' => $event->location,
+                'location_url' => $event->location_url,
+                'hosted_by' => $event->hosted_by,
+                'hosted_by_url' => $event->hosted_by_url,
+                'starts_at' => $event->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $event->ends_at->format('Y-m-d H:i:s'),
+                'is_published' => '1',
+                'bank_name' => $event->bank_name,
+                'bank_account_name' => $event->bank_account_name,
+                'bank_account_number' => $event->bank_account_number,
+                'qr_payment_account_name' => $event->qr_payment_account_name,
+                'qr_payment_account' => $event->qr_payment_account,
+                'payment_instructions' => $event->payment_instructions,
+            ])
+            ->assertRedirect('/admin/events');
+
+        $this->get('/events/'.$event->id)
+            ->assertOk()
+            ->assertSee('<strong>energy</strong>', false)
+            ->assertSee('<h2>Show details</h2>', false)
+            ->assertDontSee('alert("bad")', false)
+            ->assertDontSee('javascript:', false);
+
+        $this->assertStringNotContainsString('<script', $event->fresh()->description);
+        $this->assertStringNotContainsString('javascript:', $event->fresh()->description);
+    }
+
+    public function test_profile_has_order_ticket_tabs_and_logout_button(): void
+    {
+        $this->seed();
+
+        $user = User::factory()->create(['role' => 'customer', 'phone' => '0811111111']);
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->actingAs($user)
+            ->post('/orders', [
+                'customer_name' => 'Profile Buyer',
+                'customer_phone' => '0811111111',
+                'payment_method' => 'qr_payment',
+                'items' => [
+                    ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+                ],
+            ])->assertRedirect();
+
+        $this->actingAs($user)
+            ->get('/')
+            ->assertDontSee('Logout / ออกจากระบบ');
+
+        $this->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('Orders / ออเดอร์')
+            ->assertSee('Tickets / ตั๋ว')
+            ->assertSee('Logout / ออกจากระบบ');
+
+        $this->actingAs($user)
+            ->get('/profile?view=tickets')
+            ->assertOk()
+            ->assertSee($ticketType->name)
+            ->assertSee('View order / ดูออเดอร์')
+            ->assertSee($ticketType->event->name)
+            ->assertSee('aspect-[4/5]', false);
+    }
+
+    public function test_profile_hides_past_event_orders_and_tickets(): void
+    {
+        $this->seed();
+
+        $user = User::factory()->create(['role' => 'customer', 'phone' => '0811111111']);
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->actingAs($user)
+            ->post('/orders', [
+                'customer_name' => 'Profile Buyer',
+                'customer_phone' => '0811111111',
+                'payment_method' => 'qr_payment',
+                'items' => [
+                    ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+                ],
+            ])->assertRedirect();
+
+        $ticketType->event->update([
+            'starts_at' => now()->subDays(2),
+            'ends_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertSee('No orders yet');
+
+        $this->actingAs($user)
+            ->get('/profile?view=tickets')
+            ->assertOk()
+            ->assertSee('No tickets yet');
+    }
+
+    public function test_admin_lookup_can_search_by_order_number_only(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Lookup Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+
+        $this->actingAs($admin)
+            ->get('/orders/lookup?order_number='.$order->order_number)
+            ->assertOk()
+            ->assertSee($order->order_number)
+            ->assertSee('Approve / อนุมัติ')
+            ->assertSee('Delete / ลบ');
+    }
+
+    public function test_super_admin_can_delete_order_with_tickets(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Delete Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+        $ticketId = $order->tickets()->firstOrFail()->id;
+
+        $this->actingAs($admin)
+            ->delete('/admin/orders/'.$order->id)
+            ->assertRedirect('/admin/orders');
+
+        $this->assertDatabaseMissing('ticket_orders', ['id' => $order->id]);
+        $this->assertDatabaseMissing('tickets', ['id' => $ticketId]);
     }
 
     public function test_event_admin_bank_name_uses_thai_bank_dropdown(): void
@@ -463,6 +676,7 @@ class AuthAndOrderFlowTest extends TestCase
                         'name' => 'Door ticket',
                         'description' => 'At-door admission',
                         'price_thb' => 599,
+                        'full_price_thb' => 799,
                         'capacity' => 25,
                         'status' => 'active',
                     ],
@@ -477,6 +691,7 @@ class AuthAndOrderFlowTest extends TestCase
         $this->assertDatabaseHas('ticket_types', [
             'event_id' => $event->id,
             'name' => 'Door ticket',
+            'full_price_thb' => 799,
             'status' => 'active',
         ]);
     }

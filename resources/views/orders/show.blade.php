@@ -9,8 +9,14 @@
                 <span class="rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-200">{{ str_replace('_', ' ', $order->status) }}</span>
             </div>
             <div class="mt-5 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
-                <div class="font-semibold">Order received / ได้รับคำสั่งซื้อแล้ว</div>
-                <p class="mt-1">Please keep this order number for future lookup: <span class="font-mono font-semibold">{{ $order->order_number }}</span>. Admin approval will activate the tickets after payment review. / กรุณาเก็บเลขออเดอร์นี้ไว้สำหรับค้นหาภายหลัง แอดมินจะอนุมัติตั๋วหลังตรวจสอบการชำระเงิน</p>
+                <div class="font-semibold">Order received </div>
+                <p class="mt-1">Please keep this order number for future lookup: 
+                    <span class="font-mono font-semibold border p-1 rounded-sm ">{{ $order->order_number }}</span>. 
+                    Admin approval will activate the tickets after payment review. </p>
+                <div class="font-semibold mt-4"> ได้รับคำสั่งซื้อแล้ว</div>
+                <p class="mt-1"> กรุณาเก็บเลขออเดอร์นี้ 
+                    <span class="font-mono font-semibold border p-1 rounded-sm ">{{ $order->order_number }}</span> 
+                    ไว้สำหรับค้นหาภายหลัง แอดมินจะอนุมัติตั๋วหลังตรวจสอบการชำระเงิน</p>
             </div>
             @guest
                 <div class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-900 dark:text-amber-100">
@@ -30,6 +36,23 @@
                     </div>
                 @endif
             @endguest
+            <div class="mt-5 flex flex-wrap items-center gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-white/10 dark:bg-zinc-900">
+                @if($order->user?->avatar)
+                    <img class="h-14 w-14 rounded-full object-cover" src="{{ $order->user->avatar }}" alt="{{ $order->user->name }}">
+                @else
+                    <div class="grid h-14 w-14 place-items-center rounded-full bg-zinc-200 font-semibold text-zinc-700 dark:bg-white/10 dark:text-zinc-200">{{ strtoupper(substr($order->customer_name, 0, 1)) }}</div>
+                @endif
+                <div>
+                    <div class="font-semibold text-zinc-950 dark:text-white">{{ $order->customer_name }}</div>
+                    <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-zinc-600 dark:text-zinc-400">
+                        <span>{{ $order->customer_phone }}</span>
+                        <span>{{ $order->customer_email ?: 'No email / ไม่มีอีเมล' }}</span>
+                        @if($order->user?->provider)
+                            <span>{{ strtoupper($order->user->provider) }}</span>
+                        @endif
+                    </div>
+                </div>
+            </div>
             <div class="mt-6 divide-y divide-white/10">
                 @foreach($order->items as $item)
                     <div class="flex justify-between gap-4 py-4">

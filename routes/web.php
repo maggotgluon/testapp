@@ -44,15 +44,17 @@ Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->na
     Route::get('/events/{event}/overview', [AdminEventController::class, 'overview'])->name('events.overview');
     Route::post('/events/{event}/email-attendees', [AdminEventController::class, 'emailAttendees'])->name('events.email-attendees');
     Route::patch('/events/{event}/tickets/{ticket}/status', [AdminEventController::class, 'updateTicketStatus'])->name('events.tickets.status');
-    Route::resource('events', AdminEventController::class)->except(['show', 'destroy']);
-    Route::resource('coupons', CouponController::class)->except(['show', 'destroy']);
+    Route::delete('/events/{event}/tickets/{ticket}', [AdminEventController::class, 'destroyTicket'])->name('events.tickets.destroy');
+    Route::resource('events', AdminEventController::class)->except(['show']);
+    Route::resource('coupons', CouponController::class)->except(['show']);
     Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/approve', [AdminOrderController::class, 'approve'])->name('orders.approve');
     Route::post('/orders/{order}/reject', [AdminOrderController::class, 'reject'])->name('orders.reject');
     Route::post('/orders/{order}/refund', [AdminOrderController::class, 'refund'])->name('orders.refund');
+    Route::delete('/orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');
 });
 
 Route::middleware(['auth', 'role:super_admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::resource('users', AdminUserController::class)->only(['index', 'edit', 'update']);
+    Route::resource('users', AdminUserController::class)->only(['index', 'edit', 'update', 'destroy']);
 });

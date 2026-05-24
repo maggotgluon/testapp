@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[Fillable(['name', 'username', 'email', 'phone', 'role', 'provider', 'provider_id', 'avatar', 'password'])]
 #[Hidden(['password', 'remember_token'])]
@@ -40,8 +41,25 @@ class User extends Authenticatable
         return $this->hasMany(Ticket::class);
     }
 
+    public function assignedEvents(): BelongsToMany
+    {
+        return $this->belongsToMany(Event::class)->withTimestamps();
+    }
+
     public function isAdmin(): bool
     {
         return in_array($this->role, ['super_admin', 'event_admin', 'gate_scanner'], true);
+    }
+
+    public function canManageEvent(Event|int $event): bool
+    {
+        if ($this->role === 'super_admin') {
+            return true;
+        }
+
+        $eventId = $event instanceof Event ? $event->id : $event;
+
+        return in_array($this->role, ['event_admin', 'gate_scanner'], true)
+            && $this->assignedEvents()->whereKey($eventId)->exists();
     }
 }

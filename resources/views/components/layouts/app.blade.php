@@ -53,13 +53,9 @@
                     @if(auth()->user()->isAdmin())
                         <a class="rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('admin.dashboard') }}">Admin / ผู้ดูแล</a>
                     @endif
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10">Logout / ออกจากระบบ</button>
-                    </form>
                 @else
                     <a class="rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('login') }}">Login / เข้าสู่ระบบ</a>
-                    <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('admin.login') }}">Admin / ผู้ดูแล</a>
+                    <!-- <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('admin.login') }}">Admin / ผู้ดูแล</a> -->
                 @endauth
             </nav>
         </div>

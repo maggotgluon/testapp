@@ -13,39 +13,63 @@ class CouponController extends Controller
 {
     public function index(): View
     {
+        $coupons = Coupon::with(['event', 'ticketType'])->latest();
+
+        if (auth()->user()->role !== 'super_admin') {
+            $coupons->whereHas('event.assignedUsers', fn ($query) => $query->whereKey(auth()->id()));
+        }
+
         return view('admin.coupons.index', [
-            'coupons' => Coupon::with(['event', 'ticketType'])->latest()->paginate(20),
+            'coupons' => $coupons->paginate(20),
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         return view('admin.coupons.form', [
             'coupon' => new Coupon,
-            'events' => Event::with('ticketTypes')->orderBy('starts_at')->get(),
+            'events' => $this->eventsForUser($request),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        Coupon::create($this->validated($request));
+        $data = $this->validated($request);
+        $this->authorizeCouponEvent($request, $data);
+
+        Coupon::create($data);
 
         return redirect()->route('admin.coupons.index')->with('status', 'Coupon created.');
     }
 
     public function edit(Coupon $coupon): View
     {
+        abort_unless($this->canManageCoupon($coupon), 403);
+
         return view('admin.coupons.form', [
             'coupon' => $coupon,
-            'events' => Event::with('ticketTypes')->orderBy('starts_at')->get(),
+            'events' => $this->eventsForUser(request()),
         ]);
     }
 
     public function update(Request $request, Coupon $coupon): RedirectResponse
     {
-        $coupon->update($this->validated($request));
+        abort_unless($this->canManageCoupon($coupon), 403);
+
+        $data = $this->validated($request);
+        $this->authorizeCouponEvent($request, $data);
+
+        $coupon->update($data);
 
         return redirect()->route('admin.coupons.index')->with('status', 'Coupon updated.');
+    }
+
+    public function destroy(Coupon $coupon): RedirectResponse
+    {
+        abort_unless($this->canManageCoupon($coupon), 403);
+        $coupon->delete();
+
+        return redirect()->route('admin.coupons.index')->with('status', 'Coupon deleted.');
     }
 
     private function validated(Request $request): array
@@ -68,5 +92,31 @@ class CouponController extends Controller
         $data['is_active'] = $request->boolean('is_active');
 
         return $data;
+    }
+
+    private function eventsForUser(Request $request)
+    {
+        $events = Event::with('ticketTypes')->orderBy('starts_at');
+
+        if ($request->user()->role !== 'super_admin') {
+            $events->whereHas('assignedUsers', fn ($query) => $query->whereKey($request->user()->id));
+        }
+
+        return $events->get();
+    }
+
+    private function canManageCoupon(Coupon $coupon): bool
+    {
+        return auth()->user()->role === 'super_admin'
+            || ($coupon->event_id && auth()->user()->canManageEvent($coupon->event_id));
+    }
+
+    private function authorizeCouponEvent(Request $request, array $data): void
+    {
+        if ($request->user()->role === 'super_admin') {
+            return;
+        }
+
+        abort_unless(! empty($data['event_id']) && $request->user()->canManageEvent((int) $data['event_id']), 403);
     }
 }

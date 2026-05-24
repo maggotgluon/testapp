@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Event extends Model
@@ -30,6 +31,7 @@ class Event extends Model
         'qr_payment_image_path',
         'payment_instructions',
         'is_published',
+        'show_countdown',
     ];
 
     protected function casts(): array
@@ -38,6 +40,7 @@ class Event extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'is_published' => 'boolean',
+            'show_countdown' => 'boolean',
         ];
     }
 
@@ -49,6 +52,11 @@ class Event extends Model
     public function coupons(): HasMany
     {
         return $this->hasMany(Coupon::class);
+    }
+
+    public function assignedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)->withTimestamps();
     }
 
     public function scopeVisible($query)

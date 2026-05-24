@@ -182,12 +182,44 @@ Alpine.data('checkout', (config) => ({
     },
 }));
 
+Alpine.data('eventCountdown', (config) => ({
+    label: 'Event starts in / เริ่มงานในอีก',
+    days: '00',
+    hours: '00',
+    minutes: '00',
+    seconds: '00',
+    timer: null,
+    init() {
+        this.update();
+        this.timer = window.setInterval(() => this.update(), 1000);
+    },
+    update() {
+        const target = new Date(config.startsAt).getTime();
+        const diff = target - Date.now();
+
+        if (diff <= 0) {
+            this.label = 'Event has started / อีเวนต์เริ่มแล้ว';
+            this.days = this.hours = this.minutes = this.seconds = '00';
+            if (this.timer) {
+                window.clearInterval(this.timer);
+            }
+            return;
+        }
+
+        this.days = String(Math.floor(diff / 86400000)).padStart(2, '0');
+        this.hours = String(Math.floor((diff % 86400000) / 3600000)).padStart(2, '0');
+        this.minutes = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+        this.seconds = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+    },
+}));
+
 Alpine.data('adminTicketTypes', (config) => {
     const blankRow = () => ({
         id: '',
         name: '',
         description: '',
         price_thb: 0,
+        full_price_thb: '',
         capacity: 0,
         sale_starts_at: '',
         sale_ends_at: '',

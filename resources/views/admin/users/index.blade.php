@@ -14,13 +14,22 @@
     <div class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
         <div class="divide-y divide-white/10">
             @foreach($users as $user)
-                <a class="grid gap-2 p-4 hover:bg-zinc-50 dark:bg-white/[0.03] sm:grid-cols-[1fr_auto]" href="{{ route('admin.users.edit', $user) }}">
+                <div class="grid gap-3 p-4 hover:bg-zinc-50 dark:bg-white/[0.03] sm:grid-cols-[1fr_auto]">
                     <div>
-                        <div class="font-semibold text-zinc-950 dark:text-white">{{ $user->name }}</div>
+                        <a class="font-semibold text-zinc-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-200" href="{{ route('admin.users.edit', $user) }}">{{ $user->name }}</a>
                         <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $user->username ?: 'No username / ไม่มีชื่อผู้ใช้' }} · {{ $user->phone ?: 'No phone / ไม่มีเบอร์' }} · {{ $user->email ?: 'No email / ไม่มีอีเมล' }}</div>
                     </div>
-                    <span class="self-start rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-200">{{ str_replace('_', ' ', $user->role) }}</span>
-                </a>
+                    <div class="flex flex-wrap items-start gap-2">
+                        <span class="rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-200">{{ str_replace('_', ' ', $user->role) }}</span>
+                        @if($user->id !== auth()->id())
+                            <form method="POST" action="{{ route('admin.users.destroy', $user) }}" onsubmit="return confirm('Delete this user? / ลบผู้ใช้นี้?')">
+                                @csrf
+                                @method('DELETE')
+                                <button class="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200">Delete / ลบ</button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
             @endforeach
         </div>
         <div class="p-4">{{ $users->links() }}</div>

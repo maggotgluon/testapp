@@ -171,7 +171,7 @@ class OrderController extends Controller
     {
         abort_unless(auth()->id() === $order->user_id || request('phone') === $order->customer_phone || auth()->user()?->isAdmin(), 403);
 
-        $order->load(['items.event', 'items.ticketType', 'tickets.event', 'tickets.ticketType']);
+        $order->load(['user', 'items.event', 'items.ticketType', 'tickets.event', 'tickets.ticketType']);
 
         return view('orders.show', compact('order'));
     }

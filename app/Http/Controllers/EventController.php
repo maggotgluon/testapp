@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
+use App\Models\Ticket;
 use App\Models\TicketOrder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,18 +57,52 @@ class EventController extends Controller
     {
         $orders = TicketOrder::query()
             ->with(['items.event', 'items.ticketType', 'tickets.event', 'tickets.ticketType'])
-            ->when($request->user(), fn ($query) => $query->where('user_id', $request->user()->id))
+            ->where('user_id', $request->user()->id)
+            ->whereHas('items.event', fn ($query) => $query->where('ends_at', '>=', now()))
             ->latest()
             ->get();
 
-        return view('profile', compact('orders'));
+        $tickets = Ticket::query()
+            ->with(['event', 'ticketType', 'order'])
+            ->where('user_id', $request->user()->id)
+            ->whereHas('event', fn ($query) => $query->where('ends_at', '>=', now()))
+            ->latest()
+            ->get();
+
+        $orderEvents = $orders
+            ->flatMap(fn ($order) => $order->items->pluck('event'))
+            ->filter()
+            ->filter(fn ($event) => $event->ends_at->isFuture())
+            ->unique('id')
+            ->values();
+
+        $ticketEvents = $tickets
+            ->pluck('event')
+            ->filter()
+            ->filter(fn ($event) => $event->ends_at->isFuture())
+            ->unique('id')
+            ->values();
+
+        $activeView = $request->query('view') === 'tickets' ? 'tickets' : 'orders';
+
+        return view('profile', compact('orders', 'tickets', 'orderEvents', 'ticketEvents', 'activeView'));
     }
 
     public function lookup(Request $request): View
     {
         $orders = collect();
 
-        if ($request->filled(['phone', 'order_number'])) {
+        $isAdmin = in_array($request->user()?->role, ['super_admin', 'event_admin'], true);
+
+        if ($isAdmin && ($request->filled('phone') || $request->filled('order_number'))) {
+            $orders = TicketOrder::query()
+                ->with(['items.event', 'items.ticketType', 'tickets.event', 'tickets.ticketType'])
+                ->when($request->filled('phone'), fn ($query) => $query->where('customer_phone', 'like', '%'.$request->string('phone').'%'))
+                ->when($request->filled('order_number'), fn ($query) => $query->where('order_number', 'like', '%'.strtoupper((string) $request->string('order_number')).'%'))
+                ->when($request->user()->role !== 'super_admin', fn ($query) => $query->whereHas('items.event.assignedUsers', fn ($assigned) => $assigned->whereKey($request->user()->id)))
+                ->latest()
+                ->get();
+        } elseif ($request->filled(['phone', 'order_number'])) {
             $orders = TicketOrder::query()
                 ->with(['items.event', 'items.ticketType', 'tickets.event', 'tickets.ticketType'])
                 ->where('customer_phone', $request->string('phone'))
@@ -76,6 +111,6 @@ class EventController extends Controller
                 ->get();
         }
 
-        return view('orders.lookup', compact('orders'));
+        return view('orders.lookup', compact('orders', 'isAdmin'));
     }
 }
