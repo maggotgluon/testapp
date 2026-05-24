@@ -69,7 +69,7 @@
         </section>
     </div>
 
-    <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
+    <!-- <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
         <div class="grid gap-4 lg:grid-cols-[.7fr_1.3fr]">
             <div>
                 <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Email attendees / ส่งอีเมลถึงผู้เข้าร่วม</h2>
@@ -94,7 +94,7 @@
                 <button class="inline-flex items-center gap-2 justify-self-start rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300"><x-icon name="mail" />Send email / ส่งอีเมล</button>
             </form>
         </div>
-    </section>
+    </section> -->
 
     @if($lineNotificationsEnabled || $webPushEnabled)
     <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">

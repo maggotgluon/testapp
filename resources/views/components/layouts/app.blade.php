@@ -57,11 +57,11 @@
             </a>
             <nav class="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-sm text-zinc-700 dark:text-zinc-300 sm:gap-2">
                 <!-- <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('events.index') }}">Events / อีเวนต์</a> -->
-                <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('orders.lookup') }}"><x-icon name="search" />Find order / ค้นหาออเดอร์</a>
+                <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('orders.lookup') }}"><x-icon name="search" /></a>
                 @auth
                     <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('profile') }}"><x-icon name="user" />Profile / โปรไฟล์</a>
                     @if(auth()->user()->isAdmin())
-                        <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('admin.dashboard') }}"><x-icon name="shield" />Admin / ผู้ดูแล</a>
+                        <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('admin.dashboard') }}"><x-icon name="shield" />Admin</a>
                     @endif
                 @else
                     <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('login') }}"><x-icon name="log-in" />Login / เข้าสู่ระบบ</a>
@@ -73,15 +73,15 @@
             @if(auth()->user()->isAdmin() && request()->is('admin*'))
                 <div class="border-t border-zinc-200 dark:border-white/10">
                     <div class="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 text-sm sm:px-6 lg:px-8">
-                        <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.dashboard') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.dashboard') }}"><x-icon name="layout-dashboard" />Dashboard / ภาพรวม</a>
+                        <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.dashboard') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.dashboard') }}"><x-icon name="layout-dashboard" />Dashboard</a>
                         @if(in_array(auth()->user()->role, ['super_admin', 'event_admin'], true))
-                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.events.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.events.index') }}"><x-icon name="calendar-days" />Events / อีเวนต์</a>
-                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.coupons.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.coupons.index') }}"><x-icon name="tag" />Coupons / คูปอง</a>
-                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.orders.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.orders.index') }}"><x-icon name="shopping-bag" />Orders / ออเดอร์</a>
+                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.events.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.events.index') }}"><x-icon name="calendar-days" />Events</a>
+                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.coupons.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.coupons.index') }}"><x-icon name="tag" />Coupons</a>
+                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.orders.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.orders.index') }}"><x-icon name="shopping-bag" />Orders</a>
                         @endif
-                        <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.scanner') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.scanner') }}"><x-icon name="scan-line" />Scanner / สแกนตั๋ว</a>
+                        <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.scanner') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.scanner') }}"><x-icon name="scan-line" />Scanner</a>
                         @if(auth()->user()->role === 'super_admin')
-                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.users.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.users.index') }}"><x-icon name="users" />Users / ผู้ใช้</a>
+                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.users.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.users.index') }}"><x-icon name="users" />Users</a>
                         @endif
                     </div>
                 </div>
