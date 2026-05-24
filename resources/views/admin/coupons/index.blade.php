@@ -1,7 +1,7 @@
 <x-layouts.app title="Coupons">
     <div class="flex items-center justify-between gap-3">
         <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">Coupons / คูปอง</h1>
-        <a class="rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950" href="{{ route('admin.coupons.create') }}">New coupon / เพิ่มคูปอง</a>
+        <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950" href="{{ route('admin.coupons.create') }}"><x-icon name="plus" />New coupon / เพิ่มคูปอง</a>
     </div>
     <div class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
         <div class="divide-y divide-white/10">
@@ -16,7 +16,7 @@
                         <form method="POST" action="{{ route('admin.coupons.destroy', $coupon) }}" onsubmit="return confirm('Delete this coupon? / ลบคูปองนี้?')">
                             @csrf
                             @method('DELETE')
-                            <button class="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200">Delete / ลบ</button>
+                            <button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button>
                         </form>
                     </div>
                 </div>

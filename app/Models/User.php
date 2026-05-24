@@ -10,13 +10,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 
-#[Fillable(['name', 'username', 'email', 'phone', 'role', 'provider', 'provider_id', 'avatar', 'password'])]
+#[Fillable(['name', 'username', 'email', 'phone', 'role', 'provider', 'provider_id', 'avatar', 'password', 'line_friend_status', 'line_followed_at', 'line_blocked_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, HasPushSubscriptions, Notifiable;
 
     /**
      * Get the attributes that should be cast.
@@ -28,6 +29,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'line_followed_at' => 'datetime',
+            'line_blocked_at' => 'datetime',
         ];
     }
 

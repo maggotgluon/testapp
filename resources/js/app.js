@@ -2,33 +2,101 @@ import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
 
-Alpine.data('scanner', () => ({
+Alpine.data('scanner', (config = {}) => ({
     code: '',
     message: '',
     ok: false,
+    currentTicket: null,
+    quickMode: false,
+    selectedAction: 'check_in',
+    selectedEventId: '',
+    events: config.events || [],
+    recentScans: (config.recentScans || []).map((scan, index) => ({ ...scan, clientId: `server-${index}` })),
+    flash: '',
+    scanning: false,
+    lastScannedCode: '',
+    lastScannedAt: 0,
+    audioContext: null,
+    init() {
+        this.selectedEventId = this.events[0]?.id ? String(this.events[0].id) : '';
+        this.$nextTick(() => this.$refs.codeInput?.focus());
+    },
+    async handleScan() {
+        if (this.quickMode) {
+            await this.submit(this.selectedAction);
+            return;
+        }
+
+        await this.lookup();
+    },
+    async lookup() {
+        await this.requestScan(null);
+    },
     async submit(action) {
-        this.message = 'Scanning... / กำลังสแกน...';
+        await this.requestScan(action);
+    },
+    async requestScan(action = null) {
+        if (this.scanning) {
+            return;
+        }
 
-        const response = await fetch('/admin/scanner', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                Accept: 'application/json',
-            },
-            body: JSON.stringify({ code: this.code, action }),
-        });
+        const code = String(this.code || '').trim();
+        if (!code) {
+            this.failFeedback('Please scan or enter a ticket UUID. / กรุณาสแกนหรือกรอก UUID ตั๋ว');
+            return;
+        }
 
-        const payload = await response.json();
-        this.ok = payload.ok;
-        this.message = payload.ok
-            ? `${payload.message} ${payload.ticket.holder} - ${payload.ticket.event}`
-            : payload.message;
+        if (this.quickMode && !this.selectedEventId) {
+            this.failFeedback('Please select an event for quick mode. / กรุณาเลือกอีเวนต์สำหรับโหมดเร็ว');
+            return;
+        }
+
+        this.scanning = true;
+        this.message = action ? 'Updating ticket... / กำลังอัปเดตตั๋ว...' : 'Looking up ticket... / กำลังค้นหาตั๋ว...';
+
+        try {
+            const response = await fetch('/admin/scanner', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    code,
+                    action,
+                    event_id: this.quickMode ? this.selectedEventId : null,
+                }),
+            });
+
+            const payload = await response.json();
+            this.ok = payload.ok;
+
+            if (payload.ticket) {
+                this.currentTicket = payload.ticket;
+            }
+
+            this.message = payload.ok && payload.ticket
+                ? `${payload.message} ${payload.ticket.holder} - ${payload.ticket.event} (${this.statusLabel(payload.ticket.status)})`
+                : payload.message;
+
+            if (payload.ok) {
+                this.successFeedback();
+                this.addRecent(payload);
+                this.code = '';
+                this.$nextTick(() => this.$refs.codeInput?.focus());
+            } else {
+                this.failFeedback(payload.message, payload);
+            }
+        } catch (error) {
+            this.failFeedback('Scanner request failed. Please try again. / สแกนไม่สำเร็จ กรุณาลองใหม่');
+        } finally {
+            this.scanning = false;
+        }
     },
     async startCamera() {
         if (!('BarcodeDetector' in window)) {
-            this.ok = false;
-            this.message = 'Camera barcode detection is not supported in this browser. / เบราว์เซอร์นี้ยังไม่รองรับการสแกนบาร์โค้ดด้วยกล้อง';
+            this.failFeedback('Camera barcode detection is not supported in this browser. / เบราว์เซอร์นี้ยังไม่รองรับการสแกนบาร์โค้ดด้วยกล้อง');
             return;
         }
 
@@ -41,7 +109,14 @@ Alpine.data('scanner', () => ({
         const loop = async () => {
             const codes = await detector.detect(video).catch(() => []);
             if (codes.length > 0) {
-                this.code = codes[0].rawValue;
+                const rawValue = codes[0].rawValue;
+                const now = Date.now();
+                if (rawValue !== this.lastScannedCode || now - this.lastScannedAt > 2000) {
+                    this.lastScannedCode = rawValue;
+                    this.lastScannedAt = now;
+                    this.code = rawValue;
+                    await this.handleScan();
+                }
                 stream.getTracks().forEach((track) => track.stop());
                 video.classList.add('hidden');
                 return;
@@ -49,6 +124,76 @@ Alpine.data('scanner', () => ({
             requestAnimationFrame(loop);
         };
         loop();
+    },
+    addRecent(payload) {
+        this.recentScans = [
+            {
+                ...payload,
+                clientId: `scan-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                scanned_at: payload.scanned_at || new Date().toLocaleTimeString('th-TH', { hour12: false }),
+            },
+            ...this.recentScans,
+        ].slice(0, 20);
+    },
+    statusLabel(status) {
+        return String(status || '').replaceAll('_', ' ');
+    },
+    canCheckIn() {
+        return this.currentTicket?.status === 'approved';
+    },
+    canCheckOut() {
+        return this.currentTicket?.status === 'checked_in';
+    },
+    successFeedback() {
+        this.ok = true;
+        this.flashScreen('success');
+        this.beep(880, 90, 'sine');
+        this.vibrate([80]);
+    },
+    failFeedback(message, payload = null) {
+        this.ok = false;
+        this.message = message;
+        if (payload?.ticket) {
+            this.currentTicket = payload.ticket;
+            this.addRecent(payload);
+        } else if (String(this.code || '').trim()) {
+            this.addRecent({
+                ok: false,
+                message,
+                scanned_at: new Date().toLocaleTimeString('th-TH', { hour12: false }),
+                ticket: null,
+            });
+        }
+        this.flashScreen('error');
+        this.beep(180, 160, 'square');
+        this.vibrate([120, 60, 120]);
+    },
+    flashScreen(type) {
+        this.flash = type;
+        window.setTimeout(() => {
+            this.flash = '';
+        }, 280);
+    },
+    vibrate(pattern) {
+        if ('vibrate' in navigator) {
+            navigator.vibrate(pattern);
+        }
+    },
+    beep(frequency, duration, type = 'sine') {
+        try {
+            this.audioContext = this.audioContext || new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = this.audioContext.createOscillator();
+            const gain = this.audioContext.createGain();
+            oscillator.type = type;
+            oscillator.frequency.value = frequency;
+            gain.gain.value = 0.05;
+            oscillator.connect(gain);
+            gain.connect(this.audioContext.destination);
+            oscillator.start();
+            oscillator.stop(this.audioContext.currentTime + duration / 1000);
+        } catch (error) {
+            // Sound feedback is best-effort because some mobile browsers block audio.
+        }
     },
 }));
 
@@ -213,6 +358,80 @@ Alpine.data('eventCountdown', (config) => ({
     },
 }));
 
+Alpine.data('webPushSettings', () => ({
+    supported: false,
+    subscribed: false,
+    message: 'Checking notification support... / กำลังตรวจสอบการรองรับ...',
+    registration: null,
+    async init() {
+        this.supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && Boolean(document.querySelector('meta[name="webpush-public-key"]')?.content);
+
+        if (!this.supported) {
+            this.message = 'Web Push is not available on this device or VAPID keys are missing. / อุปกรณ์นี้ยังไม่รองรับ Web Push หรือยังไม่ได้ตั้งค่า VAPID';
+            return;
+        }
+
+        this.registration = await navigator.serviceWorker.register('/sw.js');
+        const subscription = await this.registration.pushManager.getSubscription();
+        this.subscribed = Boolean(subscription);
+        this.message = this.subscribed
+            ? 'Web Push is enabled on this device. / เปิด Web Push บนอุปกรณ์นี้แล้ว'
+            : 'Web Push is ready. / พร้อมเปิด Web Push';
+    },
+    async subscribe() {
+        if (!this.supported) {
+            return;
+        }
+
+        const permission = await Notification.requestPermission();
+
+        if (permission !== 'granted') {
+            this.message = 'Notification permission was not granted. / ยังไม่ได้อนุญาตการแจ้งเตือน';
+            return;
+        }
+
+        const subscription = await this.registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(document.querySelector('meta[name="webpush-public-key"]').content),
+        });
+
+        await fetch(document.querySelector('meta[name="push-subscribe-url"]').content, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                Accept: 'application/json',
+            },
+            body: JSON.stringify(subscription.toJSON()),
+        });
+
+        this.subscribed = true;
+        this.message = 'Web Push is enabled on this device. / เปิด Web Push บนอุปกรณ์นี้แล้ว';
+    },
+    async unsubscribe() {
+        const subscription = await this.registration?.pushManager.getSubscription();
+
+        if (!subscription) {
+            this.subscribed = false;
+            return;
+        }
+
+        await fetch(document.querySelector('meta[name="push-unsubscribe-url"]').content, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                Accept: 'application/json',
+            },
+            body: JSON.stringify({ endpoint: subscription.endpoint }),
+        });
+
+        await subscription.unsubscribe();
+        this.subscribed = false;
+        this.message = 'Web Push is off on this device. / ปิด Web Push บนอุปกรณ์นี้แล้ว';
+    },
+}));
+
 Alpine.data('adminTicketTypes', (config) => {
     const blankRow = () => ({
         id: '',
@@ -354,3 +573,16 @@ Alpine.data('lineLiffLogin', (config) => ({
 }));
 
 Alpine.start();
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+
+    return outputArray;
+}

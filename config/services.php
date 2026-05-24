@@ -46,12 +46,21 @@ return [
         'client_secret' => env('LINE_CLIENT_SECRET'),
         'redirect' => env('LINE_REDIRECT_URI'),
         'liff_id' => env('LINE_LIFF_ID'),
+        'messaging_channel_access_token' => env('LINE_MESSAGING_CHANNEL_ACCESS_TOKEN'),
+        'messaging_channel_secret' => env('LINE_MESSAGING_CHANNEL_SECRET'),
+        'official_account_url' => env('LINE_OFFICIAL_ACCOUNT_URL'),
     ],
 
     'instagram' => [
         'client_id' => env('INSTAGRAM_CLIENT_ID'),
         'client_secret' => env('INSTAGRAM_CLIENT_SECRET'),
         'redirect' => env('INSTAGRAM_REDIRECT_URI'),
+    ],
+
+    'crm' => [
+        'base_url' => env('CRM_API_URL'),
+        'token' => env('CRM_API_TOKEN'),
+        'webhook_token' => env('CRM_WEBHOOK_TOKEN'),
     ],
 
 ];

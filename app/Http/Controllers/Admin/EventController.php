@@ -7,6 +7,8 @@ use App\Mail\EventAttendeeAnnouncement;
 use App\Models\Event;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
+use App\Models\User;
+use App\Services\CustomerNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -109,6 +111,7 @@ class EventController extends Controller
             'totalTickets' => Ticket::where('event_id', $event->id)->count(),
             'checkedInTickets' => Ticket::where('event_id', $event->id)->whereIn('status', ['checked_in', 'checked_out'])->count(),
             'emailRecipientCount' => $this->attendeeEmails($event, 'approved')->count(),
+            'messageRecipientCount' => $this->attendeeUsers($event, 'approved')->count(),
         ]);
     }
 
@@ -133,6 +136,29 @@ class EventController extends Controller
         }
 
         return back()->with('status', 'Email sent to '.$emails->count().' attendees. / ส่งอีเมลถึงผู้เข้าร่วม '.$emails->count().' คนแล้ว');
+    }
+
+    public function messageAttendees(Request $request, Event $event, CustomerNotificationService $notifications): RedirectResponse
+    {
+        abort_unless($request->user()->canManageEvent($event), 403);
+
+        $data = $request->validate([
+            'subject' => ['required', 'string', 'max:255'],
+            'message' => ['required', 'string', 'max:1000'],
+            'audience' => ['required', 'in:approved,all'],
+            'channels' => ['required', 'array', 'min:1'],
+            'channels.*' => ['required', 'in:line,web_push'],
+        ]);
+
+        $users = $this->attendeeUsers($event, $data['audience']);
+
+        if ($users->isEmpty()) {
+            return back()->withErrors(['message' => 'No logged-in attendees found for this event. / ไม่พบผู้เข้าร่วมที่ล็อกอินสำหรับอีเวนต์นี้']);
+        }
+
+        $counts = $notifications->eventMessage($event, $users, $data['subject'], $data['message'], $data['channels']);
+
+        return back()->with('status', 'Message sent. LINE: '.$counts['line'].' Web Push: '.$counts['web_push'].' / ส่งข้อความแล้ว LINE: '.$counts['line'].' Web Push: '.$counts['web_push']);
     }
 
     public function update(Request $request, Event $event): RedirectResponse
@@ -315,5 +341,21 @@ class EventController extends Controller
             ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
             ->unique()
             ->values();
+    }
+
+    private function attendeeUsers(Event $event, string $audience)
+    {
+        $userIds = TicketOrder::query()
+            ->whereHas('items', fn ($query) => $query->where('event_id', $event->id))
+            ->when($audience === 'approved', fn ($query) => $query->where('status', 'approved'))
+            ->whereNotNull('user_id')
+            ->pluck('user_id')
+            ->unique()
+            ->values();
+
+        return User::query()
+            ->with('pushSubscriptions')
+            ->whereIn('id', $userIds)
+            ->get();
     }
 }

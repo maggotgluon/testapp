@@ -33,7 +33,7 @@
                     @endif
                 </div>
                 <div class="p-5">
-                    <p class="text-sm text-emerald-600 dark:text-emerald-300">{{ $event->starts_at->format('D, M j, Y H:i') }} - {{ $event->ends_at->format('H:i') }}</p>
+                    <p class="inline-flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-300"><x-icon name="calendar-days" />{{ $event->starts_at->format('D, M j, Y H:i') }} - {{ $event->ends_at->format('H:i') }}</p>
                     <h1 class="mt-2 text-3xl font-semibold text-zinc-950 dark:text-white">{{ $event->name }}</h1>
                     @if($event->show_countdown)
                         <div class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4" x-data="eventCountdown({ startsAt: @js($event->starts_at->toIso8601String()) })" x-init="init()">
@@ -50,17 +50,17 @@
                         {!! $event->description !!}
                     </div>
                     <dl class="mt-5 grid gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-                        <div><dt class="text-zinc-500">Venue / สถานที่</dt><dd>{{ $event->venue }}</dd></div>
-                        <div><dt class="text-zinc-500">Location / ที่ตั้ง</dt><dd>
+                        <div><dt class="inline-flex items-center gap-1.5 text-zinc-500"><x-icon name="building-2" class="h-3.5 w-3.5" />Venue / สถานที่</dt><dd>{{ $event->venue }}</dd></div>
+                        <div><dt class="inline-flex items-center gap-1.5 text-zinc-500"><x-icon name="map-pin" class="h-3.5 w-3.5" />Location / ที่ตั้ง</dt><dd>
                             @if($event->location_url)
-                                <a class="text-emerald-700 underline dark:text-emerald-200" href="{{ $event->location_url }}" target="_blank" rel="noopener">{{ $event->location ?: 'Open map / เปิดแผนที่' }}</a>
+                                <a class="inline-flex items-center gap-1.5 text-emerald-700 underline dark:text-emerald-200" href="{{ $event->location_url }}" target="_blank" rel="noopener"><x-icon name="map-pin" class="h-3.5 w-3.5" />{{ $event->location ?: 'Open map / เปิดแผนที่' }}</a>
                             @else
                                 {{ $event->location }}
                             @endif
                         </dd></div>
-                        <div><dt class="text-zinc-500">Hosted by / ผู้จัด</dt><dd>
+                        <div><dt class="inline-flex items-center gap-1.5 text-zinc-500"><x-icon name="heart-handshake" class="h-3.5 w-3.5" />Hosted by / ผู้จัด</dt><dd>
                             @if($event->hosted_by_url)
-                                <a class="text-emerald-700 underline dark:text-emerald-200" href="{{ $event->hosted_by_url }}" target="_blank" rel="noopener">{{ $event->hosted_by ?: 'Host / ผู้จัด' }}</a>
+                                <a class="inline-flex items-center gap-1.5 text-emerald-700 underline dark:text-emerald-200" href="{{ $event->hosted_by_url }}" target="_blank" rel="noopener"><x-icon name="heart-handshake" class="h-3.5 w-3.5" />{{ $event->hosted_by ?: 'Host / ผู้จัด' }}</a>
                             @else
                                 {{ $event->hosted_by }}
                             @endif
@@ -96,13 +96,13 @@
                                 <div class="font-semibold text-emerald-950 dark:text-emerald-50">Get Ticket faster with LINE <br> ซื้อง่ายขึ้นด้วย LINE</div>
                                 <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-100">Login with LINE to save tickets to your profile automatically. <br> เข้าสู่ระบบด้วย LINE เพื่อบันทึกตั๋วไว้ในโปรไฟล์</p>
                             </div>
-                            <a class="rounded-md bg-[#06c755] px-4 py-2 text-sm font-semibold text-zinc-950" href="{{ route('auth.social', ['provider' => 'line', 'redirect' => request()->getRequestUri()]) }}">Login with LINE / เข้าสู่ระบบด้วย LINE</a>
+                            <a class="inline-flex items-center gap-2 rounded-md bg-[#06c755] px-4 py-2 text-sm font-semibold text-zinc-950" href="{{ route('auth.social', ['provider' => 'line', 'redirect' => request()->getRequestUri()]) }}"><x-icon name="log-in" />Login with LINE / เข้าสู่ระบบด้วย LINE</a>
                         </div>
                     </div>
                 @endif
             @endguest
 
-            <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Reserve Your Spot / เลือกตั๋ว</h2>
+            <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="ticket" class="h-5 w-5 text-emerald-500" />Reserve Your Spot / เลือกตั๋ว</h2>
             <div class="mt-4 grid gap-3">
                 @forelse($event->ticketTypes as $ticket)
                     <div class="rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4">
@@ -118,10 +118,10 @@
                             </div>
                             <input type="hidden" name="items[{{ $loop->index }}][ticket_type_id]" value="{{ $ticket->id }}">
                             <div class="grid grid-cols-[40px_40px_40px] overflow-hidden rounded-md border border-zinc-200 dark:border-white/10">
-                                <button class="bg-white dark:bg-zinc-950 px-3 py-2 text-lg text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="decrement({{ $ticket->id }})">-</button>
+                                <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="decrement({{ $ticket->id }})" aria-label="Remove ticket / ลดจำนวนตั๋ว"><x-icon name="minus" /></button>
                                 <input class="border-x border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-2 py-2 text-center text-zinc-950 dark:text-white" name="items[{{ $loop->index }}][quantity]" 
                                     type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]" @input="syncHolderNames({{ $ticket->id }})">
-                                <button class="bg-white dark:bg-zinc-950 px-3 py-2 text-lg text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="increment({{ $ticket->id }})">+</button>
+                                <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="increment({{ $ticket->id }})" aria-label="Add ticket / เพิ่มจำนวนตั๋ว"><x-icon name="plus" /></button>
                             </div>
                         </div>
                         <div>
@@ -152,10 +152,10 @@
                 
                 @if($event->coupons->isNotEmpty())
                     <div class="mt-4 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4 text-sm text-zinc-700 dark:text-zinc-300" x-cloak x-show="applicableCoupons().length > 0">
-                        <div class="font-medium text-zinc-950 dark:text-white">Available coupons / คูปองที่ใช้ได้</div>
+                        <div class="inline-flex items-center gap-2 font-medium text-zinc-950 dark:text-white"><x-icon name="tag" />Available coupons / คูปองที่ใช้ได้</div>
                         <div class="mt-2 flex flex-wrap gap-2">
                             <template x-for="coupon in applicableCoupons()" :key="coupon.code">
-                                <button class="rounded bg-zinc-100 dark:bg-white/10 px-2 py-1 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/20" type="button" @click="applyCoupon(coupon.code)" x-text="coupon.code"></button>
+                                <button class="inline-flex items-center gap-1.5 rounded bg-zinc-100 dark:bg-white/10 px-2 py-1 font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/20" type="button" @click="applyCoupon(coupon.code)"><x-icon name="tag" class="h-3.5 w-3.5" /><span x-text="coupon.code"></span></button>
                             </template>
                         </div>
                     </div>
@@ -164,7 +164,7 @@
 
                 <div class="mt-5 rounded-md border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
                     <div class="flex items-center justify-between gap-3">
-                        <strong x-text="paymentMethod === 'qr_payment' ? 'QR payment / ชำระด้วย QR' : 'Bank transfer / โอนผ่านธนาคาร'"></strong>
+                        <strong class="inline-flex items-center gap-2"><x-icon name="wallet" /><span x-text="paymentMethod === 'qr_payment' ? 'QR payment / ชำระด้วย QR' : 'Bank transfer / โอนผ่านธนาคาร'"></span></strong>
                         <span class="rounded bg-emerald-300 px-2 py-1 font-semibold text-zinc-950">THB <span x-text="total().toLocaleString()"></span></span>
                     </div>
                     <dl class="mt-3 grid gap-1 text-sm">
@@ -195,7 +195,7 @@
                                 <div><dt class="text-emerald-700 dark:text-emerald-200">PromptPay / account / พร้อมเพย์หรือบัญชี</dt><dd class="font-mono" x-text="payment.qr_payment_account || '-'"></dd></div>
                                 <div><dt class="text-emerald-700 dark:text-emerald-200">Amount / จำนวนเงิน</dt><dd>THB <span x-text="total().toLocaleString()"></span></dd></div>
                                 <template x-if="payment.qr_payment_image">
-                                    <div><dt class="text-emerald-700 dark:text-emerald-200">Reference QR image / รูป QR อ้างอิง</dt><dd><a class="underline" :href="payment.qr_payment_image" target="_blank">Open uploaded account QR / เปิดรูป QR ที่อัปโหลด</a></dd></div>
+                                    <div><dt class="text-emerald-700 dark:text-emerald-200">Reference QR image / รูป QR อ้างอิง</dt><dd><a class="inline-flex items-center gap-1.5 underline" :href="payment.qr_payment_image" target="_blank"><x-icon name="qr-code" class="h-3.5 w-3.5" />Open uploaded account QR / เปิดรูป QR ที่อัปโหลด</a></dd></div>
                                 </template>
                             </dl>
                         </div>
@@ -213,14 +213,14 @@
                         Payment slip / สลิปชำระเงิน <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
                         <label class="mt-1 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-emerald-400/50 bg-white dark:bg-zinc-950 px-3 py-2 font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/10">
                             <input class="sr-only" name="slip" type="file" accept="image/*" @change="slipName = $event.target.files[0]?.name || ''" required>
-                            Attach payment slip / แนบสลิป
+                            <span class="inline-flex items-center gap-2"><x-icon name="upload" />Attach payment slip / แนบสลิป</span>
                         </label>
                         <p class="mt-1 truncate text-xs text-zinc-500" x-text="slipName || 'No file attached yet / ยังไม่ได้แนบไฟล์'"></p>
                     </div>
                 </div>
                 <label class="mt-4 block text-sm text-zinc-700 dark:text-zinc-300">Payment note / หมายเหตุการชำระเงิน<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_note" rows="3"></textarea></label>
                 <div class="mt-5 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4">
-                    <h3 class="font-semibold text-zinc-950 dark:text-white">Ticket holders / ชื่อผู้ถือบัตร</h3>
+                    <h3 class="inline-flex items-center gap-2 font-semibold text-zinc-950 dark:text-white"><x-icon name="users" />Ticket holders / ชื่อผู้ถือบัตร</h3>
                     <!-- <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Leave blank to use the buyer name. / เว้นว่างไว้เพื่อใช้ชื่อผู้ซื้อ</p> -->
                     <div class="mt-4 grid gap-4">
                         <template x-for="ticket in tickets" :key="ticket.id">
@@ -237,7 +237,7 @@
                     </div>
                 </div>
 
-                <button class="mt-5 w-full rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950 hover:bg-emerald-300">Submit order / ส่งคำสั่งซื้อ</button>
+                <button class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950 hover:bg-emerald-300"><x-icon name="send" />Submit order / ส่งคำสั่งซื้อ</button>
             </div>
         </form>
     </div>

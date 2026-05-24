@@ -7,8 +7,11 @@ use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\ScannerController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CrmController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\LineWebhookController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PushSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [EventController::class, 'index'])->name('events.index');
@@ -19,9 +22,16 @@ Route::post('/login', [AuthController::class, 'login'])->name('login.store');
 Route::get('/admin/login', [AuthController::class, 'adminShow'])->name('admin.login');
 Route::post('/admin/login', [AuthController::class, 'adminLogin'])->name('admin.login.store');
 Route::post('/auth/line/liff', [AuthController::class, 'lineLiff'])->name('auth.line.liff');
+Route::post('/line/webhook', LineWebhookController::class)->name('line.webhook');
 Route::get('/auth/{provider}', [AuthController::class, 'social'])->name('auth.social');
 Route::get('/auth/{provider}/callback', [AuthController::class, 'socialCallback'])->name('auth.social.callback');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+Route::prefix('crm')->name('crm.')->group(function () {
+    Route::get('/customers/lookup', [CrmController::class, 'lookupCustomer'])->name('customers.lookup');
+    Route::post('/customers/upsert', [CrmController::class, 'upsertCustomer'])->name('customers.upsert');
+    Route::get('/orders/{order}', [CrmController::class, 'showOrder'])->name('orders.show');
+});
 
 Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
 Route::get('/payments/events/{event}/qr', [OrderController::class, 'paymentQr'])->name('payments.qr');
@@ -32,6 +42,8 @@ Route::get('/tickets/{uuid}/qr', [OrderController::class, 'ticketQr'])->name('ti
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [EventController::class, 'profile'])->name('profile');
+    Route::post('/push-subscriptions', [PushSubscriptionController::class, 'store'])->name('push-subscriptions.store');
+    Route::delete('/push-subscriptions', [PushSubscriptionController::class, 'destroy'])->name('push-subscriptions.destroy');
 });
 
 Route::middleware(['auth', 'role:super_admin,event_admin,gate_scanner'])->prefix('admin')->name('admin.')->group(function () {
@@ -43,6 +55,7 @@ Route::middleware(['auth', 'role:super_admin,event_admin,gate_scanner'])->prefix
 Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/events/{event}/overview', [AdminEventController::class, 'overview'])->name('events.overview');
     Route::post('/events/{event}/email-attendees', [AdminEventController::class, 'emailAttendees'])->name('events.email-attendees');
+    Route::post('/events/{event}/message-attendees', [AdminEventController::class, 'messageAttendees'])->name('events.message-attendees');
     Route::patch('/events/{event}/tickets/{ticket}/status', [AdminEventController::class, 'updateTicketStatus'])->name('events.tickets.status');
     Route::delete('/events/{event}/tickets/{ticket}', [AdminEventController::class, 'destroyTicket'])->name('events.tickets.destroy');
     Route::resource('events', AdminEventController::class)->except(['show']);

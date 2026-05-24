@@ -19,17 +19,17 @@
                 <img class="mt-4 h-16 w-16 rounded-full object-cover" src="{{ $order->user->avatar }}" alt="{{ $order->user->name }}">
             @endif
             <div class="mt-6 flex flex-wrap gap-2">
-                <form method="POST" action="{{ route('admin.orders.approve', $order) }}">@csrf<button class="rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950">Approve / อนุมัติ</button></form>
-                <form method="POST" action="{{ route('admin.orders.reject', $order) }}">@csrf<button class="rounded-md bg-rose-400 px-4 py-2 font-semibold text-zinc-950">Reject / ปฏิเสธ</button></form>
-                <form method="POST" action="{{ route('admin.orders.refund', $order) }}">@csrf<button class="rounded-md border border-zinc-200 dark:border-white/10 px-4 py-2 font-semibold text-zinc-800 dark:text-zinc-100">Refund / คืนเงิน</button></form>
-                <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="rounded-md border border-rose-300 px-4 py-2 font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200">Delete / ลบ</button></form>
+                <form method="POST" action="{{ route('admin.orders.approve', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950"><x-icon name="check" />Approve / อนุมัติ</button></form>
+                <form method="POST" action="{{ route('admin.orders.reject', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-rose-400 px-4 py-2 font-semibold text-zinc-950"><x-icon name="x" />Reject / ปฏิเสธ</button></form>
+                <form method="POST" action="{{ route('admin.orders.refund', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-4 py-2 font-semibold text-zinc-800 dark:text-zinc-100"><x-icon name="undo" />Refund / คืนเงิน</button></form>
+                <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-4 py-2 font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button></form>
             </div>
             @if($order->payment_slip_path)
                 <img class="mt-6 max-h-96 rounded-lg border border-zinc-200 dark:border-white/10 object-contain" src="{{ asset('uploads/'.$order->payment_slip_path) }}" alt="Payment slip / สลิปชำระเงิน">
             @endif
         </section>
         <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
-            <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Tickets / ตั๋ว</h2>
+            <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="ticket" class="h-5 w-5 text-emerald-500" />Tickets / ตั๋ว</h2>
             <div class="mt-4 grid gap-3">
                 @foreach($order->tickets as $ticket)
                     <div class="rounded-md border border-zinc-200 p-4 dark:border-white/10">
@@ -40,7 +40,7 @@
                         <form class="mt-3" method="POST" action="{{ route('admin.events.tickets.destroy', [$ticket->event, $ticket]) }}" onsubmit="return confirm('Delete this ticket? / ลบตั๋วนี้?')">
                             @csrf
                             @method('DELETE')
-                            <button class="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200">Delete ticket / ลบตั๋ว</button>
+                            <button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete ticket / ลบตั๋ว</button>
                         </form>
                     </div>
                 @endforeach

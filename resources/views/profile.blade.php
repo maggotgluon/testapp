@@ -17,13 +17,42 @@
         </div>
         <form method="POST" action="{{ route('logout') }}">
             @csrf
-            <button class="rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/10">Logout / ออกจากระบบ</button>
+            <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/10"><x-icon name="log-out" />Logout / ออกจากระบบ</button>
         </form>
     </section>
 
+    <section class="mt-6 grid gap-4 rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04] md:grid-cols-2">
+        <div>
+            <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="bell" class="h-5 w-5 text-emerald-500" />Notifications / การแจ้งเตือน</h2>
+            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Enable reminders and ticket updates on this device. / เปิดรับการแจ้งเตือนและอัปเดตตั๋วบนอุปกรณ์นี้</p>
+            <div class="mt-4" x-data="webPushSettings()" x-init="init()">
+                <button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60" type="button" @click="subscribe()" :disabled="!supported || subscribed">
+                    <x-icon name="bell" />Enable Web Push / เปิด Web Push
+                </button>
+                <button class="ml-2 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-zinc-100" type="button" @click="unsubscribe()" :disabled="!subscribed">
+                    <x-icon name="x" />Turn off / ปิด
+                </button>
+                <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400" x-text="message"></p>
+            </div>
+        </div>
+        <div>
+            <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="heart-handshake" class="h-5 w-5 text-emerald-500" />LINE updates / แจ้งเตือนผ่าน LINE</h2>
+            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                @if(auth()->user()->provider === 'line')
+                    LINE account connected. / เชื่อมต่อบัญชี LINE แล้ว
+                @else
+                    Login with LINE to receive LINE ticket updates. / เข้าสู่ระบบด้วย LINE เพื่อรับอัปเดตตั๋วผ่าน LINE
+                @endif
+            </p>
+            @if(config('services.line.official_account_url'))
+                <a class="mt-4 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ config('services.line.official_account_url') }}" target="_blank" rel="noopener"><x-icon name="heart-handshake" />Add LINE Official Account / เพิ่มเพื่อน LINE OA</a>
+            @endif
+        </div>
+    </section>
+
     <div class="mt-8 flex flex-wrap items-center gap-2">
-        <a class="rounded-md px-4 py-2 text-sm font-semibold {{ $activeView === 'orders' ? 'bg-emerald-400 text-zinc-950' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/10' }}" href="{{ route('profile', ['view' => 'orders']) }}">Orders / ออเดอร์</a>
-        <a class="rounded-md px-4 py-2 text-sm font-semibold {{ $activeView === 'tickets' ? 'bg-emerald-400 text-zinc-950' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/10' }}" href="{{ route('profile', ['view' => 'tickets']) }}">Tickets / ตั๋ว</a>
+        <a class="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold {{ $activeView === 'orders' ? 'bg-emerald-400 text-zinc-950' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/10' }}" href="{{ route('profile', ['view' => 'orders']) }}"><x-icon name="receipt" />Orders / ออเดอร์</a>
+        <a class="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold {{ $activeView === 'tickets' ? 'bg-emerald-400 text-zinc-950' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/10' }}" href="{{ route('profile', ['view' => 'tickets']) }}"><x-icon name="ticket" />Tickets / ตั๋ว</a>
     </div>
 
     @if($activeView === 'orders')
@@ -52,9 +81,9 @@
                                     <span class="rounded bg-zinc-100 px-3 py-1 text-sm text-emerald-700 dark:bg-white/10 dark:text-emerald-200">{{ str_replace('_', ' ', $order->status) }}</span>
                                 </div>
                                 <div class="mt-4 flex flex-wrap gap-2">
-                                    <a class="rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-200" href="{{ route('orders.show', $order) }}">View order / ดูออเดอร์</a>
+                                    <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-200" href="{{ route('orders.show', $order) }}"><x-icon name="receipt" />View order / ดูออเดอร์</a>
                                     @foreach($order->tickets->where('event_id', $event->id) as $ticket)
-                                        <a class="rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-200" href="{{ route('tickets.show', $ticket->uuid) }}">{{ $ticket->ticketType->name }} · {{ $ticket->holder_name }}</a>
+                                        <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-200" href="{{ route('tickets.show', $ticket->uuid) }}"><x-icon name="ticket" />{{ $ticket->ticketType->name }} · {{ $ticket->holder_name }}</a>
                                     @endforeach
                                 </div>
                             </div>
@@ -88,7 +117,7 @@
                                     <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->holder_name }} · {{ str_replace('_', ' ', $ticket->status) }}</div>
                                 </a>
                                 @if($ticket->order)
-                                    <a class="mt-3 inline-flex rounded-md border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-200" href="{{ route('orders.show', $ticket->order) }}">{{ $ticket->order->order_number }} · View order / ดูออเดอร์</a>
+                                    <a class="mt-3 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-200" href="{{ route('orders.show', $ticket->order) }}"><x-icon name="receipt" class="h-3.5 w-3.5" />{{ $ticket->order->order_number }} · View order / ดูออเดอร์</a>
                                 @endif
                             </div>
                         @endforeach

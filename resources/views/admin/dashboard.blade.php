@@ -3,9 +3,9 @@
         <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">Admin dashboard / แดชบอร์ดผู้ดูแล</h1>
     </div>
     <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        @foreach([['Events / อีเวนต์', $eventCount], ['Pending / รอตรวจสอบ', $pendingOrders], ['Revenue THB / รายได้', number_format($revenueThb)], ['Checked in / เช็กอินแล้ว', $checkedIn]] as [$label, $value])
+        @foreach([['Events / อีเวนต์', $eventCount, 'calendar-days'], ['Pending / รอตรวจสอบ', $pendingOrders, 'clock'], ['Revenue THB / รายได้', number_format($revenueThb), 'wallet'], ['Checked in / เช็กอินแล้ว', $checkedIn, 'check']] as [$label, $value, $icon])
             <div class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
-                <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $label }}</div>
+                <div class="inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"><x-icon :name="$icon" class="h-4 w-4 text-emerald-500" />{{ $label }}</div>
                 <div class="mt-2 text-3xl font-semibold text-zinc-950 dark:text-white">{{ $value }}</div>
             </div>
         @endforeach

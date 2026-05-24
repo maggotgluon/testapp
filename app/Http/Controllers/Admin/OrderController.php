@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\TicketOrder;
+use App\Services\CrmSyncService;
+use App\Services\CustomerNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -32,7 +34,7 @@ class OrderController extends Controller
         return view('admin.orders.show', compact('order'));
     }
 
-    public function approve(Request $request, TicketOrder $order): RedirectResponse
+    public function approve(Request $request, TicketOrder $order, CustomerNotificationService $notifications, CrmSyncService $crm): RedirectResponse
     {
         $order->loadMissing('items.event');
         $this->authorizeOrder($request, $order);
@@ -51,6 +53,9 @@ class OrderController extends Controller
             $ticket->update(['status' => 'approved']);
             $ticket->ticketType()->increment('sold_count');
         }
+
+        $notifications->orderApproved($order);
+        $crm->pushOrderActivity($order->fresh(), 'ticket_order_approved');
 
         return back()->with('status', 'Order approved and tickets activated.');
     }

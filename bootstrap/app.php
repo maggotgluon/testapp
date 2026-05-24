@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->redirectGuestsTo(fn ($request) => $request->is('admin*') ? route('admin.login') : route('login'));
+        $middleware->validateCsrfTokens(except: [
+            'line/webhook',
+            'crm/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -26,9 +26,9 @@
                 <p class="mt-2 text-zinc-600 dark:text-zinc-400">{{ $ticket->event->venue }} · {{ $ticket->event->starts_at->format('M j, Y H:i') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2 text-sm">
                     @if($ticket->event->location_url)
-                        <a class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-emerald-700 dark:text-emerald-200 hover:border-emerald-300" href="{{ $ticket->event->location_url }}" target="_blank" rel="noopener">Open map <br> เปิดแผนที่</a>
+                        <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-emerald-700 dark:text-emerald-200 hover:border-emerald-300" href="{{ $ticket->event->location_url }}" target="_blank" rel="noopener"><x-icon name="map-pin" />Open map <br> เปิดแผนที่</a>
                     @endif
-                    <a class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-emerald-700 dark:text-emerald-200 hover:border-emerald-300" href="{{ $calendarUrl }}" target="_blank" rel="noopener">Add to calendar <br> เพิ่มในปฏิทิน</a>
+                    <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-emerald-700 dark:text-emerald-200 hover:border-emerald-300" href="{{ $calendarUrl }}" target="_blank" rel="noopener"><x-icon name="calendar-plus" />Add to calendar <br> เพิ่มในปฏิทิน</a>
                 </div>
             </div>
             <span class="rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-200">{{ str_replace('_', ' ', $ticket->status) }}</span>
@@ -48,12 +48,12 @@
             <div><dt class="text-zinc-500">Holder / ผู้ถือบัตร</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->holder_name }}</dd></div>
             <div><dt class="text-zinc-500">Location / ที่ตั้ง</dt><dd class="text-zinc-950 dark:text-white">
                 @if($ticket->event->location_url)
-                    <a class="text-emerald-700 underline dark:text-emerald-200" href="{{ $ticket->event->location_url }}" target="_blank" rel="noopener">{{ $ticket->event->location ?: 'Open map / เปิดแผนที่' }}</a>
+                    <a class="inline-flex items-center gap-1.5 text-emerald-700 underline dark:text-emerald-200" href="{{ $ticket->event->location_url }}" target="_blank" rel="noopener"><x-icon name="map-pin" class="h-3.5 w-3.5" />{{ $ticket->event->location ?: 'Open map / เปิดแผนที่' }}</a>
                 @else
                     {{ $ticket->event->location ?: '-' }}
                 @endif
             </dd></div>
-            <div><dt class="text-zinc-500">Order / ออเดอร์</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->order->order_number }}</dd></div>
+            <div><dt class="text-zinc-500">Order / ออเดอร์</dt><dd class="text-zinc-950 dark:text-white"><a class="inline-flex items-center gap-1.5 text-emerald-700 underline dark:text-emerald-200" href="{{ route('orders.show', $ticket->order) }}"><x-icon name="receipt" class="h-3.5 w-3.5" />{{ $ticket->order->order_number }}</a></dd></div>
             @if($ticket->event->starts_at < now()->subHours(48))
             <div class="grid grid-cols-2">
                 <div><dt class="text-zinc-500">Check in / เช็กอิน</dt><dd class="text-zinc-950 dark:text-white">{{ $ticket->checked_in_at?->format('M j, Y H:i') ?? 'Not yet / ยังไม่เช็กอิน' }}</dd></div>

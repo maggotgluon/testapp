@@ -8,7 +8,7 @@
                     <option value="{{ $value }}" @selected(request('role') === $value)>{{ $label }}</option>
                 @endforeach
             </select>
-            <button class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100">Filter / กรอง</button>
+            <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100"><x-icon name="search" />Filter / กรอง</button>
         </form>
     </div>
     <div class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
@@ -25,7 +25,7 @@
                             <form method="POST" action="{{ route('admin.users.destroy', $user) }}" onsubmit="return confirm('Delete this user? / ลบผู้ใช้นี้?')">
                                 @csrf
                                 @method('DELETE')
-                                <button class="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200">Delete / ลบ</button>
+                                <button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button>
                             </form>
                         @endif
                     </div>

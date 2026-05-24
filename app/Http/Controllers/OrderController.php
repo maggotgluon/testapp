@@ -9,6 +9,7 @@ use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Models\User;
+use App\Services\CrmSyncService;
 use App\Services\QrCodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ use Illuminate\View\View;
 
 class OrderController extends Controller
 {
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, CrmSyncService $crm): RedirectResponse
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
@@ -44,8 +45,8 @@ class OrderController extends Controller
 
         $slipPath = $request->file('slip')?->store('payment-slips', 'uploads');
 
-        $order = DB::transaction(function () use ($data, $selected, $slipPath, $request) {
-            $user = $this->syncCustomerProfile($request->user(), $data);
+        $order = DB::transaction(function () use ($data, $selected, $slipPath, $request, $crm) {
+            $user = $this->syncCustomerProfile($request->user(), $data, $crm);
             $ticketTypes = TicketType::query()
                 ->with('event')
                 ->whereIn('id', $selected->pluck('ticket_type_id'))
@@ -131,6 +132,8 @@ class OrderController extends Controller
             return $order;
         });
 
+        $crm->pushOrderActivity($order, 'ticket_order_created');
+
         $parameters = ['order' => $order];
 
         if (! $request->user()) {
@@ -140,10 +143,18 @@ class OrderController extends Controller
         return redirect()->route('orders.show', $parameters)->with('status', 'Order created. Admin approval will activate tickets. / สร้างออเดอร์แล้ว รอแอดมินอนุมัติเพื่อเปิดใช้งานตั๋ว');
     }
 
-    private function syncCustomerProfile(?User $user, array $data): ?User
+    private function syncCustomerProfile(?User $user, array $data, CrmSyncService $crm): ?User
     {
         if (! $user || $user->isAdmin()) {
             return $user;
+        }
+
+        if ($customer = $crm->pullCustomer([
+            'phone' => $data['customer_phone'],
+            'email' => $data['customer_email'] ?? null,
+            'line_user_id' => $user->provider === 'line' ? $user->provider_id : null,
+        ])) {
+            $user = $crm->applyCustomerToUser($user, $customer);
         }
 
         $updates = [
@@ -163,6 +174,7 @@ class OrderController extends Controller
         }
 
         $user->update($updates);
+        $crm->pushCustomer($user->fresh(), 'checkout');
 
         return $user->refresh();
     }

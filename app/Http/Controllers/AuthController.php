@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\TicketOrder;
+use App\Services\CrmSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,7 +49,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function login(Request $request): RedirectResponse
+    public function login(Request $request, CrmSyncService $crm): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -84,6 +85,7 @@ class AuthController extends Controller
 
         Auth::login($user, true);
         $this->attachGuestOrdersToUser($user);
+        $crm->pushCustomer($user->fresh(), 'manual_login');
 
         return redirect()->intended(route('profile'))->with('status', 'Welcome back.');
     }
@@ -141,7 +143,7 @@ class AuthController extends Controller
         return Socialite::driver($provider)->redirect();
     }
 
-    public function socialCallback(Request $request, string $provider): RedirectResponse
+    public function socialCallback(Request $request, string $provider, CrmSyncService $crm): RedirectResponse
     {
         abort_unless(in_array($provider, ['line', 'facebook', 'instagram'], true), 404);
 
@@ -167,22 +169,30 @@ class AuthController extends Controller
             'provider' => $provider,
             'provider_id' => $socialUser->getId(),
             'avatar' => $socialUser->getAvatar(),
+            'line_friend_status' => $provider === 'line' ? 'connected' : null,
         ]);
 
-        $user->update([
+        $updates = [
             'provider' => $provider,
             'provider_id' => $socialUser->getId(),
             'avatar' => $socialUser->getAvatar(),
             'email' => $email ?: $user->email,
-        ]);
+        ];
+
+        if ($provider === 'line') {
+            $updates['line_friend_status'] = $user->line_friend_status ?: 'connected';
+        }
+
+        $user->update($updates);
 
         Auth::login($user, true);
         $this->attachGuestOrdersToUser($user, $request);
+        $crm->pushCustomer($user->fresh(), $provider.'_login');
 
         return redirect()->intended(route('profile'))->with('status', 'Logged in with '.strtoupper($provider).'.');
     }
 
-    public function lineLiff(Request $request): JsonResponse
+    public function lineLiff(Request $request, CrmSyncService $crm): JsonResponse
     {
         $data = $request->validate([
             'id_token' => ['required', 'string'],
@@ -237,6 +247,7 @@ class AuthController extends Controller
             'provider' => 'line',
             'provider_id' => $lineUserId,
             'avatar' => $verified['picture'] ?? $profile['pictureUrl'] ?? null,
+            'line_friend_status' => 'connected',
         ]);
 
         if ($user->isAdmin()) {
@@ -251,11 +262,13 @@ class AuthController extends Controller
             'provider' => 'line',
             'provider_id' => $lineUserId,
             'avatar' => $verified['picture'] ?? $profile['pictureUrl'] ?? $user->avatar,
+            'line_friend_status' => $user->line_friend_status ?: 'connected',
         ]);
 
         Auth::login($user, true);
         $request->session()->regenerate();
         $this->attachGuestOrdersToUser($user, $request);
+        $crm->pushCustomer($user->fresh(), 'line_liff_login');
 
         return response()->json([
             'redirect' => $this->safeRedirect($data['redirect'] ?? null),

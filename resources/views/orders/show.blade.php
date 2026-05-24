@@ -24,9 +24,9 @@
                     <p class="mt-1">Login now to keep this order and tickets in your profile, or write down the order number and phone number for lookup later. / เข้าสู่ระบบตอนนี้เพื่อเก็บออเดอร์และตั๋วไว้ในโปรไฟล์ หรือจดเลขออเดอร์และเบอร์โทรไว้สำหรับค้นหาภายหลัง</p>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @if(config('services.line.client_id') && config('services.line.client_secret'))
-                            <a class="rounded-md bg-[#06c755] px-4 py-2 font-semibold text-zinc-950" href="{{ route('auth.social', ['provider' => 'line', 'redirect' => route('orders.show', ['order' => $order, 'phone' => $order->customer_phone]), 'claim_order' => $order->id, 'phone' => $order->customer_phone]) }}">Login with LINE and save / เข้าสู่ระบบ LINE เพื่อบันทึก</a>
+                            <a class="inline-flex items-center gap-2 rounded-md bg-[#06c755] px-4 py-2 font-semibold text-zinc-950" href="{{ route('auth.social', ['provider' => 'line', 'redirect' => route('orders.show', ['order' => $order, 'phone' => $order->customer_phone]), 'claim_order' => $order->id, 'phone' => $order->customer_phone]) }}"><x-icon name="log-in" />Login with LINE and save / เข้าสู่ระบบ LINE เพื่อบันทึก</a>
                         @endif
-                        <a class="rounded-md border border-amber-500/40 px-4 py-2 font-semibold text-amber-900 dark:text-amber-100" href="{{ route('login', ['redirect' => route('orders.show', ['order' => $order, 'phone' => $order->customer_phone]), 'claim_order' => $order->id, 'phone' => $order->customer_phone]) }}">Login / เข้าสู่ระบบ</a>
+                        <a class="inline-flex items-center gap-2 rounded-md border border-amber-500/40 px-4 py-2 font-semibold text-amber-900 dark:text-amber-100" href="{{ route('login', ['redirect' => route('orders.show', ['order' => $order, 'phone' => $order->customer_phone]), 'claim_order' => $order->id, 'phone' => $order->customer_phone]) }}"><x-icon name="log-in" />Login / เข้าสู่ระบบ</a>
                     </div>
                 </div>
             @else
@@ -71,12 +71,12 @@
             </dl>
         </section>
         <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
-            <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Tickets / ตั๋ว</h2>
+            <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="ticket" class="h-5 w-5 text-emerald-500" />Tickets / ตั๋ว</h2>
             <div class="mt-4 grid gap-3">
                 @foreach($order->tickets as $ticket)
                     <a class="rounded-md border border-zinc-200 dark:border-white/10 p-4 hover:border-emerald-300" href="{{ route('tickets.show', ['uuid' => $ticket->uuid, 'phone' => $ticket->holder_phone]) }}">
                         <div class="font-medium text-zinc-950 dark:text-white">{{ $ticket->event->name }}</div>
-                        <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->ticketType->name }} · {{ $ticket->holder_name }} · {{ str_replace('_', ' ', $ticket->status) }}</div>
+                        <div class="mt-1 inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"><x-icon name="ticket" class="h-3.5 w-3.5" />{{ $ticket->ticketType->name }} · {{ $ticket->holder_name }} · {{ str_replace('_', ' ', $ticket->status) }}</div>
                     </a>
                 @endforeach
             </div>

@@ -6,12 +6,16 @@ use App\Models\User;
 use App\Mail\EventAttendeeAnnouncement;
 use App\Models\Coupon;
 use App\Models\Event;
+use App\Models\OrderItem;
+use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Services\QrCodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AuthAndOrderFlowTest extends TestCase
@@ -58,6 +62,69 @@ class AuthAndOrderFlowTest extends TestCase
             '_token' => 'test-token',
             'role' => 'gate_scanner',
         ])->assertRedirect('/admin');
+    }
+
+    public function test_scanner_can_lookup_ticket_without_changing_status(): void
+    {
+        $this->seed();
+        $scanner = User::where('username', 'scanner')->firstOrFail();
+        $ticket = $this->createApprovedTicket();
+
+        $this->actingAs($scanner)
+            ->postJson('/admin/scanner', ['code' => $ticket->uuid])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('ticket.uuid', $ticket->uuid)
+            ->assertJsonPath('ticket.status', 'approved');
+
+        $this->assertDatabaseHas('tickets', [
+            'id' => $ticket->id,
+            'status' => 'approved',
+        ]);
+    }
+
+    public function test_scanner_requires_current_status_for_check_in_and_check_out(): void
+    {
+        Http::fake();
+        $this->seed();
+        $scanner = User::where('username', 'scanner')->firstOrFail();
+        $ticket = $this->createApprovedTicket();
+
+        $this->actingAs($scanner)
+            ->postJson('/admin/scanner', [
+                'code' => $ticket->uuid,
+                'action' => 'check_out',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('ticket.status', 'approved');
+
+        $this->actingAs($scanner)
+            ->postJson('/admin/scanner', [
+                'code' => $ticket->uuid,
+                'action' => 'check_in',
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('ticket.status', 'checked_in');
+
+        $this->actingAs($scanner)
+            ->postJson('/admin/scanner', [
+                'code' => $ticket->uuid,
+                'action' => 'check_in',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('ticket.status', 'checked_in');
+
+        $this->actingAs($scanner)
+            ->postJson('/admin/scanner', [
+                'code' => $ticket->uuid,
+                'action' => 'check_out',
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('ticket.status', 'checked_out');
     }
 
     public function test_missing_social_credentials_show_a_clear_message(): void
@@ -733,6 +800,236 @@ class AuthAndOrderFlowTest extends TestCase
         });
     }
 
+    public function test_order_approval_sends_line_message_to_line_customer(): void
+    {
+        $this->seed();
+        config(['services.line.messaging_channel_access_token' => 'line-token']);
+        Http::fake([
+            'api.line.me/v2/bot/message/push' => Http::response([], 200),
+        ]);
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $user = User::factory()->create([
+            'role' => 'customer',
+            'provider' => 'line',
+            'provider_id' => 'Uline123',
+            'phone' => '0812222222',
+        ]);
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->actingAs($user)
+            ->post('/orders', [
+                'customer_name' => 'LINE Buyer',
+                'customer_phone' => '0812222222',
+                'payment_method' => 'qr_payment',
+                'items' => [
+                    ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+                ],
+            ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/approve')
+            ->assertRedirect();
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.line.me/v2/bot/message/push'
+            && $request['to'] === 'Uline123'
+            && str_contains($request['messages'][0]['text'], $order->order_number));
+    }
+
+    public function test_user_can_save_web_push_subscription(): void
+    {
+        $user = User::factory()->create(['role' => 'customer']);
+
+        $this->actingAs($user)
+            ->postJson('/push-subscriptions', [
+                'endpoint' => 'https://push.example/subscription-1',
+                'keys' => [
+                    'p256dh' => 'public-key',
+                    'auth' => 'auth-token',
+                ],
+                'contentEncoding' => 'aes128gcm',
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->assertDatabaseHas('push_subscriptions', [
+            'subscribable_type' => User::class,
+            'subscribable_id' => $user->id,
+            'endpoint' => 'https://push.example/subscription-1',
+        ]);
+    }
+
+    public function test_crm_can_upsert_and_lookup_customer(): void
+    {
+        config(['services.crm.webhook_token' => 'crm-secret']);
+
+        $this->withToken('crm-secret')
+            ->postJson('/crm/customers/upsert', [
+                'customer' => [
+                    'name' => 'CRM Buyer',
+                    'phone' => '0813333333',
+                    'email' => 'crm@example.com',
+                    'line_user_id' => 'Ucrm123',
+                    'line_friend_status' => 'followed',
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('customer.line_user_id', 'Ucrm123');
+
+        $this->withToken('crm-secret')
+            ->getJson('/crm/customers/lookup?phone=0813333333')
+            ->assertOk()
+            ->assertJsonPath('customer.name', 'CRM Buyer')
+            ->assertJsonPath('customer.line_user_id', 'Ucrm123');
+    }
+
+    public function test_checkout_pushes_customer_activity_to_crm_when_configured(): void
+    {
+        $this->seed();
+        config([
+            'services.crm.base_url' => 'https://crm.example.test/api',
+            'services.crm.token' => 'crm-token',
+        ]);
+        Http::fake([
+            'crm.example.test/api/customers/lookup*' => Http::response(['customer' => null], 404),
+            'crm.example.test/api/customers/upsert' => Http::response(['ok' => true], 200),
+            'crm.example.test/api/customer-activities' => Http::response(['ok' => true], 200),
+        ]);
+
+        $user = User::factory()->create([
+            'role' => 'customer',
+            'phone' => '0814444444',
+        ]);
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->actingAs($user)
+            ->post('/orders', [
+                'customer_name' => 'CRM Activity Buyer',
+                'customer_phone' => '0814444444',
+                'customer_email' => 'crm-activity@example.com',
+                'payment_method' => 'qr_payment',
+                'items' => [
+                    ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+                ],
+            ])
+            ->assertRedirect();
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://crm.example.test/api/customer-activities'
+            && $request['type'] === 'ticket_order_created'
+            && $request['customer']['phone'] === '0814444444');
+    }
+
+    public function test_crm_can_get_order_detail(): void
+    {
+        $this->seed();
+        config(['services.crm.webhook_token' => 'crm-secret']);
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'CRM Order Buyer',
+            'customer_phone' => '0815555555',
+            'payment_method' => 'qr_payment',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+
+        $this->withToken('crm-secret')
+            ->getJson('/crm/orders/'.$order->id)
+            ->assertOk()
+            ->assertJsonPath('order.order_number', $order->order_number)
+            ->assertJsonPath('customer.phone', '0815555555');
+    }
+
+    public function test_line_webhook_updates_friend_status(): void
+    {
+        config(['services.line.messaging_channel_secret' => 'secret']);
+        $user = User::factory()->create([
+            'role' => 'customer',
+            'provider' => 'line',
+            'provider_id' => 'Uline123',
+        ]);
+
+        $payload = json_encode([
+            'events' => [
+                [
+                    'type' => 'follow',
+                    'source' => ['userId' => 'Uline123'],
+                ],
+            ],
+        ]);
+        $signature = base64_encode(hash_hmac('sha256', $payload, 'secret', true));
+
+        $this->withHeaders(['X-Line-Signature' => $signature])
+            ->postJson('/line/webhook', json_decode($payload, true))
+            ->assertOk();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'line_friend_status' => 'followed',
+        ]);
+    }
+
+    public function test_event_admin_can_send_line_and_web_push_message_to_attendees(): void
+    {
+        $this->seed();
+        Notification::fake();
+        config(['services.line.messaging_channel_access_token' => 'line-token']);
+        Http::fake([
+            'api.line.me/v2/bot/message/push' => Http::response([], 200),
+        ]);
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $user = User::factory()->create([
+            'role' => 'customer',
+            'provider' => 'line',
+            'provider_id' => 'Uline123',
+            'phone' => '0812222222',
+        ]);
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->actingAs($user)
+            ->post('/orders', [
+                'customer_name' => 'Notify Buyer',
+                'customer_phone' => '0812222222',
+                'payment_method' => 'qr_payment',
+                'items' => [
+                    ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+                ],
+            ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+        $order->update(['status' => 'approved']);
+        $user->updatePushSubscription('https://push.example/subscription-1', 'public-key', 'auth-token', 'aes128gcm');
+
+        $this->actingAs($admin)
+            ->post('/admin/events/'.$ticketType->event_id.'/message-attendees', [
+                'subject' => 'Event reminder',
+                'message' => 'Doors open soon.',
+                'audience' => 'approved',
+                'channels' => ['line', 'web_push'],
+            ])
+            ->assertRedirect();
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.line.me/v2/bot/message/push'
+            && str_contains($request['messages'][0]['text'], 'Doors open soon.'));
+
+        Notification::assertSentTo($user, \App\Notifications\CustomerWebPushNotification::class);
+    }
+
     public function test_coupon_can_discount_each_ticket_item(): void
     {
         $this->seed();
@@ -764,6 +1061,42 @@ class AuthAndOrderFlowTest extends TestCase
             'subtotal_thb' => $ticketType->price_thb * 2,
             'discount_thb' => 200,
             'total_thb' => ($ticketType->price_thb * 2) - 200,
+        ]);
+    }
+
+    private function createApprovedTicket(): Ticket
+    {
+        $event = Event::firstOrFail();
+        $ticketType = $event->ticketTypes()->firstOrFail();
+        $order = TicketOrder::create([
+            'order_number' => 'SCAN-TEST-001',
+            'customer_name' => 'Scan Tester',
+            'customer_phone' => '0812345678',
+            'status' => 'approved',
+            'subtotal_thb' => $ticketType->price_thb,
+            'discount_thb' => 0,
+            'total_thb' => $ticketType->price_thb,
+            'payment_method' => 'qr_payment',
+            'approved_at' => now(),
+        ]);
+        $item = OrderItem::create([
+            'ticket_order_id' => $order->id,
+            'event_id' => $event->id,
+            'ticket_type_id' => $ticketType->id,
+            'quantity' => 1,
+            'unit_price_thb' => $ticketType->price_thb,
+            'line_total_thb' => $ticketType->price_thb,
+        ]);
+
+        return Ticket::create([
+            'uuid' => (string) Str::uuid(),
+            'ticket_order_id' => $order->id,
+            'order_item_id' => $item->id,
+            'event_id' => $event->id,
+            'ticket_type_id' => $ticketType->id,
+            'holder_name' => 'Scan Tester',
+            'holder_phone' => '0812345678',
+            'status' => 'approved',
         ]);
     }
 }

@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.3",
         "chillerlan/php-qrcode": "^6.0",
+        "laravel-notification-channels/webpush": "^10.5",
         "laravel/framework": "^13.8",
         "laravel/socialite": "^5.27",
         "laravel/tinker": "^3.0",

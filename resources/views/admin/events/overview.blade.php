@@ -5,7 +5,7 @@
             <h1 class="mt-2 text-3xl font-semibold text-zinc-950 dark:text-white">{{ $event->name }}</h1>
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $event->starts_at->format('M j, Y H:i') }} · {{ $event->venue }}</p>
         </div>
-        <a class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100" href="{{ route('admin.events.edit', $event) }}">Edit event / แก้ไขอีเวนต์</a>
+        <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100" href="{{ route('admin.events.edit', $event) }}"><x-icon name="edit" />Edit event / แก้ไขอีเวนต์</a>
     </div>
 
     <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -87,7 +87,38 @@
                 <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Message / ข้อความ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
                     <textarea class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="message" rows="5" required>{{ old('message') }}</textarea>
                 </label>
-                <button class="justify-self-start rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300">Send email / ส่งอีเมล</button>
+                <button class="inline-flex items-center gap-2 justify-self-start rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300"><x-icon name="mail" />Send email / ส่งอีเมล</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
+        <div class="grid gap-4 lg:grid-cols-[.7fr_1.3fr]">
+            <div>
+                <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">LINE/Web Push attendees / ส่ง LINE และ Web Push</h2>
+                <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Send ticket updates or event reminders to logged-in attendees. Approved audience currently has {{ number_format($messageRecipientCount) }} recipients. / ส่งอัปเดตตั๋วหรือแจ้งเตือนอีเวนต์ถึงผู้เข้าร่วมที่ล็อกอิน กลุ่มที่อนุมัติแล้วมี {{ number_format($messageRecipientCount) }} คน</p>
+            </div>
+            <form method="POST" action="{{ route('admin.events.message-attendees', $event) }}" class="grid gap-3" onsubmit="return confirm('Send this notification to attendees? / ส่งการแจ้งเตือนนี้ถึงผู้เข้าร่วม?')">
+                @csrf
+                <div class="grid gap-3 sm:grid-cols-[1fr_180px]">
+                    <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Subject / หัวข้อ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
+                        <input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="subject" value="{{ old('subject') }}" required>
+                    </label>
+                    <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Audience / กลุ่มผู้รับ
+                        <select class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="audience">
+                            <option value="approved" @selected(old('audience', 'approved') === 'approved')>Approved only / อนุมัติแล้ว</option>
+                            <option value="all" @selected(old('audience') === 'all')>All logged-in buyers / ผู้ซื้อที่ล็อกอินทั้งหมด</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="flex flex-wrap gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+                    <label class="flex items-center gap-2"><input type="checkbox" name="channels[]" value="line" checked> LINE Messaging API</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" name="channels[]" value="web_push" checked> Web Push</label>
+                </div>
+                <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Message / ข้อความ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
+                    <textarea class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="message" rows="5" required>{{ old('message') }}</textarea>
+                </label>
+                <button class="inline-flex items-center gap-2 justify-self-start rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300"><x-icon name="send" />Send notification / ส่งการแจ้งเตือน</button>
             </form>
         </div>
     </section>
@@ -102,7 +133,7 @@
                         <option value="{{ $status }}" @selected(request('order_status') === $status)>{{ str_replace('_', ' ', $status) }}</option>
                     @endforeach
                 </select>
-                <button class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100">Filter / กรอง</button>
+                <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100"><x-icon name="search" />Filter / กรอง</button>
             </form>
         </div>
         <div class="divide-y divide-white/10">
@@ -119,11 +150,11 @@
                     </div>
                     <div class="flex flex-wrap items-start gap-2">
                         @if($order->status !== 'approved')
-                            <form method="POST" action="{{ route('admin.orders.approve', $order) }}">@csrf<button class="rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950">Approve / อนุมัติ</button></form>
+                            <form method="POST" action="{{ route('admin.orders.approve', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="check" />Approve / อนุมัติ</button></form>
                         @endif
-                        <form method="POST" action="{{ route('admin.orders.reject', $order) }}">@csrf<button class="rounded-md bg-rose-400 px-3 py-2 text-sm font-semibold text-zinc-950">Reject / ปฏิเสธ</button></form>
-                        <form method="POST" action="{{ route('admin.orders.refund', $order) }}">@csrf<button class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100">Refund / คืนเงิน</button></form>
-                        <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200">Delete / ลบ</button></form>
+                        <form method="POST" action="{{ route('admin.orders.reject', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-rose-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="x" />Reject / ปฏิเสธ</button></form>
+                        <form method="POST" action="{{ route('admin.orders.refund', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100"><x-icon name="undo" />Refund / คืนเงิน</button></form>
+                        <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button></form>
                     </div>
                 </div>
             @empty
@@ -143,7 +174,7 @@
                         <option value="{{ $status }}" @selected(request('ticket_status') === $status)>{{ str_replace('_', ' ', $status) }}</option>
                     @endforeach
                 </select>
-                <button class="rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100">Filter / กรอง</button>
+                <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100"><x-icon name="search" />Filter / กรอง</button>
             </form>
         </div>
         <div class="divide-y divide-white/10">
@@ -163,12 +194,12 @@
                                     <option value="{{ $status }}" @selected($ticket->status === $status)>{{ str_replace('_', ' ', $status) }}</option>
                                 @endforeach
                             </select>
-                            <button class="rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950">Update / อัปเดต</button>
+                            <button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="save" />Update / อัปเดต</button>
                         </form>
                         <form method="POST" action="{{ route('admin.events.tickets.destroy', [$event, $ticket]) }}" onsubmit="return confirm('Delete this ticket? / ลบตั๋วนี้?')">
                             @csrf
                             @method('DELETE')
-                            <button class="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200">Delete / ลบ</button>
+                            <button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button>
                         </form>
                     </div>
                 </div>

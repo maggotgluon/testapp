@@ -81,7 +81,7 @@
                         <input type="hidden" :name="`tickets[${index}][status]`" value="active">
                         <div class="flex items-start justify-between gap-3">
                             <label class="flex-1 text-sm text-zinc-700 dark:text-zinc-300">Type / ประเภท<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`tickets[${index}][name]`" x-model="ticket.name"></label>
-                            <button class="mt-6 rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:text-rose-200" type="button" @click="removeRow(index)">Remove / ลบ</button>
+                            <button class="mt-6 inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:text-rose-200" type="button" @click="removeRow(index)"><x-icon name="trash-2" />Remove / ลบ</button>
                         </div>
                         <div class="mt-3 grid gap-3 sm:grid-cols-2">
                             <label class="text-sm text-zinc-700 dark:text-zinc-300">Sale price THB / ราคาขาย<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="number" :name="`tickets[${index}][price_thb]`" x-model="ticket.price_thb"></label>
@@ -94,8 +94,8 @@
                     </div>
                 </template>
             </div>
-            <button class="mt-5 w-full rounded-md border border-zinc-200 dark:border-white/10 px-4 py-3 font-semibold text-zinc-800 dark:text-zinc-100 hover:border-emerald-300" type="button" @click="addRow()">Add ticket type / เพิ่มประเภทตั๋ว</button>
-            <button class="mt-5 w-full rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950">Save event / บันทึกอีเวนต์</button>
+            <button class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-4 py-3 font-semibold text-zinc-800 dark:text-zinc-100 hover:border-emerald-300" type="button" @click="addRow()"><x-icon name="plus" />Add ticket type / เพิ่มประเภทตั๋ว</button>
+            <button class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950"><x-icon name="save" />Save event / บันทึกอีเวนต์</button>
         </section>
     </form>
 </x-layouts.app>
