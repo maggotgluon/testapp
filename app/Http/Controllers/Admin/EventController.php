@@ -142,6 +142,12 @@ class EventController extends Controller
     {
         abort_unless($request->user()->canManageEvent($event), 403);
 
+        $availableChannels = $notifications->availableChannels();
+
+        if ($availableChannels === []) {
+            return back()->withErrors(['channels' => 'Notification channels are not configured yet. / ยังไม่ได้ตั้งค่าช่องทางแจ้งเตือน']);
+        }
+
         $data = $request->validate([
             'subject' => ['required', 'string', 'max:255'],
             'message' => ['required', 'string', 'max:1000'],
@@ -149,6 +155,12 @@ class EventController extends Controller
             'channels' => ['required', 'array', 'min:1'],
             'channels.*' => ['required', 'in:line,web_push'],
         ]);
+
+        $data['channels'] = array_values(array_intersect($data['channels'], $availableChannels));
+
+        if ($data['channels'] === []) {
+            return back()->withErrors(['channels' => 'Selected notification channel is not configured. / ช่องทางแจ้งเตือนที่เลือกยังไม่ได้ตั้งค่า']);
+        }
 
         $users = $this->attendeeUsers($event, $data['audience']);
 

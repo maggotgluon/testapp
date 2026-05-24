@@ -803,7 +803,10 @@ class AuthAndOrderFlowTest extends TestCase
     public function test_order_approval_sends_line_message_to_line_customer(): void
     {
         $this->seed();
-        config(['services.line.messaging_channel_access_token' => 'line-token']);
+        config([
+            'services.line.messaging_channel_access_token' => 'line-token',
+            'services.line.messaging_channel_secret' => 'line-secret',
+        ]);
         Http::fake([
             'api.line.me/v2/bot/message/push' => Http::response([], 200),
         ]);
@@ -985,7 +988,12 @@ class AuthAndOrderFlowTest extends TestCase
     {
         $this->seed();
         Notification::fake();
-        config(['services.line.messaging_channel_access_token' => 'line-token']);
+        config([
+            'services.line.messaging_channel_access_token' => 'line-token',
+            'services.line.messaging_channel_secret' => 'line-secret',
+            'webpush.vapid.public_key' => 'test-public-key',
+            'webpush.vapid.private_key' => 'test-private-key',
+        ]);
         Http::fake([
             'api.line.me/v2/bot/message/push' => Http::response([], 200),
         ]);
@@ -1028,6 +1036,34 @@ class AuthAndOrderFlowTest extends TestCase
             && str_contains($request['messages'][0]['text'], 'Doors open soon.'));
 
         Notification::assertSentTo($user, \App\Notifications\CustomerWebPushNotification::class);
+    }
+
+    public function test_notification_ui_is_hidden_when_channels_are_not_configured(): void
+    {
+        $this->seed();
+        config([
+            'services.line.messaging_channel_access_token' => null,
+            'services.line.messaging_channel_secret' => null,
+            'services.line.official_account_url' => null,
+            'webpush.vapid.public_key' => null,
+            'webpush.vapid.private_key' => null,
+        ]);
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $event = Event::firstOrFail();
+
+        $this->actingAs($admin)
+            ->get('/profile')
+            ->assertOk()
+            ->assertDontSee('Enable Web Push / เปิด Web Push')
+            ->assertDontSee('LINE updates / แจ้งเตือนผ่าน LINE');
+
+        $this->actingAs($admin)
+            ->get('/admin/events/'.$event->id.'/overview')
+            ->assertOk()
+            ->assertDontSee('Attendee notifications / ส่งการแจ้งเตือนถึงผู้เข้าร่วม')
+            ->assertDontSee('LINE Messaging API')
+            ->assertDontSee('Web Push');
     }
 
     public function test_coupon_can_discount_each_ticket_item(): void

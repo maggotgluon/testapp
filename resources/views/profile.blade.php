@@ -1,3 +1,7 @@
+@php
+    $webPushEnabled = filled(config('webpush.vapid.public_key')) && filled(config('webpush.vapid.private_key'));
+    $lineNotificationsEnabled = filled(config('services.line.messaging_channel_access_token')) && filled(config('services.line.messaging_channel_secret')) && filled(config('services.line.official_account_url'));
+@endphp
 <x-layouts.app title="Profile">
     <section class="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04]">
         <div class="flex flex-wrap items-center gap-4">
@@ -21,7 +25,9 @@
         </form>
     </section>
 
-    <section class="mt-6 grid gap-4 rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04] md:grid-cols-2">
+    @if($webPushEnabled || $lineNotificationsEnabled)
+    <section class="mt-6 grid gap-4 rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04] {{ $webPushEnabled && $lineNotificationsEnabled ? 'md:grid-cols-2' : '' }}">
+        @if($webPushEnabled)
         <div>
             <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="bell" class="h-5 w-5 text-emerald-500" />Notifications / การแจ้งเตือน</h2>
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Enable reminders and ticket updates on this device. / เปิดรับการแจ้งเตือนและอัปเดตตั๋วบนอุปกรณ์นี้</p>
@@ -35,6 +41,8 @@
                 <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400" x-text="message"></p>
             </div>
         </div>
+        @endif
+        @if($lineNotificationsEnabled)
         <div>
             <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="heart-handshake" class="h-5 w-5 text-emerald-500" />LINE updates / แจ้งเตือนผ่าน LINE</h2>
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
@@ -44,11 +52,11 @@
                     Login with LINE to receive LINE ticket updates. / เข้าสู่ระบบด้วย LINE เพื่อรับอัปเดตตั๋วผ่าน LINE
                 @endif
             </p>
-            @if(config('services.line.official_account_url'))
-                <a class="mt-4 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ config('services.line.official_account_url') }}" target="_blank" rel="noopener"><x-icon name="heart-handshake" />Add LINE Official Account / เพิ่มเพื่อน LINE OA</a>
-            @endif
+            <a class="mt-4 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ config('services.line.official_account_url') }}" target="_blank" rel="noopener"><x-icon name="heart-handshake" />Add LINE Official Account / เพิ่มเพื่อน LINE OA</a>
         </div>
+        @endif
     </section>
+    @endif
 
     <div class="mt-8 flex flex-wrap items-center gap-2">
         <a class="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold {{ $activeView === 'orders' ? 'bg-emerald-400 text-zinc-950' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/10' }}" href="{{ route('profile', ['view' => 'orders']) }}"><x-icon name="receipt" />Orders / ออเดอร์</a>

@@ -1,3 +1,7 @@
+@php
+    $lineNotificationsEnabled = filled(config('services.line.messaging_channel_access_token')) && filled(config('services.line.messaging_channel_secret'));
+    $webPushEnabled = filled(config('webpush.vapid.public_key')) && filled(config('webpush.vapid.private_key'));
+@endphp
 <x-layouts.app :title="$event->name.' overview'">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -92,10 +96,11 @@
         </div>
     </section>
 
+    @if($lineNotificationsEnabled || $webPushEnabled)
     <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
         <div class="grid gap-4 lg:grid-cols-[.7fr_1.3fr]">
             <div>
-                <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">LINE/Web Push attendees / ส่ง LINE และ Web Push</h2>
+                <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Attendee notifications / ส่งการแจ้งเตือนถึงผู้เข้าร่วม</h2>
                 <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Send ticket updates or event reminders to logged-in attendees. Approved audience currently has {{ number_format($messageRecipientCount) }} recipients. / ส่งอัปเดตตั๋วหรือแจ้งเตือนอีเวนต์ถึงผู้เข้าร่วมที่ล็อกอิน กลุ่มที่อนุมัติแล้วมี {{ number_format($messageRecipientCount) }} คน</p>
             </div>
             <form method="POST" action="{{ route('admin.events.message-attendees', $event) }}" class="grid gap-3" onsubmit="return confirm('Send this notification to attendees? / ส่งการแจ้งเตือนนี้ถึงผู้เข้าร่วม?')">
@@ -112,8 +117,12 @@
                     </label>
                 </div>
                 <div class="flex flex-wrap gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-                    <label class="flex items-center gap-2"><input type="checkbox" name="channels[]" value="line" checked> LINE Messaging API</label>
-                    <label class="flex items-center gap-2"><input type="checkbox" name="channels[]" value="web_push" checked> Web Push</label>
+                    @if($lineNotificationsEnabled)
+                        <label class="flex items-center gap-2"><input type="checkbox" name="channels[]" value="line" checked> LINE Messaging API</label>
+                    @endif
+                    @if($webPushEnabled)
+                        <label class="flex items-center gap-2"><input type="checkbox" name="channels[]" value="web_push" checked> Web Push</label>
+                    @endif
                 </div>
                 <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Message / ข้อความ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
                     <textarea class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="message" rows="5" required>{{ old('message') }}</textarea>
@@ -122,6 +131,7 @@
             </form>
         </div>
     </section>
+    @endif
 
     <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 dark:border-white/10 p-4">

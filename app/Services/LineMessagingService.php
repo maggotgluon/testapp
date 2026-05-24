@@ -13,6 +13,12 @@ class LineMessagingService
         return filled(config('services.line.messaging_channel_access_token'));
     }
 
+    public function isConfigured(): bool
+    {
+        return filled(config('services.line.messaging_channel_access_token'))
+            && filled(config('services.line.messaging_channel_secret'));
+    }
+
     public function pushText(User $user, string $message): bool
     {
         if (! $this->available() || $user->provider !== 'line' || blank($user->provider_id)) {

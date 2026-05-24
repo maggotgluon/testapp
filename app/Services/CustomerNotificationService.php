@@ -48,8 +48,23 @@ class CustomerNotificationService
         );
     }
 
+    public function availableChannels(): array
+    {
+        return array_values(array_filter([
+            $this->line->isConfigured() ? 'line' : null,
+            $this->webPushConfigured() ? 'web_push' : null,
+        ]));
+    }
+
+    public function webPushConfigured(): bool
+    {
+        return filled(config('webpush.vapid.public_key'))
+            && filled(config('webpush.vapid.private_key'));
+    }
+
     private function sendToUsers(Collection $users, string $title, string $body, string $url, array $channels): array
     {
+        $channels = array_values(array_intersect($channels, $this->availableChannels()));
         $counts = ['line' => 0, 'web_push' => 0];
 
         foreach ($users->unique('id') as $user) {
