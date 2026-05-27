@@ -11,6 +11,7 @@ use App\Models\TicketType;
 use App\Models\User;
 use App\Services\CrmSyncService;
 use App\Services\QrCodeService;
+use App\Services\SlipQrDecoderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -20,7 +21,7 @@ use Illuminate\View\View;
 
 class OrderController extends Controller
 {
-    public function store(Request $request, CrmSyncService $crm): RedirectResponse
+    public function store(Request $request, CrmSyncService $crm, SlipQrDecoderService $slipQrDecoder): RedirectResponse
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
@@ -28,6 +29,7 @@ class OrderController extends Controller
             'customer_email' => ['nullable', 'email'],
             'payment_method' => ['required', 'in:bank_transfer,qr_payment'],
             'payment_note' => ['nullable', 'string', 'max:1000'],
+            'terms_accepted' => ['required', 'accepted'],
             'coupon_code' => ['nullable', 'string', 'max:40'],
             'slip' => ['nullable', 'image', 'max:4096'],
             'items' => ['required', 'array', 'min:1'],
@@ -44,8 +46,9 @@ class OrderController extends Controller
         }
 
         $slipPath = $request->file('slip')?->store('payment-slips', 'uploads');
+        $slipQrData = $slipQrDecoder->decode($slipPath);
 
-        $order = DB::transaction(function () use ($data, $selected, $slipPath, $request, $crm) {
+        $order = DB::transaction(function () use ($data, $selected, $slipPath, $slipQrData, $request, $crm) {
             $user = $this->syncCustomerProfile($request->user(), $data, $crm);
             $ticketTypes = TicketType::query()
                 ->with('event')
@@ -120,14 +123,14 @@ class OrderController extends Controller
                 }
             }
 
-            Payment::create([
+            Payment::create(array_merge([
                 'ticket_order_id' => $order->id,
                 'method' => $data['payment_method'],
                 'amount_thb' => $order->total_thb,
                 'status' => 'submitted',
                 'slip_path' => $slipPath,
                 'note' => $data['payment_note'] ?? null,
-            ]);
+            ], $slipQrData));
 
             return $order;
         });

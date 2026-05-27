@@ -25,7 +25,7 @@
         </form>
     </section>
 
-    @if($webPushEnabled || $lineNotificationsEnabled)
+    @if($webPushEnabled && $lineNotificationsEnabled)
     <section class="mt-6 grid gap-4 rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04] {{ $webPushEnabled && $lineNotificationsEnabled ? 'md:grid-cols-2' : '' }}">
         @if($webPushEnabled)
         <div>

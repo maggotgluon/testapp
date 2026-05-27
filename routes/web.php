@@ -12,9 +12,20 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\LineWebhookController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PushSubscriptionController;
+use App\Http\Controllers\SeoController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap');
+
 Route::get('/', [EventController::class, 'index'])->name('events.index');
+Route::view('/guides/how-to-buy-ticket', 'guides.how-to-buy-ticket')->name('guides.buy-ticket');
+Route::view('/guides/gate-check-in', 'guides.gate-check-in')->name('guides.gate-check-in');
+Route::view('/legal/terms', 'legal.terms')->name('legal.terms');
+Route::view('/legal/privacy', 'legal.privacy')->name('legal.privacy');
+Route::view('/legal/refund-policy', 'legal.refund-policy')->name('legal.refund');
+Route::view('/legal/event-admission-policy', 'legal.event-admission-policy')->name('legal.event-admission');
+Route::view('/legal/cookie-policy', 'legal.cookie-policy')->name('legal.cookies');
 Route::get('/events/{event}', [EventController::class, 'show'])->name('events.show');
 
 Route::get('/login', [AuthController::class, 'show'])->name('login');
@@ -65,6 +76,7 @@ Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->na
     Route::post('/orders/{order}/approve', [AdminOrderController::class, 'approve'])->name('orders.approve');
     Route::post('/orders/{order}/reject', [AdminOrderController::class, 'reject'])->name('orders.reject');
     Route::post('/orders/{order}/refund', [AdminOrderController::class, 'refund'])->name('orders.refund');
+    Route::post('/orders/{order}/check-slip-qr', [AdminOrderController::class, 'checkSlipQr'])->name('orders.check-slip-qr');
     Route::delete('/orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');
 });
 

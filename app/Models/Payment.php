@@ -14,6 +14,19 @@ class Payment extends Model
         'status',
         'slip_path',
         'note',
+        'slip_qr_status',
+        'slip_qr_payload',
+        'slip_qr_data',
+        'slip_qr_amount_thb',
+        'slip_qr_paid_at',
+        'slip_qr_reference',
+        'slip_qr_receiver',
+    ];
+
+    protected $casts = [
+        'slip_qr_data' => 'array',
+        'slip_qr_amount_thb' => 'decimal:2',
+        'slip_qr_paid_at' => 'datetime',
     ];
 
     public function order(): BelongsTo

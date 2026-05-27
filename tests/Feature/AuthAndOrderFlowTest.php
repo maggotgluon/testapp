@@ -11,10 +11,13 @@ use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Services\QrCodeService;
+use App\Services\SlipQrDecoderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -217,6 +220,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'Demo Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -225,6 +229,53 @@ class AuthAndOrderFlowTest extends TestCase
         $response->assertRedirect();
         $order = TicketOrder::firstOrFail();
         $this->assertMatchesRegularExpression('/^[A-Z0-9]{3,4}-'.now()->format('md').'-001$/', $order->order_number);
+    }
+
+    public function test_checkout_decodes_uploaded_slip_qr_when_possible(): void
+    {
+        $result = app(SlipQrDecoderService::class)->parsePayloadForReview('https://bank.example/slip?amount=199.00&ref=ABC123&receiver=Event+Organizer&paid_at=2026-05-25T10:30:00');
+
+        $this->assertSame('decoded', $result['slip_qr_status']);
+        $this->assertSame(199.00, $result['slip_qr_amount_thb']);
+        $this->assertSame('ABC123', $result['slip_qr_reference']);
+        $this->assertSame('Event Organizer', $result['slip_qr_receiver']);
+        $this->assertSame('url', $result['slip_qr_data']['format']);
+    }
+
+    public function test_slip_qr_parser_understands_thai_slip_verify_payload(): void
+    {
+        $result = app(SlipQrDecoderService::class)->parsePayloadForReview('00390006000001010300402180183451347458273955102TH910409D6');
+
+        $this->assertSame('decoded', $result['slip_qr_status']);
+        $this->assertSame('slip_verify', $result['slip_qr_data']['format']);
+        $this->assertSame('004', $result['slip_qr_data']['slip_verify']['sending_bank']);
+        $this->assertSame('018345134745827395', $result['slip_qr_reference']);
+        $this->assertStringContainsString('Kasikornbank', $result['slip_qr_receiver']);
+    }
+
+    public function test_checkout_stores_no_qr_status_for_plain_slip_image(): void
+    {
+        Storage::fake('uploads');
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Slip Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'terms_accepted' => '1',
+            'slip' => UploadedFile::fake()->image('slip.jpg', 640, 640),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('payments', [
+            'ticket_order_id' => TicketOrder::firstOrFail()->id,
+            'slip_qr_status' => 'no_qr',
+        ]);
     }
 
     public function test_guest_order_redirect_includes_lookup_phone_and_confirmation_guidance(): void
@@ -238,6 +289,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'Guest Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
+            'terms_accepted' => '1',
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -263,6 +315,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'Guest Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
+            'terms_accepted' => '1',
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -299,15 +352,57 @@ class AuthAndOrderFlowTest extends TestCase
         $this->seed();
 
         $event = Event::firstOrFail();
-        $event->update(['social_image_path' => 'social-share/demo.jpg']);
+        $event->update([
+            'description' => '<p>Move with <strong>energy</strong> at this fitness event.</p>',
+            'social_description' => null,
+            'social_image_path' => 'social-share/demo.jpg',
+        ]);
 
         $this->get('/events/'.$event->id)
             ->assertOk()
             ->assertSee('property="og:description"', false)
+            ->assertSee('Move with energy at this fitness event.', false)
             ->assertSee('property="og:image"', false)
             ->assertSee('social-share/demo.jpg', false)
+            ->assertSee('application/ld+json', false)
+            ->assertSee('"@type":"Event"', false)
+            ->assertSee('"priceCurrency":"THB"', false)
             ->assertSee('https://www.google.com/maps/search', false)
             ->assertSee('href="'.$event->hosted_by_url.'"', false);
+    }
+
+    public function test_public_seo_files_expose_sitemap_and_hide_private_paths(): void
+    {
+        $this->seed();
+
+        $this->get('/robots.txt')
+            ->assertOk()
+            ->assertSee('Sitemap: '.route('seo.sitemap'), false)
+            ->assertSee('Disallow: /admin/', false)
+            ->assertSee('Disallow: /orders/', false)
+            ->assertSee('Disallow: /tickets/', false);
+
+        $event = Event::firstOrFail();
+
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertSee('<urlset', false)
+            ->assertSee(route('events.show', $event), false)
+            ->assertDontSee('/admin/', false)
+            ->assertDontSee('/orders/', false);
+    }
+
+    public function test_private_pages_are_marked_noindex(): void
+    {
+        $this->seed();
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('name="robots" content="noindex, nofollow"', false);
+
+        $this->get('/orders/lookup')
+            ->assertOk()
+            ->assertSee('name="robots" content="noindex, nofollow"', false);
     }
 
     public function test_event_checkout_includes_bank_logo_metadata(): void
@@ -318,7 +413,29 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertOk()
             ->assertSee('Krungthai Bank')
             ->assertSee('ธนาคารกรุงไทย')
-            ->assertSee('ktb.svg', false);
+            ->assertSee('ktb.svg', false)
+            ->assertSee('terms_accepted', false)
+            ->assertSee(route('legal.terms'), false)
+            ->assertSee(route('legal.privacy'), false)
+            ->assertSee(route('legal.refund'), false);
+    }
+
+    public function test_public_legal_pages_render_from_footer_links(): void
+    {
+        foreach ([
+            route('legal.terms', absolute: false) => 'Terms and Conditions',
+            route('legal.privacy', absolute: false) => 'Privacy Policy',
+            route('legal.refund', absolute: false) => 'Refund Policy',
+            route('legal.event-admission', absolute: false) => 'Event Admission Policy',
+            route('legal.cookies', absolute: false) => 'Cookie Policy',
+        ] as $url => $heading) {
+            $this->get($url)
+                ->assertOk()
+                ->assertSee($heading)
+                ->assertSee('Terms / เงื่อนไข')
+                ->assertSee('Privacy / ความเป็นส่วนตัว')
+                ->assertSee('Refunds / คืนเงิน');
+        }
     }
 
     public function test_event_checkout_can_show_countdown_and_full_ticket_price(): void
@@ -349,6 +466,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'Main Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
+            'terms_accepted' => '1',
             'items' => [
                 [
                     'ticket_type_id' => $ticketType->id,
@@ -362,6 +480,23 @@ class AuthAndOrderFlowTest extends TestCase
         $this->assertDatabaseHas('tickets', ['holder_name' => 'Guest Two']);
     }
 
+    public function test_checkout_requires_terms_acceptance(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Terms Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertSessionHasErrors('terms_accepted');
+    }
+
     public function test_checkout_uses_buyer_name_when_ticket_holder_is_blank(): void
     {
         $this->seed();
@@ -373,6 +508,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'Main Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
+            'terms_accepted' => '1',
             'items' => [
                 [
                     'ticket_type_id' => $ticketType->id,
@@ -396,6 +532,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'Pending Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
+            'terms_accepted' => '1',
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -450,10 +587,12 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_phone' => '0811111111',
                 'customer_email' => 'updated@example.com',
                 'payment_method' => 'bank_transfer',
+                'terms_accepted' => '1',
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
-            ])->assertRedirect();
+            ])->assertSessionHasNoErrors()
+            ->assertRedirect();
 
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
@@ -579,6 +718,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_name' => 'Profile Buyer',
                 'customer_phone' => '0811111111',
                 'payment_method' => 'qr_payment',
+                'terms_accepted' => '1',
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -618,6 +758,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_name' => 'Profile Buyer',
                 'customer_phone' => '0811111111',
                 'payment_method' => 'qr_payment',
+                'terms_accepted' => '1',
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -652,6 +793,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'Lookup Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -667,6 +809,49 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertSee('Delete / ลบ');
     }
 
+    public function test_admin_can_recheck_existing_payment_slip_qr(): void
+    {
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Slip Recheck Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'terms_accepted' => '1',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::with('payments')->firstOrFail();
+        $order->update(['payment_slip_path' => 'payment-slips/recheck.png']);
+        $order->payments()->firstOrFail()->update([
+            'slip_path' => 'payment-slips/recheck.png',
+            'slip_qr_status' => null,
+        ]);
+
+        $this->instance(SlipQrDecoderService::class, new class extends SlipQrDecoderService {
+            public function decode(?string $slipPath): array
+            {
+                return $this->parsePayloadForReview('00390006000001010300402180183451347458273955102TH910409D6');
+            }
+        });
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/check-slip-qr')
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('payments', [
+            'ticket_order_id' => $order->id,
+            'slip_qr_status' => 'decoded',
+            'slip_qr_reference' => '018345134745827395',
+        ]);
+    }
+
     public function test_super_admin_can_delete_order_with_tickets(): void
     {
         $this->seed();
@@ -680,6 +865,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'Delete Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -778,6 +964,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'customer_email' => 'attendee@example.com',
             'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -827,6 +1014,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_name' => 'LINE Buyer',
                 'customer_phone' => '0812222222',
                 'payment_method' => 'qr_payment',
+                'terms_accepted' => '1',
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -918,6 +1106,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_phone' => '0814444444',
                 'customer_email' => 'crm-activity@example.com',
                 'payment_method' => 'qr_payment',
+                'terms_accepted' => '1',
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -941,6 +1130,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'CRM Order Buyer',
             'customer_phone' => '0815555555',
             'payment_method' => 'qr_payment',
+            'terms_accepted' => '1',
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -1014,6 +1204,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_name' => 'Notify Buyer',
                 'customer_phone' => '0812222222',
                 'payment_method' => 'qr_payment',
+                'terms_accepted' => '1',
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -1087,6 +1278,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_name' => 'Demo Buyer',
             'customer_phone' => '0812345678',
             'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
             'coupon_code' => 'ITEM100',
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 2],

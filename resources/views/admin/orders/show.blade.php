@@ -1,3 +1,10 @@
+@php
+    $payment = $order->payments->first();
+    $qrAmountMatches = $payment?->slip_qr_amount_thb !== null
+        ? abs((float) $payment->slip_qr_amount_thb - (float) $order->total_thb) < 0.01
+        : null;
+@endphp
+
 <x-layouts.app :title="$order->order_number">
     <div class="grid gap-6 lg:grid-cols-[1fr_.8fr]">
         <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
@@ -22,10 +29,45 @@
                 <form method="POST" action="{{ route('admin.orders.approve', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950"><x-icon name="check" />Approve / อนุมัติ</button></form>
                 <form method="POST" action="{{ route('admin.orders.reject', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-rose-400 px-4 py-2 font-semibold text-zinc-950"><x-icon name="x" />Reject / ปฏิเสธ</button></form>
                 <form method="POST" action="{{ route('admin.orders.refund', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-4 py-2 font-semibold text-zinc-800 dark:text-zinc-100"><x-icon name="undo" />Refund / คืนเงิน</button></form>
+                @if($order->payment_slip_path)
+                    <form method="POST" action="{{ route('admin.orders.check-slip-qr', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-emerald-300 px-4 py-2 font-semibold text-emerald-800 dark:border-emerald-400/40 dark:text-emerald-100"><x-icon name="qr-code" />Check slip QR / ตรวจ QR สลิป</button></form>
+                @endif
                 <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-4 py-2 font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button></form>
             </div>
             @if($order->payment_slip_path)
                 <img class="mt-6 max-h-96 rounded-lg border border-zinc-200 dark:border-white/10 object-contain" src="{{ asset('uploads/'.$order->payment_slip_path) }}" alt="Payment slip / สลิปชำระเงิน">
+            @endif
+            @if($payment?->slip_qr_status)
+                <div class="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="scan-line" class="h-5 w-5 text-emerald-500" />Slip QR assist / ช่วยอ่าน QR จากสลิป</h2>
+                        <span class="rounded px-2 py-1 text-xs font-semibold {{ $payment->slip_qr_status === 'decoded' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100' : 'bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-100' }}">{{ str_replace('_', ' ', $payment->slip_qr_status) }}</span>
+                    </div>
+                    @if($payment->slip_qr_status === 'decoded')
+                        <dl class="mt-4 grid gap-3 text-sm text-zinc-700 dark:text-zinc-300 sm:grid-cols-2">
+                            @if(($payment->slip_qr_data['format'] ?? null) === 'slip_verify')
+                                <div><dt class="text-zinc-500 dark:text-zinc-400">Slip QR type / ประเภท QR</dt><dd class="font-semibold text-zinc-950 dark:text-white">Thai Slip Verify / ตรวจสอบสลิปไทย</dd></div>
+                                <div><dt class="text-zinc-500 dark:text-zinc-400">Sending bank / ธนาคารต้นทาง</dt><dd>{{ $payment->slip_qr_data['slip_verify']['sending_bank_name'] ?? 'Not found / ไม่พบข้อมูล' }} @if($payment->slip_qr_data['slip_verify']['sending_bank'] ?? null)({{ $payment->slip_qr_data['slip_verify']['sending_bank'] }})@endif</dd></div>
+                            @endif
+                            <div>
+                                <dt class="text-zinc-500 dark:text-zinc-400">Decoded amount / ยอดที่อ่านได้</dt>
+                                <dd class="font-semibold text-zinc-950 dark:text-white">{{ $payment->slip_qr_amount_thb ? 'THB '.number_format((float) $payment->slip_qr_amount_thb, 2) : 'Not found / ไม่พบข้อมูล' }}</dd>
+                                @if($qrAmountMatches !== null)
+                                    <p class="mt-1 text-xs {{ $qrAmountMatches ? 'text-emerald-700 dark:text-emerald-200' : 'text-amber-700 dark:text-amber-200' }}">{{ $qrAmountMatches ? 'Amount matches this order. / ยอดตรงกับออเดอร์' : 'Amount differs from this order. / ยอดไม่ตรงกับออเดอร์' }}</p>
+                                @endif
+                            </div>
+                            <div><dt class="text-zinc-500 dark:text-zinc-400">Reference / เลขอ้างอิง</dt><dd>{{ $payment->slip_qr_reference ?: 'Not found / ไม่พบข้อมูล' }}</dd></div>
+                            <div><dt class="text-zinc-500 dark:text-zinc-400">Receiver / ผู้รับเงิน</dt><dd>{{ $payment->slip_qr_receiver ?: 'Not found / ไม่พบข้อมูล' }}</dd></div>
+                            <div><dt class="text-zinc-500 dark:text-zinc-400">Paid at / เวลาชำระเงิน</dt><dd>{{ $payment->slip_qr_paid_at?->format('M j, Y H:i') ?: 'Not found / ไม่พบข้อมูล' }}</dd></div>
+                        </dl>
+                        <details class="mt-4 text-sm">
+                            <summary class="cursor-pointer font-medium text-zinc-700 dark:text-zinc-200">Raw QR payload / ข้อมูล QR ดิบ</summary>
+                            <pre class="mt-2 max-h-40 overflow-auto rounded-md bg-white p-3 text-xs text-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">{{ $payment->slip_qr_payload }}</pre>
+                        </details>
+                    @else
+                        <p class="mt-3 text-sm text-zinc-600 dark:text-zinc-300">No readable QR data was found. Please continue manual slip review before approving. / ไม่พบข้อมูล QR ที่อ่านได้ กรุณาตรวจสลิปด้วยตัวเองก่อนอนุมัติ</p>
+                    @endif
+                </div>
             @endif
         </section>
         <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">

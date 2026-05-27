@@ -1,12 +1,47 @@
 @php
     $socialImagePath = $event->social_image_path ?: $event->poster_path;
-    $socialDescription = $event->social_description ?: $event->description;
+    $plainDescription = trim(preg_replace('/\s+/', ' ', strip_tags($event->description ?? '')));
+    $socialDescription = str($event->social_description ?: $plainDescription)->limit(220, '');
+    $eventImageUrl = $socialImagePath ? asset('uploads/'.$socialImagePath) : null;
+    $lowestPrice = $event->ticketTypes->min('price_thb');
+    $structuredData = array_filter([
+        '@context' => 'https://schema.org',
+        '@type' => 'Event',
+        'name' => $event->name,
+        'description' => (string) $socialDescription,
+        'startDate' => $event->starts_at->toIso8601String(),
+        'endDate' => $event->ends_at->toIso8601String(),
+        'eventStatus' => 'https://schema.org/EventScheduled',
+        'eventAttendanceMode' => 'https://schema.org/OfflineEventAttendanceMode',
+        'image' => $eventImageUrl ? [$eventImageUrl] : null,
+        'url' => route('events.show', $event),
+        'location' => [
+            '@type' => 'Place',
+            'name' => $event->venue,
+            'address' => $event->location ?: $event->venue,
+            'url' => $event->location_url,
+        ],
+        'organizer' => $event->hosted_by ? array_filter([
+            '@type' => 'Organization',
+            'name' => $event->hosted_by,
+            'url' => $event->hosted_by_url,
+        ]) : null,
+        'offers' => $lowestPrice !== null ? [
+            '@type' => 'Offer',
+            'url' => route('events.show', $event).'#checkout',
+            'price' => (string) $lowestPrice,
+            'priceCurrency' => 'THB',
+            'availability' => $event->ticketTypes->isNotEmpty() ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
+            'validFrom' => optional($event->ticketTypes->pluck('sale_starts_at')->filter()->sort()->first())->toIso8601String(),
+        ] : null,
+    ]);
 @endphp
 <x-layouts.app
     :title="$event->name"
     :meta-description="$socialDescription"
-    :meta-image="$socialImagePath ? asset('uploads/'.$socialImagePath) : null"
+    :meta-image="$eventImageUrl"
     :canonical-url="route('events.show', $event)"
+    :structured-data="$structuredData"
 >
     @php
         $bank = collect(config('thai_banks'))->firstWhere('name', $event->bank_name);
@@ -66,11 +101,16 @@
                             @endif
                         </dd></div>
                     </dl>
+                    <div class="mt-5 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
+                        <div class="font-semibold">Need a quick guide? / ต้องการดูวิธีซื้อ?</div>
+                        <p class="mt-1">See the friendly step-by-step ticket guide before booking. / ดูขั้นตอนซื้อตั๋วแบบง่าย ๆ ก่อนจอง</p>
+                        <a class="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300" href="{{ route('guides.buy-ticket') }}"><x-icon name="sparkles" />How to buy / วิธีซื้อตั๋ว</a>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <form method="POST" action="{{ route('orders.store') }}" enctype="multipart/form-data" class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5" @submit="prepareSubmit($event)" x-data="checkout({
+        <form id="checkout" method="POST" action="{{ route('orders.store') }}" enctype="multipart/form-data" class="scroll-mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5" @submit="prepareSubmit($event)" x-data="checkout({
             eventId: {{ $event->id }},
             tickets: @js($checkoutTickets),
             coupons: @js($checkoutCoupons),
@@ -234,6 +274,56 @@
                                 </template>
                             </div>
                         </template>
+                    </div>
+                </div>
+
+                <div class="mt-5" x-data="{
+                    openLegal: null,
+                    legalDocs: {
+                        terms: {
+                            title: 'Terms and Conditions / ข้อกำหนดและเงื่อนไข',
+                            body: 'TicketFlow helps customers reserve event tickets, submit payment evidence, receive digital ticket QR codes, and check in at the venue. Orders are pending until payment is reviewed and approved. Each ticket QR is for the named holder and event only. / TicketFlow ช่วยให้ลูกค้าจองตั๋ว ส่งหลักฐานการชำระเงิน รับ QR ตั๋วดิจิทัล และเช็กอินที่หน้างาน ออเดอร์จะรออนุมัติจนกว่าทีมงานตรวจสอบการชำระเงิน QR ตั๋วใช้สำหรับผู้ถือบัตรและอีเวนต์ที่ระบุเท่านั้น'
+                        },
+                        privacy: {
+                            title: 'Privacy Policy / นโยบายความเป็นส่วนตัว',
+                            body: 'We use customer, order, ticket, payment slip, LINE login, scan, and notification data to process orders, verify payments, issue tickets, support gate entry, and send event updates. / เราใช้ข้อมูลลูกค้า ออเดอร์ ตั๋ว สลิป LINE Login รายการสแกน และการแจ้งเตือน เพื่อดำเนินการออเดอร์ ตรวจสอบการชำระเงิน ออกตั๋ว สนับสนุนการเข้างาน และส่งข่าวสารอีเวนต์'
+                        },
+                        refund: {
+                            title: 'Refund Policy / นโยบายการคืนเงิน',
+                            body: 'Pending or rejected orders may be reviewed for correction or refund handling. Approved tickets are generally non-refundable unless the organizer states otherwise, the event is cancelled, or law requires it. / ออเดอร์ที่รออนุมัติหรือถูกปฏิเสธอาจได้รับการตรวจสอบเพื่อแก้ไขหรือคืนเงิน ตั๋วที่อนุมัติแล้วโดยทั่วไปไม่สามารถคืนเงินได้ ยกเว้นผู้จัดแจ้งเป็นอย่างอื่น งานถูกยกเลิก หรือกฎหมายกำหนด'
+                        },
+                        admission: {
+                            title: 'Event Admission Policy / นโยบายการเข้างาน',
+                            body: 'Customers must show an approved ticket QR at the gate. Staff may verify ticket status, holder details, venue rules, and duplicate scan history before allowing entry. / ลูกค้าต้องแสดง QR ตั๋วที่อนุมัติแล้วที่หน้างาน ทีมงานอาจตรวจสถานะตั๋ว ข้อมูลผู้ถือบัตร กฎสถานที่ และประวัติการสแกนซ้ำก่อนให้เข้างาน'
+                        },
+                    },
+                }">
+                    <label class="flex items-start gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-300">
+                        <input class="mt-1 rounded border-zinc-300 text-emerald-500 focus:ring-emerald-400" name="terms_accepted" type="checkbox" value="1" required>
+                        <span>
+                            I agree to the TicketFlow terms, privacy policy, refund policy, and event admission rules. / ฉันยอมรับเงื่อนไขการให้บริการ นโยบายความเป็นส่วนตัว นโยบายการคืนเงิน และกฎการเข้างานของ TicketFlow
+                            <span class="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                                <button class="font-semibold text-emerald-700 underline dark:text-emerald-200" type="button" @click.prevent="openLegal = 'terms'">Terms / เงื่อนไข</button>
+                                <span>·</span>
+                                <button class="font-semibold text-emerald-700 underline dark:text-emerald-200" type="button" @click.prevent="openLegal = 'privacy'">Privacy / ความเป็นส่วนตัว</button>
+                                <span>·</span>
+                                <button class="font-semibold text-emerald-700 underline dark:text-emerald-200" type="button" @click.prevent="openLegal = 'refund'">Refunds / คืนเงิน</button>
+                                <span>·</span>
+                                <button class="font-semibold text-emerald-700 underline dark:text-emerald-200" type="button" @click.prevent="openLegal = 'admission'">Admission / เข้างาน</button>
+                            </span>
+                        </span>
+                    </label>
+
+                    <div class="fixed inset-0 z-50 grid place-items-center bg-zinc-950/70 px-4" x-cloak x-show="openLegal" x-transition @keydown.escape.window="openLegal = null">
+                        <div class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-zinc-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-zinc-950" @click.outside="openLegal = null">
+                            <div class="flex items-start justify-between gap-4">
+                                <h3 class="text-xl font-semibold text-zinc-950 dark:text-white" x-text="legalDocs[openLegal]?.title"></h3>
+                                <button class="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/10" type="button" @click="openLegal = null" aria-label="Close / ปิด"><x-icon name="x" /></button>
+                            </div>
+                            <p class="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-300" x-text="legalDocs[openLegal]?.body"></p>
+                            <p class="mt-4 text-xs text-zinc-500">This is a checkout summary. Footer legal pages contain the full public documents. / นี่คือสรุประหว่าง checkout เอกสารฉบับเต็มอยู่ในลิงก์ท้ายเว็บไซต์</p>
+                            <button class="mt-5 inline-flex w-full items-center justify-center rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300" type="button" @click="openLegal = null">I understand / เข้าใจแล้ว</button>
+                        </div>
                     </div>
                 </div>
 

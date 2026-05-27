@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\TicketOrder;
 use App\Services\CrmSyncService;
 use App\Services\CustomerNotificationService;
+use App\Services\SlipQrDecoderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -28,7 +29,14 @@ class OrderController extends Controller
 
     public function show(Request $request, TicketOrder $order): View
     {
-        $order->load(['user', 'items.event', 'items.ticketType', 'tickets.event', 'tickets.ticketType']);
+        $order->load([
+            'user',
+            'items.event',
+            'items.ticketType',
+            'tickets.event',
+            'tickets.ticketType',
+            'payments' => fn ($query) => $query->latest(),
+        ]);
         $this->authorizeOrder($request, $order);
 
         return view('admin.orders.show', compact('order'));
@@ -80,6 +88,30 @@ class OrderController extends Controller
         $order->tickets()->update(['status' => 'refunded']);
 
         return back()->with('status', 'Order marked refunded.');
+    }
+
+    public function checkSlipQr(Request $request, TicketOrder $order, SlipQrDecoderService $slipQrDecoder): RedirectResponse
+    {
+        $order->loadMissing(['items.event', 'payments']);
+        $this->authorizeOrder($request, $order);
+
+        if (! $order->payment_slip_path) {
+            return back()->with('status', 'No payment slip found for this order. / ไม่พบสลิปของออเดอร์นี้');
+        }
+
+        $payment = $order->payments()->latest()->first()
+            ?? $order->payments()->create([
+                'method' => $order->payment_method,
+                'amount_thb' => $order->total_thb,
+                'status' => 'submitted',
+                'slip_path' => $order->payment_slip_path,
+            ]);
+
+        $payment->update(array_merge([
+            'slip_path' => $order->payment_slip_path,
+        ], $slipQrDecoder->decode($order->payment_slip_path)));
+
+        return back()->with('status', 'Payment slip QR checked. / ตรวจ QR จากสลิปแล้ว');
     }
 
     public function destroy(Request $request, TicketOrder $order): RedirectResponse
