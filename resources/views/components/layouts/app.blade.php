@@ -131,11 +131,7 @@
                     TicketFlow
                 </div>
                 <nav class="flex flex-wrap gap-x-4 gap-y-2">
-                    <a class="hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('legal.terms') }}">Terms</a>
-                    <a class="hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('legal.privacy') }}">Privacy</a>
-                    <a class="hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('legal.refund') }}">Refunds</a>
-                    <a class="hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('legal.event-admission') }}">Admission</a>
-                    <a class="hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('legal.cookies') }}">Cookies</a>
+                    <a class="hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('legal.terms') }}">Terms and Conditions / ข้อกำหนดและเงื่อนไข</a>
                 </nav>
             </div>
             <!-- <p>This page provides general service information and is not legal advice. / หน้านี้เป็นข้อมูลทั่วไปของบริการ ไม่ใช่คำแนะนำทางกฎหมาย</p> -->

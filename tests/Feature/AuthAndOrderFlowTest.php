@@ -415,9 +415,11 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertSee('ธนาคารกรุงไทย')
             ->assertSee('ktb.svg', false)
             ->assertSee('terms_accepted', false)
+            ->assertSee('Terms and Conditions / ข้อกำหนดและเงื่อนไข')
             ->assertSee(route('legal.terms'), false)
-            ->assertSee(route('legal.privacy'), false)
-            ->assertSee(route('legal.refund'), false);
+            ->assertDontSee('Privacy / ความเป็นส่วนตัว')
+            ->assertDontSee('Refunds / คืนเงิน')
+            ->assertDontSee(route('legal.privacy'), false);
     }
 
     public function test_public_legal_pages_render_from_footer_links(): void
@@ -432,9 +434,11 @@ class AuthAndOrderFlowTest extends TestCase
             $this->get($url)
                 ->assertOk()
                 ->assertSee($heading)
-                ->assertSee('Terms / เงื่อนไข')
-                ->assertSee('Privacy / ความเป็นส่วนตัว')
-                ->assertSee('Refunds / คืนเงิน');
+                ->assertSee('English')
+                ->assertSee('ไทย')
+                ->assertSee(route('legal.terms'), false)
+                ->assertSee(route('legal.privacy'), false)
+                ->assertSee(route('legal.refund'), false);
         }
     }
 

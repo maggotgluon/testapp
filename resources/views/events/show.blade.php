@@ -58,6 +58,7 @@
             'value' => $coupon->discount_value,
             'ticket_type_id' => $coupon->ticket_type_id,
         ])->values();
+        $checkoutLegalDocs = app(\App\Services\LegalDocumentService::class)->modal(['terms', 'privacy', 'refund']);
     @endphp
     <div class="grid gap-8 lg:grid-cols-[.8fr_1.2fr]">
         <section>
@@ -279,37 +280,16 @@
 
                 <div class="mt-5" x-data="{
                     openLegal: null,
-                    legalDocs: {
-                        terms: {
-                            title: 'Terms and Conditions / ข้อกำหนดและเงื่อนไข',
-                            body: 'TicketFlow helps customers reserve event tickets, submit payment evidence, receive digital ticket QR codes, and check in at the venue. Orders are pending until payment is reviewed and approved. Each ticket QR is for the named holder and event only. / TicketFlow ช่วยให้ลูกค้าจองตั๋ว ส่งหลักฐานการชำระเงิน รับ QR ตั๋วดิจิทัล และเช็กอินที่หน้างาน ออเดอร์จะรออนุมัติจนกว่าทีมงานตรวจสอบการชำระเงิน QR ตั๋วใช้สำหรับผู้ถือบัตรและอีเวนต์ที่ระบุเท่านั้น'
-                        },
-                        privacy: {
-                            title: 'Privacy Policy / นโยบายความเป็นส่วนตัว',
-                            body: 'We use customer, order, ticket, payment slip, LINE login, scan, and notification data to process orders, verify payments, issue tickets, support gate entry, and send event updates. / เราใช้ข้อมูลลูกค้า ออเดอร์ ตั๋ว สลิป LINE Login รายการสแกน และการแจ้งเตือน เพื่อดำเนินการออเดอร์ ตรวจสอบการชำระเงิน ออกตั๋ว สนับสนุนการเข้างาน และส่งข่าวสารอีเวนต์'
-                        },
-                        refund: {
-                            title: 'Refund Policy / นโยบายการคืนเงิน',
-                            body: 'Pending or rejected orders may be reviewed for correction or refund handling. Approved tickets are generally non-refundable unless the organizer states otherwise, the event is cancelled, or law requires it. / ออเดอร์ที่รออนุมัติหรือถูกปฏิเสธอาจได้รับการตรวจสอบเพื่อแก้ไขหรือคืนเงิน ตั๋วที่อนุมัติแล้วโดยทั่วไปไม่สามารถคืนเงินได้ ยกเว้นผู้จัดแจ้งเป็นอย่างอื่น งานถูกยกเลิก หรือกฎหมายกำหนด'
-                        },
-                        admission: {
-                            title: 'Event Admission Policy / นโยบายการเข้างาน',
-                            body: 'Customers must show an approved ticket QR at the gate. Staff may verify ticket status, holder details, venue rules, and duplicate scan history before allowing entry. / ลูกค้าต้องแสดง QR ตั๋วที่อนุมัติแล้วที่หน้างาน ทีมงานอาจตรวจสถานะตั๋ว ข้อมูลผู้ถือบัตร กฎสถานที่ และประวัติการสแกนซ้ำก่อนให้เข้างาน'
-                        },
-                    },
+                    activeLegalSection: 'terms',
+                    lang: (navigator.language || '').toLowerCase().startsWith('th') ? 'th' : 'en',
+                    legalDocs: @js($checkoutLegalDocs),
                 }">
                     <label class="flex items-start gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-300">
                         <input class="mt-1 rounded border-zinc-300 text-emerald-500 focus:ring-emerald-400" name="terms_accepted" type="checkbox" value="1" required>
                         <span>
-                            I agree to the TicketFlow terms, privacy policy, refund policy, and event admission rules. / ฉันยอมรับเงื่อนไขการให้บริการ นโยบายความเป็นส่วนตัว นโยบายการคืนเงิน และกฎการเข้างานของ TicketFlow
+                            I agree to the TicketFlow Terms and Conditions. / ฉันยอมรับข้อกำหนดและเงื่อนไขของ TicketFlow
                             <span class="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
-                                <button class="font-semibold text-emerald-700 underline dark:text-emerald-200" type="button" @click.prevent="openLegal = 'terms'">Terms / เงื่อนไข</button>
-                                <span>·</span>
-                                <button class="font-semibold text-emerald-700 underline dark:text-emerald-200" type="button" @click.prevent="openLegal = 'privacy'">Privacy / ความเป็นส่วนตัว</button>
-                                <span>·</span>
-                                <button class="font-semibold text-emerald-700 underline dark:text-emerald-200" type="button" @click.prevent="openLegal = 'refund'">Refunds / คืนเงิน</button>
-                                <span>·</span>
-                                <button class="font-semibold text-emerald-700 underline dark:text-emerald-200" type="button" @click.prevent="openLegal = 'admission'">Admission / เข้างาน</button>
+                                <button class="font-semibold text-emerald-700 underline dark:text-emerald-200" type="button" @click.prevent="openLegal = 'terms'; activeLegalSection = 'terms'">Terms and Conditions / ข้อกำหนดและเงื่อนไข</button>
                             </span>
                         </span>
                     </label>
@@ -317,11 +297,30 @@
                     <div class="fixed inset-0 z-50 grid place-items-center bg-zinc-950/70 px-4" x-cloak x-show="openLegal" x-transition @keydown.escape.window="openLegal = null">
                         <div class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-zinc-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-zinc-950" @click.outside="openLegal = null">
                             <div class="flex items-start justify-between gap-4">
-                                <h3 class="text-xl font-semibold text-zinc-950 dark:text-white" x-text="legalDocs[openLegal]?.title"></h3>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-zinc-950 dark:text-white" x-text="legalDocs.terms?.title[lang]"></h3>
+                                    <a class="mt-1 inline-flex text-sm font-semibold text-emerald-700 underline dark:text-emerald-200" :href="legalDocs.terms?.url" target="_blank" rel="noopener">Open full page / เปิดหน้าเต็ม</a>
+                                </div>
                                 <button class="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/10" type="button" @click="openLegal = null" aria-label="Close / ปิด"><x-icon name="x" /></button>
                             </div>
-                            <p class="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-300" x-text="legalDocs[openLegal]?.body"></p>
-                            <p class="mt-4 text-xs text-zinc-500">This is a checkout summary. Footer legal pages contain the full public documents. / นี่คือสรุประหว่าง checkout เอกสารฉบับเต็มอยู่ในลิงก์ท้ายเว็บไซต์</p>
+                            <div class="mt-4 inline-grid grid-cols-2 overflow-hidden rounded-md border border-zinc-200 text-sm font-semibold dark:border-white/10">
+                                <button class="px-4 py-2" type="button" :class="lang === 'en' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'" @click="lang = 'en'">English</button>
+                                <button class="px-4 py-2" type="button" :class="lang === 'th' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'" @click="lang = 'th'">ไทย</button>
+                            </div>
+                            <div class="mt-4 divide-y divide-zinc-200 overflow-hidden rounded-md border border-zinc-200 dark:divide-white/10 dark:border-white/10">
+                                <template x-for="([key, doc]) in Object.entries(legalDocs)" :key="key">
+                                    <section>
+                                        <button class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left font-semibold text-zinc-950 hover:bg-zinc-50 dark:text-white dark:hover:bg-white/10" type="button" @click="activeLegalSection = activeLegalSection === key ? null : key">
+                                            <span x-text="doc.title[lang]"></span>
+                                            <span class="text-lg leading-none" x-text="activeLegalSection === key ? '-' : '+'"></span>
+                                        </button>
+                                        <div class="px-4 pb-4" x-cloak x-show="activeLegalSection === key" x-transition>
+                                            <div class="legal-document legal-document--compact max-w-none text-sm" x-html="doc.html[lang]"></div>
+                                        </div>
+                                    </section>
+                                </template>
+                            </div>
+                            <p class="mt-4 text-xs text-zinc-500">This content comes from the same legal document source used by the public legal pages. / เนื้อหานี้มาจากแหล่งเอกสารเดียวกับหน้าเอกสารทางกฎหมายสาธารณะ</p>
                             <button class="mt-5 inline-flex w-full items-center justify-center rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300" type="button" @click="openLegal = null">I understand / เข้าใจแล้ว</button>
                         </div>
                     </div>

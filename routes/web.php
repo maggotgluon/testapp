@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CrmController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\LegalDocumentController;
 use App\Http\Controllers\LineWebhookController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PushSubscriptionController;
@@ -21,11 +22,11 @@ Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap
 Route::get('/', [EventController::class, 'index'])->name('events.index');
 Route::view('/guides/how-to-buy-ticket', 'guides.how-to-buy-ticket')->name('guides.buy-ticket');
 Route::view('/guides/gate-check-in', 'guides.gate-check-in')->name('guides.gate-check-in');
-Route::view('/legal/terms', 'legal.terms')->name('legal.terms');
-Route::view('/legal/privacy', 'legal.privacy')->name('legal.privacy');
-Route::view('/legal/refund-policy', 'legal.refund-policy')->name('legal.refund');
-Route::view('/legal/event-admission-policy', 'legal.event-admission-policy')->name('legal.event-admission');
-Route::view('/legal/cookie-policy', 'legal.cookie-policy')->name('legal.cookies');
+Route::get('/legal/terms', [LegalDocumentController::class, 'show'])->defaults('document', 'terms')->name('legal.terms');
+Route::get('/legal/privacy', [LegalDocumentController::class, 'show'])->defaults('document', 'privacy')->name('legal.privacy');
+Route::get('/legal/refund-policy', [LegalDocumentController::class, 'show'])->defaults('document', 'refund')->name('legal.refund');
+Route::get('/legal/event-admission-policy', [LegalDocumentController::class, 'show'])->defaults('document', 'event-admission')->name('legal.event-admission');
+Route::get('/legal/cookie-policy', [LegalDocumentController::class, 'show'])->defaults('document', 'cookies')->name('legal.cookies');
 Route::get('/events/{event}', [EventController::class, 'show'])->name('events.show');
 
 Route::get('/login', [AuthController::class, 'show'])->name('login');
