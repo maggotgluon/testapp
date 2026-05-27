@@ -58,6 +58,21 @@
             'value' => $coupon->discount_value,
             'ticket_type_id' => $coupon->ticket_type_id,
         ])->values();
+        $checkoutPromotions = $event->promotions->map(fn ($promotion) => [
+            'id' => $promotion->id,
+            'name' => $promotion->name,
+            'description' => $promotion->description,
+            'type' => $promotion->promotion_type,
+            'scope' => $promotion->discount_scope,
+            'value' => $promotion->discount_value,
+            'ticket_type_id' => $promotion->ticket_type_id,
+            'buy_quantity' => $promotion->buy_quantity,
+            'get_quantity' => $promotion->get_quantity,
+            'min_quantity' => $promotion->min_quantity,
+            'max_discount_thb' => $promotion->max_discount_thb,
+            'combines_with_coupons' => $promotion->combines_with_coupons,
+            'summary' => $promotion->displaySummary(),
+        ])->values();
         $checkoutLegalDocs = app(\App\Services\LegalDocumentService::class)->modal(['terms', 'privacy', 'refund']);
     @endphp
     <div class="grid gap-8 lg:grid-cols-[.8fr_1.2fr]">
@@ -102,11 +117,6 @@
                             @endif
                         </dd></div>
                     </dl>
-                    <div class="mt-5 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
-                        <div class="font-semibold">Need a quick guide? / ต้องการดูวิธีซื้อ?</div>
-                        <p class="mt-1">See the friendly step-by-step ticket guide before booking. / ดูขั้นตอนซื้อตั๋วแบบง่าย ๆ ก่อนจอง</p>
-                        <a class="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300" href="{{ route('guides.buy-ticket') }}"><x-icon name="sparkles" />How to buy / วิธีซื้อตั๋ว</a>
-                    </div>
                 </div>
             </div>
         </section>
@@ -115,6 +125,7 @@
             eventId: {{ $event->id }},
             tickets: @js($checkoutTickets),
             coupons: @js($checkoutCoupons),
+            promotions: @js($checkoutPromotions),
             payment: @js([
                 'bank_name' => $event->bank_name,
                 'bank_account_name' => $event->bank_account_name,
@@ -144,6 +155,24 @@
             @endguest
 
             <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="ticket" class="h-5 w-5 text-emerald-500" />Reserve Your Spot / เลือกตั๋ว</h2>
+            @if($event->promotions->isNotEmpty() && 1==2)
+                <div class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
+                    <div class="inline-flex items-center gap-2 font-semibold"><x-icon name="sparkles" />Today’s promotions / โปรโมชันวันนี้</div>
+                    <div class="mt-3 grid gap-2">
+                        @foreach($event->promotions as $promotion)
+                            <div class="rounded-md bg-white/70 px-3 py-2 dark:bg-zinc-950/60">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <span class="font-semibold">{{ $promotion->name }}</span>
+                                    <span class="text-xs font-medium text-emerald-700 dark:text-emerald-200">{{ $promotion->displaySummary() }}</span>
+                                </div>
+                                @if($promotion->description)
+                                    <p class="mt-1 text-xs text-emerald-800 dark:text-emerald-100">{{ $promotion->description }}</p>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
             <div class="mt-4 grid gap-3">
                 @forelse($event->ticketTypes as $ticket)
                     <div class="rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4">
@@ -202,6 +231,23 @@
                     </div>
                 @endif
 
+                @if($event->promotions->isNotEmpty())
+                    <div class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50" x-cloak x-show="activePromotions().length > 0">
+                        <div class="inline-flex items-center gap-2 font-medium"><x-icon name="sparkles" />Active promotions / โปรโมชันที่ใช้ได้</div>
+                        <div class="mt-3 grid gap-2">
+                            <template x-for="promotion in activePromotions()" :key="promotion.id">
+                                <div class="rounded-md bg-white/70 px-3 py-2 dark:bg-zinc-950/60">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <span class="font-semibold" x-text="promotion.name"></span>
+                                        <span class="text-xs font-medium text-emerald-700 dark:text-emerald-200" x-text="promotion.summary"></span>
+                                    </div>
+                                    <p class="mt-1 text-xs text-emerald-800 dark:text-emerald-100" x-show="promotion.description" x-text="promotion.description"></p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                @endif
+
 
                 <div class="mt-5 rounded-md border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
                     <div class="flex items-center justify-between gap-3">
@@ -212,6 +258,9 @@
                         <div class="flex justify-between gap-3"><dt class="text-emerald-700 dark:text-emerald-200">Subtotal / ยอดรวม</dt><dd>THB <span x-text="subtotal().toLocaleString()"></span></dd></div>
                         @if($event->coupons->isNotEmpty())
                         <div class="flex justify-between gap-3"><dt class="text-emerald-700 dark:text-emerald-200">Coupon discount / ส่วนลดคูปอง</dt><dd>- THB <span x-text="discount().toLocaleString()"></span></dd></div>
+                        @endif
+                        @if($event->promotions->isNotEmpty())
+                        <div class="flex justify-between gap-3"><dt class="text-emerald-700 dark:text-emerald-200">Promotion discount / ส่วนลดโปรโมชัน</dt><dd>- THB <span x-text="promotionDiscount().toLocaleString()"></span></dd></div>
                         @endif
                     </dl>
                     <template x-if="paymentMethod === 'bank_transfer'">
@@ -330,4 +379,9 @@
             </div>
         </form>
     </div>
+
+    <a class="fixed bottom-4 left-1/2 z-40 inline-flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-2 rounded-lg border border-emerald-300/70 bg-emerald-400 px-4 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:border-emerald-300/30 sm:bottom-6 sm:right-6 sm:left-auto sm:w-auto sm:translate-x-0" href="#checkout">
+        <x-icon name="ticket" class="h-5 w-5" />
+        Reserve Your Spot / เลือกตั๋ว
+    </a>
 </x-layouts.app>

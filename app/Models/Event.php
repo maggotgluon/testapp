@@ -54,6 +54,11 @@ class Event extends Model
         return $this->hasMany(Coupon::class);
     }
 
+    public function promotions(): HasMany
+    {
+        return $this->hasMany(Promotion::class);
+    }
+
     public function assignedUsers(): BelongsToMany
     {
         return $this->belongsToMany(User::class)->withTimestamps();

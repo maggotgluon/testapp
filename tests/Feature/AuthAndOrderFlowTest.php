@@ -7,6 +7,7 @@ use App\Mail\EventAttendeeAnnouncement;
 use App\Models\Coupon;
 use App\Models\Event;
 use App\Models\OrderItem;
+use App\Models\Promotion;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
@@ -1293,6 +1294,87 @@ class AuthAndOrderFlowTest extends TestCase
             'subtotal_thb' => $ticketType->price_thb * 2,
             'discount_thb' => 200,
             'total_thb' => ($ticketType->price_thb * 2) - 200,
+        ]);
+    }
+
+    public function test_buy_x_get_y_promotion_discounts_free_ticket(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        Promotion::create([
+            'event_id' => $ticketType->event_id,
+            'ticket_type_id' => $ticketType->id,
+            'name' => 'Buy 2 Get 1',
+            'promotion_type' => 'buy_x_get_y',
+            'buy_quantity' => 2,
+            'get_quantity' => 1,
+            'combines_with_coupons' => true,
+            'is_active' => true,
+        ]);
+
+        $this->post('/orders', [
+            'customer_name' => 'Demo Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 3],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'subtotal_thb' => $ticketType->price_thb * 3,
+            'discount_thb' => $ticketType->price_thb,
+            'total_thb' => $ticketType->price_thb * 2,
+        ]);
+    }
+
+    public function test_promotion_can_skip_coupon_stacking(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        Coupon::create([
+            'event_id' => $ticketType->event_id,
+            'ticket_type_id' => $ticketType->id,
+            'code' => 'SAVE100',
+            'discount_type' => 'fixed',
+            'discount_scope' => 'order',
+            'discount_value' => 100,
+            'is_active' => true,
+        ]);
+
+        Promotion::create([
+            'event_id' => $ticketType->event_id,
+            'ticket_type_id' => $ticketType->id,
+            'name' => 'Buy 2 Get 1',
+            'promotion_type' => 'buy_x_get_y',
+            'buy_quantity' => 2,
+            'get_quantity' => 1,
+            'combines_with_coupons' => false,
+            'is_active' => true,
+        ]);
+
+        $this->post('/orders', [
+            'customer_name' => 'Demo Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'coupon_code' => 'SAVE100',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 3],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'subtotal_thb' => $ticketType->price_thb * 3,
+            'discount_thb' => 100,
+            'total_thb' => ($ticketType->price_thb * 3) - 100,
         ]);
     }
 

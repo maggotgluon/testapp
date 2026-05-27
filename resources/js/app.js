@@ -204,6 +204,7 @@ Alpine.data('checkout', (config) => ({
     errorMessage: '',
     customerName: config.customerName || '',
     tickets: config.tickets,
+    promotions: config.promotions || [],
     quantities: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, 0])),
     holderNames: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, []])),
     holderTouched: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, []])),
@@ -274,6 +275,15 @@ Alpine.data('checkout', (config) => ({
             return sum + (Number(this.quantities[ticket.id] || 0) * Number(ticket.price));
         }, 0);
     },
+    eligibleQuantity(promotion) {
+        return config.tickets.reduce((sum, ticket) => {
+            if (promotion.ticket_type_id && Number(promotion.ticket_type_id) !== Number(ticket.id)) {
+                return sum;
+            }
+
+            return sum + Number(this.quantities[ticket.id] || 0);
+        }, 0);
+    },
     discount() {
         const coupon = this.activeCoupon();
 
@@ -304,8 +314,83 @@ Alpine.data('checkout', (config) => ({
 
         return Math.min(eligibleSubtotal, discount);
     },
+    activePromotions() {
+        return this.promotions.filter((promotion) => this.discountForPromotion(promotion, this.discount()) > 0);
+    },
+    promotionEligibleSubtotal(promotion) {
+        return config.tickets.reduce((sum, ticket) => {
+            if (promotion.ticket_type_id && Number(promotion.ticket_type_id) !== Number(ticket.id)) {
+                return sum;
+            }
+
+            return sum + (Number(this.quantities[ticket.id] || 0) * Number(ticket.price));
+        }, 0);
+    },
+    discountForPromotion(promotion, couponDiscount = this.discount()) {
+        if (couponDiscount > 0 && promotion.combines_with_coupons === false) {
+            return 0;
+        }
+
+        const minQuantity = Number(promotion.min_quantity || 1);
+        if (this.eligibleQuantity(promotion) < minQuantity) {
+            return 0;
+        }
+
+        const eligibleSubtotal = this.promotionEligibleSubtotal(promotion);
+        let discount = 0;
+
+        if (promotion.type === 'buy_x_get_y') {
+            const buyQuantity = Math.max(1, Number(promotion.buy_quantity || 1));
+            const getQuantity = Math.max(1, Number(promotion.get_quantity || 1));
+            const groupSize = buyQuantity + getQuantity;
+            const freeQuantity = Math.floor(this.eligibleQuantity(promotion) / groupSize) * getQuantity;
+            const unitPrices = [];
+
+            config.tickets.forEach((ticket) => {
+                if (promotion.ticket_type_id && Number(promotion.ticket_type_id) !== Number(ticket.id)) {
+                    return;
+                }
+
+                for (let index = 0; index < Number(this.quantities[ticket.id] || 0); index += 1) {
+                    unitPrices.push(Number(ticket.price));
+                }
+            });
+
+            discount = unitPrices.sort((a, b) => a - b).slice(0, freeQuantity).reduce((sum, price) => sum + price, 0);
+        } else if (promotion.scope === 'item') {
+            discount = config.tickets.reduce((sum, ticket) => {
+                if (promotion.ticket_type_id && Number(promotion.ticket_type_id) !== Number(ticket.id)) {
+                    return sum;
+                }
+
+                const quantity = Number(this.quantities[ticket.id] || 0);
+                const lineTotal = quantity * Number(ticket.price);
+                const lineDiscount = promotion.type === 'percent'
+                    ? Math.round(lineTotal * (Number(promotion.value || 0) / 100))
+                    : quantity * Number(promotion.value || 0);
+
+                return sum + Math.min(lineTotal, lineDiscount);
+            }, 0);
+        } else {
+            discount = promotion.type === 'percent'
+                ? Math.round(eligibleSubtotal * (Number(promotion.value || 0) / 100))
+                : Number(promotion.value || 0);
+        }
+
+        if (promotion.max_discount_thb) {
+            discount = Math.min(discount, Number(promotion.max_discount_thb));
+        }
+
+        return Math.min(eligibleSubtotal, discount);
+    },
+    promotionDiscount() {
+        const couponDiscount = this.discount();
+        const discount = this.promotions.reduce((sum, promotion) => sum + this.discountForPromotion(promotion, couponDiscount), 0);
+
+        return Math.min(Math.max(0, this.subtotal() - couponDiscount), discount);
+    },
     total() {
-        return Math.max(0, this.subtotal() - this.discount());
+        return Math.max(0, this.subtotal() - this.discount() - this.promotionDiscount());
     },
     paymentQrUrl() {
         return `/payments/events/${config.eventId}/qr?amount=${this.total()}`;

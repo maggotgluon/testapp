@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Coupon;
-use App\Models\Payment;
 use App\Models\Event;
+use App\Models\Payment;
+use App\Models\Promotion;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
@@ -66,7 +67,7 @@ class OrderController extends Controller
             }
 
             $coupon = null;
-            $discount = 0;
+            $couponDiscount = 0;
             if (! empty($data['coupon_code'])) {
                 $eventIds = $ticketTypes->pluck('event_id')->unique();
                 $coupon = Coupon::query()
@@ -74,12 +75,31 @@ class OrderController extends Controller
                     ->where(fn ($query) => $query->whereNull('event_id')->orWhereIn('event_id', $eventIds))
                     ->first();
                 if ($coupon) {
-                    $discount = $coupon->discountForItems($selected, $ticketTypes);
-                    if ($discount > 0) {
+                    $couponDiscount = $coupon->discountForItems($selected, $ticketTypes);
+                    if ($couponDiscount > 0) {
                         $coupon->increment('used_count');
                     }
                 }
             }
+
+            $eventIds = $ticketTypes->pluck('event_id')->unique();
+            $promotions = Promotion::query()
+                ->where(fn ($query) => $query->whereNull('event_id')->orWhereIn('event_id', $eventIds))
+                ->get();
+            $promotionDiscount = 0;
+            $remainingDiscountable = max(0, $subtotal - $couponDiscount);
+            foreach ($promotions as $promotion) {
+                $discount = $promotion->discountForItems($selected, $ticketTypes, $couponDiscount > 0);
+                $appliedDiscount = min($remainingDiscountable, $discount);
+
+                if ($appliedDiscount > 0) {
+                    $promotionDiscount += $appliedDiscount;
+                    $remainingDiscountable -= $appliedDiscount;
+                    $promotion->increment('used_count');
+                }
+            }
+
+            $discount = $couponDiscount + $promotionDiscount;
 
             $order = TicketOrder::create([
                 'order_number' => $this->generateOrderNumber($ticketTypes),

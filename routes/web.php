@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\EventController as AdminEventController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Admin\PromotionController;
 use App\Http\Controllers\Admin\ScannerController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\AuthController;
@@ -72,6 +73,7 @@ Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->na
     Route::delete('/events/{event}/tickets/{ticket}', [AdminEventController::class, 'destroyTicket'])->name('events.tickets.destroy');
     Route::resource('events', AdminEventController::class)->except(['show']);
     Route::resource('coupons', CouponController::class)->except(['show']);
+    Route::resource('promotions', PromotionController::class)->except(['show']);
     Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/approve', [AdminOrderController::class, 'approve'])->name('orders.approve');

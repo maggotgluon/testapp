@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
+use App\Models\Promotion;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
 use Illuminate\Http\RedirectResponse;
@@ -43,11 +44,26 @@ class EventController extends Controller
                 ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
                 ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>=', now()))
                 ->where(fn ($query) => $query->whereNull('usage_limit')->orWhereColumn('used_count', '<', 'usage_limit')),
+            'promotions' => fn ($query) => $query
+                ->where('is_active', true)
+                ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+                ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>=', now()))
+                ->where(fn ($query) => $query->whereNull('usage_limit')->orWhereColumn('used_count', '<', 'usage_limit')),
         ]);
 
         $availableTicketTypeIds = $event->ticketTypes->pluck('id');
+        $globalPromotions = Promotion::query()
+            ->whereNull('event_id')
+            ->where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>=', now()))
+            ->where(fn ($query) => $query->whereNull('usage_limit')->orWhereColumn('used_count', '<', 'usage_limit'))
+            ->get();
         $event->setRelation('coupons', $event->coupons->filter(
             fn ($coupon) => $coupon->ticket_type_id === null || $availableTicketTypeIds->contains($coupon->ticket_type_id)
+        )->values());
+        $event->setRelation('promotions', $event->promotions->merge($globalPromotions)->filter(
+            fn ($promotion) => $promotion->ticket_type_id === null || $availableTicketTypeIds->contains($promotion->ticket_type_id)
         )->values());
 
         return view('events.show', compact('event'));
