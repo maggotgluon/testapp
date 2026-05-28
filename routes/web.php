@@ -55,6 +55,7 @@ Route::get('/tickets/{uuid}/qr', [OrderController::class, 'ticketQr'])->name('ti
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [EventController::class, 'profile'])->name('profile');
+    Route::patch('/profile', [EventController::class, 'updateProfile'])->name('profile.update');
     Route::post('/push-subscriptions', [PushSubscriptionController::class, 'store'])->name('push-subscriptions.store');
     Route::delete('/push-subscriptions', [PushSubscriptionController::class, 'destroy'])->name('push-subscriptions.destroy');
 });

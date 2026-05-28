@@ -35,6 +35,32 @@ class CustomerNotificationService
         );
     }
 
+    public function orderCreatedForAdmins(TicketOrder $order): array
+    {
+        $order->loadMissing(['items.event']);
+
+        $eventIds = $order->items->pluck('event_id')->filter()->unique()->values();
+        $eventName = $order->items->pluck('event.name')->filter()->unique()->join(', ');
+        $url = route('admin.orders.show', $order);
+        $message = "New ticket order {$order->order_number} is waiting for review.\nมีออเดอร์ใหม่ {$order->order_number} รอตรวจสอบ\n{$eventName}\n{$url}";
+
+        $users = User::query()
+            ->whereIn('role', ['super_admin', 'event_admin'])
+            ->where(function ($query) use ($eventIds) {
+                $query->where('role', 'super_admin')
+                    ->orWhereHas('assignedEvents', fn ($assigned) => $assigned->whereIn('events.id', $eventIds));
+            })
+            ->get();
+
+        return $this->sendToUsers(
+            $users,
+            'New order / ออเดอร์ใหม่',
+            $message,
+            $url,
+            ['web_push']
+        );
+    }
+
     public function eventMessage(Event $event, Collection $users, string $subject, string $message, array $channels): array
     {
         $body = trim($subject)."\n\n".trim($message)."\n\n".$event->name."\n".route('events.show', $event);

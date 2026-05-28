@@ -96,7 +96,7 @@
         </div>
     </section> -->
 
-    @if($lineNotificationsEnabled || $webPushEnabled)
+    @if(($lineNotificationsEnabled || $webPushEnabled) && $messageRecipientCount > 0)
     <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
         <div class="grid gap-4 lg:grid-cols-[.7fr_1.3fr]">
             <div>

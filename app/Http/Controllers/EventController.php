@@ -8,6 +8,7 @@ use App\Models\Ticket;
 use App\Models\TicketOrder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class EventController extends Controller
@@ -102,6 +103,19 @@ class EventController extends Controller
         $activeView = $request->query('view') === 'tickets' ? 'tickets' : 'orders';
 
         return view('profile', compact('orders', 'tickets', 'orderEvents', 'ticketEvents', 'activeView'));
+    }
+
+    public function updateProfile(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('users')->ignore($request->user()->id)],
+            'phone' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $request->user()->update($data);
+
+        return back()->with('status', 'Profile updated. / อัปเดตโปรไฟล์แล้ว');
     }
 
     public function lookup(Request $request): View

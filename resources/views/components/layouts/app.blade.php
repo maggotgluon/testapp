@@ -19,6 +19,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="theme-color" content="#34d399">
+    <link rel="manifest" href="/site.webmanifest">
     @auth
         @if(config('webpush.vapid.public_key'))
             <meta name="webpush-public-key" content="{{ config('webpush.vapid.public_key') }}">
@@ -105,7 +107,6 @@
                             <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.orders.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.orders.index') }}"><x-icon name="shopping-bag" />Orders</a>
                         @endif
                         <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.scanner') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.scanner') }}"><x-icon name="scan-line" />Scanner</a>
-                        <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('guides.gate-check-in') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('guides.gate-check-in') }}"><x-icon name="sparkles" />Check-in guide</a>
                         @if(auth()->user()->role === 'super_admin')
                             <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.users.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.users.index') }}"><x-icon name="users" />Users</a>
                         @endif

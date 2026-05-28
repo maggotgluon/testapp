@@ -309,10 +309,12 @@
                     </div>
                 </div>
                 <label class="mt-4 block text-sm text-zinc-700 dark:text-zinc-300">Payment note / หมายเหตุการชำระเงิน<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_note" rows="3"></textarea></label>
-                <div class="mt-5 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4">
-                    <h3 class="inline-flex items-center gap-2 font-semibold text-zinc-950 dark:text-white"><x-icon name="users" />Ticket holders / ชื่อผู้ถือบัตร</h3>
-                    <!-- <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Leave blank to use the buyer name. / เว้นว่างไว้เพื่อใช้ชื่อผู้ซื้อ</p> -->
-                    <div class="mt-4 grid gap-4">
+                <div class="mt-5 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4" x-data="{ holdersOpen: false }">
+                    <button class="flex w-full items-center justify-between gap-3 text-left font-semibold text-zinc-950 dark:text-white" type="button" @click="holdersOpen = !holdersOpen" :aria-expanded="holdersOpen.toString()">
+                        <span class="inline-flex items-center gap-2"><x-icon name="users" />Ticket holders / ชื่อผู้ถือบัตร</span>
+                        <span class="text-sm text-emerald-700 dark:text-emerald-200" x-text="holdersOpen ? 'Hide / ซ่อน' : 'Edit / แก้ไข'"></span>
+                    </button>
+                    <div class="mt-4 grid gap-4" x-cloak x-show="holdersOpen" x-transition>
                         <template x-for="ticket in tickets" :key="ticket.id">
                             <div class="grid gap-2" x-show="Number(quantities[ticket.id] || 0) > 0">
                                 <div class="text-sm font-medium text-zinc-700 dark:text-zinc-200" x-text="ticket.name"></div>
@@ -380,8 +382,8 @@
         </form>
     </div>
 
-    <a class="fixed bottom-4 left-1/2 z-40 inline-flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-2 rounded-lg border border-emerald-300/70 bg-emerald-400 px-4 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:border-emerald-300/30 sm:bottom-6 sm:right-6 sm:left-auto sm:w-auto sm:translate-x-0" href="#checkout">
+    <a class="fixed bottom-4 left-1/2 z-40 inline-flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-2 rounded-lg border border-emerald-300/70 bg-emerald-400 px-4 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:border-emerald-300/30 sm:bottom-6 sm:right-6 sm:left-auto sm:w-auto sm:translate-x-0" href="#checkout" x-data="floatingReserve()" x-init="init()" :class="inCheckout ? 'opacity-35' : 'opacity-100'">
         <x-icon name="ticket" class="h-5 w-5" />
-        Reserve Your Spot / เลือกตั๋ว
+        <span x-text="inCheckout ? 'Get your spot / จองเลย' : 'Reserve Your Spot / เลือกตั๋ว'"></span>
     </a>
 </x-layouts.app>

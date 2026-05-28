@@ -10,6 +10,11 @@ Alpine.data('scanner', (config = {}) => ({
     quickMode: false,
     selectedAction: 'check_in',
     selectedEventId: '',
+    guideOpen: false,
+    ticketModalOpen: false,
+    modalTicket: null,
+    modalMessage: '',
+    modalOk: false,
     events: config.events || [],
     recentScans: (config.recentScans || []).map((scan, index) => ({ ...scan, clientId: `server-${index}` })),
     flash: '',
@@ -23,6 +28,11 @@ Alpine.data('scanner', (config = {}) => ({
     },
     async handleScan() {
         if (this.quickMode) {
+            if (this.selectedAction === 'view') {
+                await this.lookup();
+                return;
+            }
+
             await this.submit(this.selectedAction);
             return;
         }
@@ -74,6 +84,7 @@ Alpine.data('scanner', (config = {}) => ({
 
             if (payload.ticket) {
                 this.currentTicket = payload.ticket;
+                this.showTicketModal(payload);
             }
 
             this.message = payload.ok && payload.ticket
@@ -143,6 +154,26 @@ Alpine.data('scanner', (config = {}) => ({
     },
     canCheckOut() {
         return this.currentTicket?.status === 'checked_in';
+    },
+    canModalCheckIn() {
+        return this.modalTicket?.status === 'approved';
+    },
+    canModalCheckOut() {
+        return this.modalTicket?.status === 'checked_in';
+    },
+    showTicketModal(payload) {
+        this.modalTicket = payload.ticket;
+        this.modalMessage = payload.message || '';
+        this.modalOk = Boolean(payload.ok);
+        this.ticketModalOpen = true;
+    },
+    async modalSubmit(action) {
+        if (!this.modalTicket?.uuid) {
+            return;
+        }
+
+        this.code = this.modalTicket.uuid;
+        await this.submit(action);
     },
     successFeedback() {
         this.ok = true;
@@ -412,6 +443,26 @@ Alpine.data('checkout', (config) => ({
     },
 }));
 
+Alpine.data('floatingReserve', () => ({
+    inCheckout: false,
+    init() {
+        const checkout = document.querySelector('#checkout');
+
+        if (!checkout || !('IntersectionObserver' in window)) {
+            return;
+        }
+
+        const observer = new IntersectionObserver(([entry]) => {
+            this.inCheckout = entry.isIntersecting;
+        }, {
+            rootMargin: '-20% 0px -45% 0px',
+            threshold: 0.01,
+        });
+
+        observer.observe(checkout);
+    },
+}));
+
 Alpine.data('eventCountdown', (config) => ({
     label: 'Event starts in / เริ่มงานในอีก',
     days: '00',
@@ -656,6 +707,12 @@ Alpine.data('lineLiffLogin', (config) => ({
         }
     },
 }));
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+}
 
 Alpine.start();
 

@@ -10,6 +10,7 @@ use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Models\User;
+use App\Services\CustomerNotificationService;
 use App\Services\CrmSyncService;
 use App\Services\QrCodeService;
 use App\Services\SlipQrDecoderService;
@@ -22,7 +23,7 @@ use Illuminate\View\View;
 
 class OrderController extends Controller
 {
-    public function store(Request $request, CrmSyncService $crm, SlipQrDecoderService $slipQrDecoder): RedirectResponse
+    public function store(Request $request, CrmSyncService $crm, SlipQrDecoderService $slipQrDecoder, CustomerNotificationService $notifications): RedirectResponse
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
@@ -156,6 +157,7 @@ class OrderController extends Controller
         });
 
         $crm->pushOrderActivity($order, 'ticket_order_created');
+        $notifications->orderCreatedForAdmins($order);
 
         $parameters = ['order' => $order];
 

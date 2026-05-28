@@ -25,7 +25,25 @@
         </form>
     </section>
 
-    @if($webPushEnabled && $lineNotificationsEnabled)
+    <section class="mt-6 rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04]">
+        <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="user" class="h-5 w-5 text-emerald-500" />Edit profile / แก้ไขโปรไฟล์</h2>
+        <form method="POST" action="{{ route('profile.update') }}" class="mt-4 grid gap-4 sm:grid-cols-3">
+            @csrf
+            @method('PATCH')
+            <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Name / ชื่อ
+                <input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="name" value="{{ old('name', auth()->user()->name) }}" required>
+            </label>
+            <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Email / อีเมล
+                <input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="email" type="email" value="{{ old('email', auth()->user()->email) }}">
+            </label>
+            <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Phone / เบอร์โทร
+                <input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="phone" value="{{ old('phone', auth()->user()->phone) }}">
+            </label>
+            <button class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 sm:justify-self-start"><x-icon name="save" />Save profile / บันทึกโปรไฟล์</button>
+        </form>
+    </section>
+
+    @if($webPushEnabled || $lineNotificationsEnabled)
     <section class="mt-6 grid gap-4 rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04] {{ $webPushEnabled && $lineNotificationsEnabled ? 'md:grid-cols-2' : '' }}">
         @if($webPushEnabled)
         <div>
