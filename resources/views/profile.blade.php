@@ -25,56 +25,67 @@
         </form>
     </section>
 
-    <section class="mt-6 rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04]">
-        <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="user" class="h-5 w-5 text-emerald-500" />Edit profile / แก้ไขโปรไฟล์</h2>
-        <form method="POST" action="{{ route('profile.update') }}" class="mt-4 grid gap-4 sm:grid-cols-3">
-            @csrf
-            @method('PATCH')
-            <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Name / ชื่อ
-                <input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="name" value="{{ old('name', auth()->user()->name) }}" required>
-            </label>
-            <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Email / อีเมล
-                <input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="email" type="email" value="{{ old('email', auth()->user()->email) }}">
-            </label>
-            <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Phone / เบอร์โทร
-                <input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="phone" value="{{ old('phone', auth()->user()->phone) }}">
-            </label>
-            <button class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 sm:justify-self-start"><x-icon name="save" />Save profile / บันทึกโปรไฟล์</button>
-        </form>
-    </section>
+    <section class="mt-6 grid gap-3" x-data="{ openProfile: false, openNotifications: false }">
+        <div class="rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04]">
+            <button class="flex w-full items-center justify-between gap-3 text-left" type="button" @click="openProfile = !openProfile">
+                <span class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="user" class="h-5 w-5 text-emerald-500" />Edit profile / แก้ไขโปรไฟล์</span>
+                <span class="text-sm font-semibold text-emerald-700 dark:text-emerald-200" x-text="openProfile ? 'Hide / ซ่อน' : 'Show / แสดง'"></span>
+            </button>
+            <form method="POST" action="{{ route('profile.update') }}" class="mt-4 grid gap-4 sm:grid-cols-3" x-cloak x-show="openProfile" x-transition>
+                @csrf
+                @method('PATCH')
+                <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Name / ชื่อ
+                    <input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="name" value="{{ old('name', auth()->user()->name) }}" required>
+                </label>
+                <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Email / อีเมล
+                    <input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="email" type="email" value="{{ old('email', auth()->user()->email) }}">
+                </label>
+                <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Phone / เบอร์โทร
+                    <input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="phone" value="{{ old('phone', auth()->user()->phone) }}">
+                </label>
+                <button class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 sm:justify-self-start"><x-icon name="save" />Save profile / บันทึกโปรไฟล์</button>
+            </form>
+        </div>
 
-    @if($webPushEnabled || $lineNotificationsEnabled)
-    <section class="mt-6 grid gap-4 rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04] {{ $webPushEnabled && $lineNotificationsEnabled ? 'md:grid-cols-2' : '' }}">
-        @if($webPushEnabled)
-        <div>
-            <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="bell" class="h-5 w-5 text-emerald-500" />Notifications / การแจ้งเตือน</h2>
-            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Enable reminders and ticket updates on this device. / เปิดรับการแจ้งเตือนและอัปเดตตั๋วบนอุปกรณ์นี้</p>
-            <div class="mt-4" x-data="webPushSettings()" x-init="init()">
-                <button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60" type="button" @click="subscribe()" :disabled="!supported || subscribed">
-                    <x-icon name="bell" />Enable Web Push / เปิด Web Push
-                </button>
-                <button class="ml-2 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-zinc-100" type="button" @click="unsubscribe()" :disabled="!subscribed">
-                    <x-icon name="x" />Turn off / ปิด
-                </button>
-                <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400" x-text="message"></p>
+        @if($webPushEnabled || $lineNotificationsEnabled)
+        <div class="rounded-lg border border-zinc-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.04]">
+            <button class="flex w-full items-center justify-between gap-3 text-left" type="button" @click="openNotifications = !openNotifications">
+                <span class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="bell" class="h-5 w-5 text-emerald-500" />Notification settings / ตั้งค่าการแจ้งเตือน</span>
+                <span class="text-sm font-semibold text-emerald-700 dark:text-emerald-200" x-text="openNotifications ? 'Hide / ซ่อน' : 'Show / แสดง'"></span>
+            </button>
+            <div class="mt-4 grid gap-4 {{ $webPushEnabled && $lineNotificationsEnabled ? 'md:grid-cols-2' : '' }}" x-cloak x-show="openNotifications" x-transition>
+                @if($webPushEnabled)
+                <div>
+                    <h2 class="inline-flex items-center gap-2 font-semibold text-zinc-950 dark:text-white"><x-icon name="bell" class="h-5 w-5 text-emerald-500" />Web Push / การแจ้งเตือนบนอุปกรณ์</h2>
+                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Enable reminders and ticket updates on this device. / เปิดรับการแจ้งเตือนและอัปเดตตั๋วบนอุปกรณ์นี้</p>
+                    <div class="mt-4" x-data="webPushSettings()" x-init="init()">
+                        <button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-60" type="button" @click="subscribe()" :disabled="!supported || subscribed">
+                            <x-icon name="bell" />Enable Web Push / เปิด Web Push
+                        </button>
+                        <button class="ml-2 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-zinc-100" type="button" @click="unsubscribe()" :disabled="!subscribed">
+                            <x-icon name="x" />Turn off / ปิด
+                        </button>
+                        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400" x-text="message"></p>
+                    </div>
+                </div>
+                @endif
+                @if($lineNotificationsEnabled)
+                <div>
+                    <h2 class="inline-flex items-center gap-2 font-semibold text-zinc-950 dark:text-white"><x-icon name="heart-handshake" class="h-5 w-5 text-emerald-500" />LINE updates / แจ้งเตือนผ่าน LINE</h2>
+                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                        @if(auth()->user()->provider === 'line')
+                            LINE account connected. / เชื่อมต่อบัญชี LINE แล้ว
+                        @else
+                            Login with LINE to receive LINE ticket updates. / เข้าสู่ระบบด้วย LINE เพื่อรับอัปเดตตั๋วผ่าน LINE
+                        @endif
+                    </p>
+                    <a class="mt-4 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ config('services.line.official_account_url') }}" target="_blank" rel="noopener"><x-icon name="heart-handshake" />Add LINE Official Account / เพิ่มเพื่อน LINE OA</a>
+                </div>
+                @endif
             </div>
         </div>
         @endif
-        @if($lineNotificationsEnabled)
-        <div>
-            <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="heart-handshake" class="h-5 w-5 text-emerald-500" />LINE updates / แจ้งเตือนผ่าน LINE</h2>
-            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                @if(auth()->user()->provider === 'line')
-                    LINE account connected. / เชื่อมต่อบัญชี LINE แล้ว
-                @else
-                    Login with LINE to receive LINE ticket updates. / เข้าสู่ระบบด้วย LINE เพื่อรับอัปเดตตั๋วผ่าน LINE
-                @endif
-            </p>
-            <a class="mt-4 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ config('services.line.official_account_url') }}" target="_blank" rel="noopener"><x-icon name="heart-handshake" />Add LINE Official Account / เพิ่มเพื่อน LINE OA</a>
-        </div>
-        @endif
     </section>
-    @endif
 
     <div class="mt-8 flex flex-wrap items-center gap-2">
         <a class="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold {{ $activeView === 'orders' ? 'bg-emerald-400 text-zinc-950' : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/10' }}" href="{{ route('profile', ['view' => 'orders']) }}"><x-icon name="receipt" />Orders / ออเดอร์</a>

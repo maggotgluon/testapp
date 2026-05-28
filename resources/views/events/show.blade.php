@@ -138,6 +138,7 @@
                 'bank_display_name' => $bank ? $bank['name'].' / '.$bank['thai_name'] : $event->bank_name,
             ]),
             customerName: @js(auth()->user()->name ?? old('customer_name', '')),
+            customerPhone: @js(auth()->user()->phone ?? old('customer_phone', '')),
         })">
             @csrf
             @guest
@@ -173,7 +174,7 @@
                     </div>
                 </div>
             @endif
-            <div class="mt-4 grid gap-3">
+            <div class="mt-4 grid gap-3 rounded-md transition" data-checkout-section="tickets" :class="validationAttempted && invalidSection === 'tickets' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
                 @forelse($event->ticketTypes as $ticket)
                     <div class="rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4">
                         <div class="flex items-center justify-between gap-4">
@@ -190,7 +191,7 @@
                             <div class="grid grid-cols-[40px_40px_40px] overflow-hidden rounded-md border border-zinc-200 dark:border-white/10">
                                 <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="decrement({{ $ticket->id }})" aria-label="Remove ticket / ลดจำนวนตั๋ว"><x-icon name="minus" /></button>
                                 <input class="border-x border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-2 py-2 text-center text-zinc-950 dark:text-white" name="items[{{ $loop->index }}][quantity]" 
-                                    type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]" @input="syncHolderNames({{ $ticket->id }})">
+                                    type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]" @input="syncHolderNames({{ $ticket->id }}); notifyCart()">
                                 <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="increment({{ $ticket->id }})" aria-label="Add ticket / เพิ่มจำนวนตั๋ว"><x-icon name="plus" /></button>
                             </div>
                         </div>
@@ -209,9 +210,9 @@
             <div class="mt-4 rounded-md border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-800 dark:text-rose-100" x-cloak x-show="errorMessage" x-text="errorMessage"></div>
 
             <div x-cloak x-show="subtotal() > 0" x-transition>
-                <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                <div class="mt-5 grid gap-4 rounded-md transition sm:grid-cols-2" data-checkout-section="customer" :class="validationAttempted && invalidSection === 'customer' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Name / ชื่อ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_name" x-model="customerName" @input="syncDefaultHolderNames()" required></label>
-                    <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Phone / เบอร์โทร <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_phone" value="{{ auth()->user()->phone ?? old('customer_phone') }}" required></label>
+                    <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Phone / เบอร์โทร <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_phone" x-model="customerPhone" required></label>
                     <label class="text-sm text-zinc-700 dark:text-zinc-300">Email / อีเมล<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="customer_email" value="{{ auth()->user()->email ?? old('customer_email') }}"></label>
                     @if($event->coupons->isNotEmpty())
                         <label class="text-sm text-zinc-700 dark:text-zinc-300">Coupon / คูปอง
@@ -293,7 +294,7 @@
                     <p class="mt-3 text-emerald-800 dark:text-emerald-100" x-text="payment.instructions || 'Upload your payment slip after transfer. Admin approval will activate tickets. / อัปโหลดสลิปหลังชำระเงิน แอดมินจะตรวจสอบและอนุมัติตั๋ว'"></p>
                 </div>
 
-                <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                <div class="mt-4 grid gap-4 rounded-md transition sm:grid-cols-2" data-checkout-section="payment" :class="validationAttempted && invalidSection === 'payment' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Payment method / วิธีชำระเงิน <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
                     <select class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_method" x-model="paymentMethod" required>
                         <option value="qr_payment">QR payment / ชำระด้วย QR</option>
@@ -302,7 +303,7 @@
                     <div class="text-sm text-zinc-700 dark:text-zinc-300">
                         Payment slip / สลิปชำระเงิน <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
                         <label class="mt-1 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-emerald-400/50 bg-white dark:bg-zinc-950 px-3 py-2 font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/10">
-                            <input class="sr-only" name="slip" type="file" accept="image/*" @change="slipName = $event.target.files[0]?.name || ''" required>
+                        <input class="sr-only" name="slip" type="file" accept="image/*" @change="slipName = $event.target.files[0]?.name || ''" required>
                             <span class="inline-flex items-center gap-2"><x-icon name="upload" />Attach payment slip / แนบสลิป</span>
                         </label>
                         <p class="mt-1 truncate text-xs text-zinc-500" x-text="slipName || 'No file attached yet / ยังไม่ได้แนบไฟล์'"></p>
@@ -321,7 +322,7 @@
                                 <template x-for="index in holderSlots(ticket.id)" :key="`${ticket.id}-${index}`">
                                     <label class="text-sm text-zinc-700 dark:text-zinc-300">
                                         <span x-text="`Holder ${index + 1} / ผู้ถือบัตร ${index + 1}`"></span>
-                                        <input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`items[${ticket.itemIndex}][holders][${index}]`" x-model="holderNames[ticket.id][index]" @input="markHolderTouched(ticket.id, index)" placeholder="Ticket holder name / ใช้ชื่อผู้ถือบัตร" required>
+                                        <input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`items[${ticket.itemIndex}][holders][${index}]`" x-model="holderNames[ticket.id][index]" @input="markHolderTouched(ticket.id, index)" placeholder="Ticket holder name / ใช้ชื่อผู้ถือบัตร">
                                     </label>
                                 </template>
                             </div>
@@ -329,14 +330,15 @@
                     </div>
                 </div>
 
-                <div class="mt-5" x-data="{
-                    openLegal: null,
-                    activeLegalSection: 'terms',
-                    lang: (navigator.language || '').toLowerCase().startsWith('th') ? 'th' : 'en',
-                    legalDocs: @js($checkoutLegalDocs),
-                }">
+                <div class="mt-5 rounded-md transition" data-checkout-section="legal" :class="validationAttempted && invalidSection === 'legal' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
+                    <div x-data="{
+                        openLegal: null,
+                        activeLegalSection: 'terms',
+                        lang: (navigator.language || '').toLowerCase().startsWith('th') ? 'th' : 'en',
+                        legalDocs: @js($checkoutLegalDocs),
+                    }">
                     <label class="flex items-start gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-300">
-                        <input class="mt-1 rounded border-zinc-300 text-emerald-500 focus:ring-emerald-400" name="terms_accepted" type="checkbox" value="1" required>
+                        <input class="mt-1 rounded border-zinc-300 text-emerald-500 focus:ring-emerald-400" name="terms_accepted" type="checkbox" value="1" x-model="termsAccepted" required>
                         <span>
                             I agree to the TicketFlow Terms and Conditions. / ฉันยอมรับข้อกำหนดและเงื่อนไขของ TicketFlow
                             <span class="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
@@ -377,13 +379,13 @@
                     </div>
                 </div>
 
-                <button class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950 hover:bg-emerald-300"><x-icon name="send" />Submit order / ส่งคำสั่งซื้อ</button>
+                <button class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 font-semibold transition" :class="canSubmitOrder() ? 'bg-emerald-400 text-zinc-950 hover:bg-emerald-300' : 'cursor-not-allowed bg-zinc-200 text-zinc-500 dark:bg-white/10 dark:text-zinc-400'" :data-disabled="(!canSubmitOrder()).toString()" @click="guardSubmit($event)"><x-icon name="send" />Submit order / ส่งคำสั่งซื้อ</button>
             </div>
         </form>
     </div>
 
-    <a class="fixed bottom-4 left-1/2 z-40 inline-flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-2 rounded-lg border border-emerald-300/70 bg-emerald-400 px-4 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:border-emerald-300/30 sm:bottom-6 sm:right-6 sm:left-auto sm:w-auto sm:translate-x-0" href="#checkout" x-data="floatingReserve()" x-init="init()" :class="inCheckout ? 'opacity-35' : 'opacity-100'">
+    <a class="fixed bottom-4 left-1/2 z-40 inline-flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-2 rounded-lg border border-emerald-300/70 bg-emerald-400 px-4 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:border-emerald-300/30 sm:bottom-6 sm:right-6 sm:left-auto sm:w-auto sm:translate-x-0" href="#checkout" x-data="floatingReserve()" x-init="init()" x-show="visible()" x-transition.opacity>
         <x-icon name="ticket" class="h-5 w-5" />
-        <span x-text="inCheckout ? 'Get your spot / จองเลย' : 'Reserve Your Spot / เลือกตั๋ว'"></span>
+        <span>Reserve Your Spot / เลือกตั๋ว</span>
     </a>
 </x-layouts.app>

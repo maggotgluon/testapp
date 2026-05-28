@@ -15,6 +15,8 @@ Alpine.data('scanner', (config = {}) => ({
     modalTicket: null,
     modalMessage: '',
     modalOk: false,
+    cameraStream: null,
+    cameraLoopActive: false,
     events: config.events || [],
     recentScans: (config.recentScans || []).map((scan, index) => ({ ...scan, clientId: `server-${index}` })),
     flash: '',
@@ -111,13 +113,27 @@ Alpine.data('scanner', (config = {}) => ({
             return;
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        this.stopCamera();
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 960, max: 1280 },
+                height: { ideal: 540, max: 720 },
+            },
+        });
         const video = this.$refs.video;
+        this.cameraStream = stream;
+        this.cameraLoopActive = true;
         video.classList.remove('hidden');
         video.srcObject = stream;
+        await video.play().catch(() => {});
 
         const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128'] });
         const loop = async () => {
+            if (!this.cameraLoopActive) {
+                return;
+            }
+
             const codes = await detector.detect(video).catch(() => []);
             if (codes.length > 0) {
                 const rawValue = codes[0].rawValue;
@@ -128,13 +144,25 @@ Alpine.data('scanner', (config = {}) => ({
                     this.code = rawValue;
                     await this.handleScan();
                 }
-                stream.getTracks().forEach((track) => track.stop());
-                video.classList.add('hidden');
+                this.stopCamera();
                 return;
             }
-            requestAnimationFrame(loop);
+            window.setTimeout(loop, 220);
         };
         loop();
+    },
+    stopCamera() {
+        this.cameraLoopActive = false;
+        if (this.cameraStream) {
+            this.cameraStream.getTracks().forEach((track) => track.stop());
+            this.cameraStream = null;
+        }
+
+        const video = this.$refs.video;
+        if (video) {
+            video.srcObject = null;
+            video.classList.add('hidden');
+        }
     },
     addRecent(payload) {
         this.recentScans = [
@@ -233,7 +261,11 @@ Alpine.data('checkout', (config) => ({
     couponCode: '',
     slipName: '',
     errorMessage: '',
+    validationAttempted: false,
+    invalidSection: '',
     customerName: config.customerName || '',
+    customerPhone: config.customerPhone || '',
+    termsAccepted: false,
     tickets: config.tickets,
     promotions: config.promotions || [],
     quantities: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, 0])),
@@ -243,10 +275,12 @@ Alpine.data('checkout', (config) => ({
     increment(ticketId) {
         this.quantities[ticketId] = Math.min(20, Number(this.quantities[ticketId] || 0) + 1);
         this.syncHolderNames(ticketId);
+        this.notifyCart();
     },
     decrement(ticketId) {
         this.quantities[ticketId] = Math.max(0, Number(this.quantities[ticketId] || 0) - 1);
         this.syncHolderNames(ticketId);
+        this.notifyCart();
     },
     syncHolderNames(ticketId) {
         const quantity = Number(this.quantities[ticketId] || 0);
@@ -281,6 +315,14 @@ Alpine.data('checkout', (config) => ({
         return config.tickets.reduce((sum, ticket) => {
             return sum + (Number(this.quantities[ticket.id] || 0) * Number(ticket.price));
         }, 0);
+    },
+    cartQuantity() {
+        return config.tickets.reduce((sum, ticket) => sum + Number(this.quantities[ticket.id] || 0), 0);
+    },
+    notifyCart() {
+        window.dispatchEvent(new CustomEvent('checkout-cart-updated', {
+            detail: { quantity: this.cartQuantity() },
+        }));
     },
     activeCoupon() {
         const code = String(this.couponCode || '').trim().toUpperCase();
@@ -426,6 +468,49 @@ Alpine.data('checkout', (config) => ({
     paymentQrUrl() {
         return `/payments/events/${config.eventId}/qr?amount=${this.total()}`;
     },
+    canSubmitOrder() {
+        return this.subtotal() > 0
+            && String(this.customerName || '').trim().length > 0
+            && String(this.customerPhone || '').trim().length > 0
+            && Boolean(this.slipName)
+            && this.termsAccepted;
+    },
+    firstMissingSection() {
+        if (this.subtotal() <= 0) {
+            return 'tickets';
+        }
+
+        if (!String(this.customerName || '').trim() || !String(this.customerPhone || '').trim()) {
+            return 'customer';
+        }
+
+        if (!this.slipName) {
+            return 'payment';
+        }
+
+        if (!this.termsAccepted) {
+            return 'legal';
+        }
+
+        return '';
+    },
+    highlightMissingSection() {
+        this.validationAttempted = true;
+        this.invalidSection = this.firstMissingSection();
+        this.errorMessage = 'Please complete the highlighted section before submitting. / กรุณากรอกส่วนที่ไฮไลต์ให้ครบก่อนส่งคำสั่งซื้อ';
+
+        this.$nextTick(() => {
+            document.querySelector(`[data-checkout-section="${this.invalidSection}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    },
+    guardSubmit(event) {
+        if (this.canSubmitOrder()) {
+            return;
+        }
+
+        event.preventDefault();
+        this.highlightMissingSection();
+    },
     prepareSubmit(event) {
         this.errorMessage = '';
         this.syncDefaultHolderNames();
@@ -445,6 +530,7 @@ Alpine.data('checkout', (config) => ({
 
 Alpine.data('floatingReserve', () => ({
     inCheckout: false,
+    cartQuantity: 0,
     init() {
         const checkout = document.querySelector('#checkout');
 
@@ -460,6 +546,12 @@ Alpine.data('floatingReserve', () => ({
         });
 
         observer.observe(checkout);
+        window.addEventListener('checkout-cart-updated', (event) => {
+            this.cartQuantity = Number(event.detail?.quantity || 0);
+        });
+    },
+    visible() {
+        return !this.inCheckout && this.cartQuantity < 1;
     },
 }));
 
