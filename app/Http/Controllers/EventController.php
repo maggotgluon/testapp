@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Promotion;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
+use App\Services\EventDescriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -13,6 +14,10 @@ use Illuminate\View\View;
 
 class EventController extends Controller
 {
+    public function __construct(private EventDescriptionService $descriptions)
+    {
+    }
+
     public function index(): View|RedirectResponse
     {
         $events = Event::query()
@@ -66,8 +71,9 @@ class EventController extends Controller
         $event->setRelation('promotions', $event->promotions->merge($globalPromotions)->filter(
             fn ($promotion) => $promotion->ticket_type_id === null || $availableTicketTypeIds->contains($promotion->ticket_type_id)
         )->values());
+        $eventDescriptionHtml = $this->descriptions->render($event->description, $event->description_format ?? 'html');
 
-        return view('events.show', compact('event'));
+        return view('events.show', compact('event', 'eventDescriptionHtml'));
     }
 
     public function profile(Request $request): View

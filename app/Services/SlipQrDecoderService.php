@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Payment;
 use chillerlan\QRCode\QRCode;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
@@ -121,6 +122,7 @@ class SlipQrDecoderService
                 $query['billPaymentRef1'] ?? null,
                 $emv['62.05'] ?? null,
                 $emv['62.07'] ?? null,
+                $emv['emvco']['merchant_account_information']['promptpay_id'] ?? null,
             ]),
             'slip_qr_receiver' => $this->firstFilled([
                 $slipVerify['sending_bank_name'] ?? null,
@@ -136,6 +138,53 @@ class SlipQrDecoderService
                 $emv['30.03'] ?? null,
             ]),
         ];
+    }
+
+    public function withDuplicateReview(array $result, ?Payment $currentPayment = null): array
+    {
+        if (($result['slip_qr_status'] ?? null) !== 'decoded') {
+            return $result;
+        }
+
+        $payload = $result['slip_qr_payload'] ?? null;
+        $reference = $result['slip_qr_reference'] ?? null;
+
+        if (! $payload && ! $reference) {
+            return $result;
+        }
+
+        $duplicate = Payment::query()
+            ->with('order:id,order_number,customer_name,customer_phone')
+            ->when($currentPayment?->exists, fn ($query) => $query->whereKeyNot($currentPayment->getKey()))
+            ->where(function ($query) use ($payload, $reference) {
+                if ($payload) {
+                    $query->where('slip_qr_payload', $payload);
+                }
+
+                if ($reference) {
+                    $query->orWhere('slip_qr_reference', $reference);
+                }
+            })
+            ->whereNotNull('slip_qr_status')
+            ->first();
+
+        if (! $duplicate) {
+            return $result;
+        }
+
+        $data = $result['slip_qr_data'] ?? [];
+        $data['duplicate'] = [
+            'payment_id' => $duplicate->id,
+            'ticket_order_id' => $duplicate->ticket_order_id,
+            'order_number' => $duplicate->order?->order_number,
+            'customer_name' => $duplicate->order?->customer_name,
+            'matched_by' => $payload && $duplicate->slip_qr_payload === $payload ? 'payload' : 'reference',
+        ];
+
+        return array_merge($result, [
+            'slip_qr_status' => 'duplicate',
+            'slip_qr_data' => $data,
+        ]);
     }
 
     private function parseSlipVerifyPayload(string $payload): array
@@ -184,7 +233,86 @@ class SlipQrDecoderService
             }
         }
 
+        $fields['emvco'] = $this->emvcoSummary($fields, $payload);
+
         return $fields;
+    }
+
+    private function emvcoSummary(array $fields, string $payload): array
+    {
+        $merchantAccount = $this->merchantAccountInformation($fields);
+        $crc = $this->crcReview($payload, $fields['63'] ?? null);
+        $amount = $this->firstAmount([$fields['54'] ?? null]);
+        $currencyCode = $fields['53'] ?? null;
+        $countryCode = $fields['58'] ?? null;
+        $methodCode = $fields['01'] ?? null;
+
+        return [
+            'initiation_method' => match ($methodCode) {
+                '11' => 'static',
+                '12' => 'dynamic',
+                default => 'unknown',
+            },
+            'initiation_method_code' => $methodCode,
+            'merchant_account_information' => $merchantAccount,
+            'currency_code' => $currencyCode,
+            'currency' => $currencyCode === '764' ? 'THB' : $currencyCode,
+            'amount' => $amount,
+            'country_code' => $countryCode,
+            'crc_checksum' => $crc,
+        ];
+    }
+
+    private function merchantAccountInformation(array $fields): array
+    {
+        foreach (range(26, 51) as $tagNumber) {
+            $tag = str_pad((string) $tagNumber, 2, '0', STR_PAD_LEFT);
+            $guid = $fields[$tag.'.00'] ?? null;
+
+            if ($guid !== 'A000000677010111') {
+                continue;
+            }
+
+            $promptPayId = $this->firstFilled([
+                $fields[$tag.'.01'] ?? null,
+                $fields[$tag.'.02'] ?? null,
+                $fields[$tag.'.03'] ?? null,
+            ]);
+
+            return [
+                'tag' => $tag,
+                'globally_unique_identifier' => $guid,
+                'promptpay_id' => $promptPayId,
+                'promptpay_type' => match (true) {
+                    isset($fields[$tag.'.01']) => 'phone',
+                    isset($fields[$tag.'.02']) => 'national_id_or_tax_id',
+                    isset($fields[$tag.'.03']) => 'ewallet_id',
+                    default => null,
+                },
+                'routing_data' => $fields[$tag] ?? null,
+            ];
+        }
+
+        return [];
+    }
+
+    private function crcReview(string $payload, ?string $reported): array
+    {
+        if (! $reported || ! str_ends_with($payload, '6304'.$reported)) {
+            return [
+                'value' => $reported,
+                'valid' => false,
+            ];
+        }
+
+        $payloadForCrc = substr($payload, 0, -4);
+        $expected = $this->formatCrc($this->crc16Xmodem($payloadForCrc));
+
+        return [
+            'value' => strtoupper($reported),
+            'expected' => $expected,
+            'valid' => strtoupper($reported) === $expected,
+        ];
     }
 
     private function parseTlv(string $payload): array
@@ -271,5 +399,26 @@ class SlipQrDecoderService
         }
 
         return null;
+    }
+
+    private function crc16Xmodem(string $payload): int
+    {
+        $crc = 0xffff;
+
+        foreach (unpack('C*', $payload) as $byte) {
+            $crc ^= ($byte << 8);
+
+            for ($i = 0; $i < 8; $i++) {
+                $crc = ($crc & 0x8000) ? (($crc << 1) ^ 0x1021) : ($crc << 1);
+                $crc &= 0xffff;
+            }
+        }
+
+        return $crc;
+    }
+
+    private function formatCrc(int $crc): string
+    {
+        return str_pad(strtoupper(dechex($crc)), 4, '0', STR_PAD_LEFT);
     }
 }

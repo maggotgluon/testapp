@@ -91,10 +91,12 @@ class PromotionController extends Controller
             'expires_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'combines_with_coupons' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
+            'show_on_event_page' => ['nullable', 'boolean'],
         ]);
 
         $data['combines_with_coupons'] = $request->boolean('combines_with_coupons');
         $data['is_active'] = $request->boolean('is_active');
+        $data['show_on_event_page'] = $request->boolean('show_on_event_page');
 
         if ($data['promotion_type'] === 'buy_x_get_y') {
             $data['buy_quantity'] = $data['buy_quantity'] ?: 2;

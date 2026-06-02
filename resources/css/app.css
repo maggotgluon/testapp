@@ -73,4 +73,30 @@
             color: var(--color-zinc-400);
         }
     }
+
+    @media print {
+        body * {
+            visibility: hidden !important;
+        }
+
+        .ticket-print-surface,
+        .ticket-print-surface * {
+            visibility: visible !important;
+        }
+
+        .ticket-print-surface {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .ticket-export-card {
+            width: min(100vw, 420px) !important;
+            min-height: 100vh !important;
+            margin: 0 auto !important;
+        }
+    }
 }

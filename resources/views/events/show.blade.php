@@ -1,6 +1,6 @@
 @php
     $socialImagePath = $event->social_image_path ?: $event->poster_path;
-    $plainDescription = trim(preg_replace('/\s+/', ' ', strip_tags($event->description ?? '')));
+    $plainDescription = trim(preg_replace('/\s+/', ' ', strip_tags($eventDescriptionHtml ?? $event->description ?? '')));
     $socialDescription = str($event->social_description ?: $plainDescription)->limit(220, '');
     $eventImageUrl = $socialImagePath ? asset('uploads/'.$socialImagePath) : null;
     $lowestPrice = $event->ticketTypes->min('price_thb');
@@ -51,14 +51,17 @@
             'name' => $ticket->name,
             'price' => $ticket->price_thb,
         ])->values();
-        $checkoutCoupons = $event->coupons->map(fn ($coupon) => [
+        $visibleCheckoutCoupons = $event->coupons->filter->show_on_checkout;
+        $visibleEventPromotions = $event->promotions->filter->show_on_event_page;
+        $checkoutCoupons = $visibleCheckoutCoupons->map(fn ($coupon) => [
             'code' => $coupon->code,
             'type' => $coupon->discount_type,
             'scope' => $coupon->discount_scope,
             'value' => $coupon->discount_value,
             'ticket_type_id' => $coupon->ticket_type_id,
+            'show_on_checkout' => $coupon->show_on_checkout,
         ])->values();
-        $checkoutPromotions = $event->promotions->map(fn ($promotion) => [
+        $checkoutPromotions = $visibleEventPromotions->map(fn ($promotion) => [
             'id' => $promotion->id,
             'name' => $promotion->name,
             'description' => $promotion->description,
@@ -71,8 +74,10 @@
             'min_quantity' => $promotion->min_quantity,
             'max_discount_thb' => $promotion->max_discount_thb,
             'combines_with_coupons' => $promotion->combines_with_coupons,
+            'show_on_event_page' => $promotion->show_on_event_page,
             'summary' => $promotion->displaySummary(),
         ])->values();
+        $paymentMethods = $event->enabledPaymentMethods();
         $checkoutLegalDocs = app(\App\Services\LegalDocumentService::class)->modal(['terms', 'privacy', 'refund']);
     @endphp
     <div class="grid gap-8 lg:grid-cols-[.8fr_1.2fr]">
@@ -98,7 +103,7 @@
                         </div>
                     @endif
                     <div class="mt-3 space-y-3 text-zinc-700 dark:text-zinc-300 [&_a]:text-emerald-700 [&_a]:underline dark:[&_a]:text-emerald-200 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-300 [&_blockquote]:pl-4 [&_li]:ml-5 [&_li]:list-disc">
-                        {!! $event->description !!}
+                        {!! $eventDescriptionHtml !!}
                     </div>
                     <dl class="mt-5 grid gap-3 text-sm text-zinc-700 dark:text-zinc-300">
                         <div><dt class="inline-flex items-center gap-1.5 text-zinc-500"><x-icon name="building-2" class="h-3.5 w-3.5" />Venue / สถานที่</dt><dd>{{ $event->venue }}</dd></div>
@@ -126,6 +131,7 @@
             tickets: @js($checkoutTickets),
             coupons: @js($checkoutCoupons),
             promotions: @js($checkoutPromotions),
+            paymentMethods: @js($paymentMethods),
             payment: @js([
                 'bank_name' => $event->bank_name,
                 'bank_account_name' => $event->bank_account_name,
@@ -221,7 +227,7 @@
                     @endif
                 </div>
                 
-                @if($event->coupons->isNotEmpty())
+                @if($visibleCheckoutCoupons->isNotEmpty())
                     <div class="mt-4 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4 text-sm text-zinc-700 dark:text-zinc-300" x-cloak x-show="applicableCoupons().length > 0">
                         <div class="inline-flex items-center gap-2 font-medium text-zinc-950 dark:text-white"><x-icon name="tag" />Available coupons / คูปองที่ใช้ได้</div>
                         <div class="mt-2 flex flex-wrap gap-2">
@@ -232,11 +238,11 @@
                     </div>
                 @endif
 
-                @if($event->promotions->isNotEmpty())
+                @if($visibleEventPromotions->isNotEmpty())
                     <div class="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50" x-cloak x-show="activePromotions().length > 0">
                         <div class="inline-flex items-center gap-2 font-medium"><x-icon name="sparkles" />Active promotions / โปรโมชันที่ใช้ได้</div>
                         <div class="mt-3 grid gap-2">
-                            <template x-for="promotion in activePromotions()" :key="promotion.id">
+                            <template x-for="promotion in visibleActivePromotions()" :key="promotion.id">
                                 <div class="rounded-md bg-white/70 px-3 py-2 dark:bg-zinc-950/60">
                                     <div class="flex flex-wrap items-center justify-between gap-2">
                                         <span class="font-semibold" x-text="promotion.name"></span>
@@ -244,6 +250,14 @@
                                     </div>
                                     <p class="mt-1 text-xs text-emerald-800 dark:text-emerald-100" x-show="promotion.description" x-text="promotion.description"></p>
                                 </div>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="mt-4 rounded-md border border-sky-300/40 bg-sky-100/70 p-4 text-sm text-sky-950 dark:border-sky-300/20 dark:bg-sky-400/10 dark:text-sky-100" x-cloak x-show="promotionHints().length > 0">
+                        <div class="inline-flex items-center gap-2 font-medium"><x-icon name="sparkles" />Unlock more savings / ซื้อเพิ่มเพื่อรับส่วนลด</div>
+                        <div class="mt-2 grid gap-1">
+                            <template x-for="hint in promotionHints()" :key="hint.id">
+                                <p x-text="hint.text"></p>
                             </template>
                         </div>
                     </div>
@@ -276,6 +290,12 @@
                             <div><dt class="text-emerald-700 dark:text-emerald-200">Account number / เลขบัญชี</dt><dd class="font-mono" x-text="payment.bank_account_number || '-'"></dd></div>
                         </dl>
                     </template>
+                    <template x-if="paymentMethod === 'cash'">
+                        <div class="mt-3 rounded-md border border-emerald-400/30 bg-white/70 p-3 dark:bg-zinc-950/60">
+                            <div class="font-semibold">Cash sale / ชำระเงินสด</div>
+                            <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-100">No slip is required. Admin approval is still required before tickets become active. / ไม่ต้องแนบสลิป แต่ยังต้องรอแอดมินอนุมัติก่อนตั๋วใช้งานได้</p>
+                        </div>
+                    </template>
                     <template x-if="paymentMethod === 'qr_payment'">
                         <div class="mt-3 grid gap-4 sm:grid-cols-[160px_1fr]">
                             <div class="grid place-items-center rounded-md bg-white p-3">
@@ -291,22 +311,26 @@
                             </dl>
                         </div>
                     </template>
-                    <p class="mt-3 text-emerald-800 dark:text-emerald-100" x-text="payment.instructions || 'Upload your payment slip after transfer. Admin approval will activate tickets. / อัปโหลดสลิปหลังชำระเงิน แอดมินจะตรวจสอบและอนุมัติตั๋ว'"></p>
+                    <p class="mt-3 text-emerald-800 dark:text-emerald-100" x-text="paymentInstructions()"></p>
                 </div>
 
                 <div class="mt-4 grid gap-4 rounded-md transition sm:grid-cols-2" data-checkout-section="payment" :class="validationAttempted && invalidSection === 'payment' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Payment method / วิธีชำระเงิน <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
                     <select class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_method" x-model="paymentMethod" required>
-                        <option value="qr_payment">QR payment / ชำระด้วย QR</option>
-                        <option value="bank_transfer">Direct bank transfer / โอนผ่านธนาคาร</option>
+                        <template x-for="method in paymentMethods" :key="method">
+                            <option :value="method" x-text="paymentMethodLabel(method)"></option>
+                        </template>
                     </select></label>
-                    <div class="text-sm text-zinc-700 dark:text-zinc-300">
+                    <div class="text-sm text-zinc-700 dark:text-zinc-300" x-show="slipRequired()" x-cloak>
                         Payment slip / สลิปชำระเงิน <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
                         <label class="mt-1 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-emerald-400/50 bg-white dark:bg-zinc-950 px-3 py-2 font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/10">
-                        <input class="sr-only" name="slip" type="file" accept="image/*" @change="slipName = $event.target.files[0]?.name || ''" required>
+                        <input class="sr-only" name="slip" type="file" accept="image/*" @change="slipName = $event.target.files[0]?.name || ''" :required="slipRequired()">
                             <span class="inline-flex items-center gap-2"><x-icon name="upload" />Attach payment slip / แนบสลิป</span>
                         </label>
                         <p class="mt-1 truncate text-xs text-zinc-500" x-text="slipName || 'No file attached yet / ยังไม่ได้แนบไฟล์'"></p>
+                    </div>
+                    <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-600 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-300" x-show="!slipRequired()" x-cloak>
+                        No slip is required for this order. / ออเดอร์นี้ไม่ต้องแนบสลิป
                     </div>
                 </div>
                 <label class="mt-4 block text-sm text-zinc-700 dark:text-zinc-300">Payment note / หมายเหตุการชำระเงิน<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_note" rows="3"></textarea></label>

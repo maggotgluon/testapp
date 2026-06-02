@@ -29,6 +29,7 @@ class Promotion extends Model
         'expires_at',
         'combines_with_coupons',
         'is_active',
+        'show_on_event_page',
     ];
 
     protected $casts = [
@@ -36,6 +37,7 @@ class Promotion extends Model
         'expires_at' => 'datetime',
         'combines_with_coupons' => 'boolean',
         'is_active' => 'boolean',
+        'show_on_event_page' => 'boolean',
     ];
 
     public function event(): BelongsTo

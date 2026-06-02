@@ -107,9 +107,12 @@ class OrderController extends Controller
                 'slip_path' => $order->payment_slip_path,
             ]);
 
-        $payment->update(array_merge([
+        $decoded = array_merge([
             'slip_path' => $order->payment_slip_path,
-        ], $slipQrDecoder->decode($order->payment_slip_path)));
+        ], $slipQrDecoder->decode($order->payment_slip_path));
+
+        $payment->update($decoded);
+        $payment->update($slipQrDecoder->withDuplicateReview($decoded, $payment));
 
         return back()->with('status', 'Payment slip QR checked. / ตรวจ QR จากสลิปแล้ว');
     }

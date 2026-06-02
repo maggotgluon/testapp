@@ -257,7 +257,8 @@ Alpine.data('scanner', (config = {}) => ({
 }));
 
 Alpine.data('checkout', (config) => ({
-    paymentMethod: 'qr_payment',
+    paymentMethods: config.paymentMethods?.length ? config.paymentMethods : ['qr_payment'],
+    paymentMethod: (config.paymentMethods?.length ? config.paymentMethods : ['qr_payment'])[0],
     couponCode: '',
     slipName: '',
     errorMessage: '',
@@ -272,6 +273,13 @@ Alpine.data('checkout', (config) => ({
     holderNames: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, []])),
     holderTouched: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, []])),
     payment: config.payment,
+    paymentMethodLabel(method) {
+        return {
+            qr_payment: 'QR payment / ชำระด้วย QR',
+            bank_transfer: 'Direct bank transfer / โอนผ่านธนาคาร',
+            cash: 'Cash sale / ชำระเงินสด',
+        }[method] || method;
+    },
     increment(ticketId) {
         this.quantities[ticketId] = Math.min(20, Number(this.quantities[ticketId] || 0) + 1);
         this.syncHolderNames(ticketId);
@@ -334,7 +342,7 @@ Alpine.data('checkout', (config) => ({
         return config.coupons.find((coupon) => coupon.code === code) || null;
     },
     applicableCoupons() {
-        return config.coupons.filter((coupon) => this.eligibleSubtotal(coupon) > 0);
+        return config.coupons.filter((coupon) => coupon.show_on_checkout !== false && this.eligibleSubtotal(coupon) > 0);
     },
     applyCoupon(code) {
         this.couponCode = String(code || '').trim().toUpperCase();
@@ -389,6 +397,29 @@ Alpine.data('checkout', (config) => ({
     },
     activePromotions() {
         return this.promotions.filter((promotion) => this.discountForPromotion(promotion, this.discount()) > 0);
+    },
+    visibleActivePromotions() {
+        return this.activePromotions().filter((promotion) => promotion.show_on_event_page !== false);
+    },
+    promotionHints() {
+        return this.promotions
+            .filter((promotion) => promotion.show_on_event_page !== false && this.discountForPromotion(promotion, this.discount()) <= 0)
+            .map((promotion) => {
+                const currentQuantity = this.eligibleQuantity(promotion);
+                const threshold = promotion.type === 'buy_x_get_y'
+                    ? Math.max(1, Number(promotion.buy_quantity || 1)) + Math.max(1, Number(promotion.get_quantity || 1))
+                    : Number(promotion.min_quantity || 1);
+                const needed = Math.max(0, threshold - currentQuantity);
+                if (needed < 1) {
+                    return null;
+                }
+
+                return {
+                    id: promotion.id,
+                    text: `Add ${needed} more ticket${needed > 1 ? 's' : ''} to unlock ${promotion.name}. / เพิ่มอีก ${needed} ใบเพื่อใช้โปรโมชัน ${promotion.name}`,
+                };
+            })
+            .filter(Boolean);
     },
     promotionEligibleSubtotal(promotion) {
         return config.tickets.reduce((sum, ticket) => {
@@ -468,15 +499,29 @@ Alpine.data('checkout', (config) => ({
     paymentQrUrl() {
         return `/payments/events/${config.eventId}/qr?amount=${this.total()}`;
     },
+    slipRequired() {
+        return this.total() > 0 && this.paymentMethod !== 'cash';
+    },
+    paymentInstructions() {
+        if (this.total() === 0) {
+            return 'This order is free. Tickets will be activated automatically. / ออเดอร์นี้ฟรี ตั๋วจะเปิดใช้งานอัตโนมัติ';
+        }
+
+        if (this.paymentMethod === 'cash') {
+            return 'Cash sale does not require a slip. Admin approval will activate tickets. / ชำระเงินสดไม่ต้องแนบสลิป แอดมินจะอนุมัติเพื่อเปิดใช้งานตั๋ว';
+        }
+
+        return this.payment.instructions || 'Upload your payment slip after transfer. Admin approval will activate tickets. / อัปโหลดสลิปหลังชำระเงิน แอดมินจะตรวจสอบและอนุมัติตั๋ว';
+    },
     canSubmitOrder() {
-        return this.subtotal() > 0
+        return this.cartQuantity() > 0
             && String(this.customerName || '').trim().length > 0
             && String(this.customerPhone || '').trim().length > 0
-            && Boolean(this.slipName)
+            && (!this.slipRequired() || Boolean(this.slipName))
             && this.termsAccepted;
     },
     firstMissingSection() {
-        if (this.subtotal() <= 0) {
+        if (this.cartQuantity() <= 0) {
             return 'tickets';
         }
 
@@ -484,7 +529,7 @@ Alpine.data('checkout', (config) => ({
             return 'customer';
         }
 
-        if (!this.slipName) {
+        if (this.slipRequired() && !this.slipName) {
             return 'payment';
         }
 
@@ -515,7 +560,7 @@ Alpine.data('checkout', (config) => ({
         this.errorMessage = '';
         this.syncDefaultHolderNames();
 
-        if (this.subtotal() <= 0) {
+        if (this.cartQuantity() <= 0) {
             event.preventDefault();
             this.errorMessage = 'Please select at least one ticket. / กรุณาเลือกตั๋วอย่างน้อย 1 ใบ';
             return;
@@ -583,6 +628,176 @@ Alpine.data('eventCountdown', (config) => ({
         this.hours = String(Math.floor((diff % 86400000) / 3600000)).padStart(2, '0');
         this.minutes = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
         this.seconds = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+    },
+}));
+
+Alpine.data('ticketExport', (config) => ({
+    async downloadPng() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1080;
+        canvas.height = 1920;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        await this.drawHero(ctx);
+        this.drawText(ctx);
+
+        if (config.active && config.qrUrl) {
+            await this.drawQr(ctx);
+        } else {
+            this.drawInactiveNotice(ctx);
+        }
+
+        this.downloadCanvas(canvas);
+    },
+    printPdf() {
+        window.print();
+    },
+    async drawHero(ctx) {
+        const heroHeight = 860;
+        const gradient = ctx.createLinearGradient(0, 0, 1080, heroHeight);
+        gradient.addColorStop(0, '#10b981');
+        gradient.addColorStop(0.5, '#0ea5e9');
+        gradient.addColorStop(1, '#18181b');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 1080, heroHeight);
+
+        if (config.imageUrl) {
+            const image = await this.loadImage(config.imageUrl).catch(() => null);
+            if (image) {
+                this.coverImage(ctx, image, 0, 0, 1080, heroHeight);
+            }
+        }
+
+        const shade = ctx.createLinearGradient(0, 420, 0, heroHeight);
+        shade.addColorStop(0, 'rgba(9,9,11,0)');
+        shade.addColorStop(1, 'rgba(9,9,11,0.88)');
+        ctx.fillStyle = shade;
+        ctx.fillRect(0, 420, 1080, heroHeight - 420);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 36px sans-serif';
+        ctx.fillText(String(config.ticketType || '').toUpperCase(), 72, 665);
+        ctx.font = '700 76px sans-serif';
+        this.wrapText(ctx, config.eventName, 72, 755, 900, 86, 2);
+    },
+    drawText(ctx) {
+        ctx.fillStyle = '#18181b';
+        ctx.font = '700 48px sans-serif';
+        ctx.fillText(config.holderName || '-', 72, 960);
+
+        ctx.fillStyle = '#71717a';
+        ctx.font = '400 28px sans-serif';
+        ctx.fillText('Holder / ผู้ถือบัตร', 72, 912);
+        ctx.fillText('Date & time / วันเวลา', 72, 1040);
+        ctx.fillText('Venue / สถานที่', 72, 1162);
+        ctx.fillText('Order / ออเดอร์', 72, 1800);
+
+        ctx.fillStyle = '#18181b';
+        ctx.font = '600 38px sans-serif';
+        ctx.fillText(`${config.startsAt || '-'} - ${String(config.endsAt || '').split(' ').pop() || ''}`, 72, 1090);
+        this.wrapText(ctx, config.venue || '-', 72, 1210, 900, 44, 2);
+
+        ctx.fillStyle = '#52525b';
+        ctx.font = '400 30px sans-serif';
+        this.wrapText(ctx, config.location || '', 72, 1310, 900, 38, 2);
+
+        ctx.fillStyle = '#71717a';
+        ctx.font = '400 26px monospace';
+        this.wrapText(ctx, `${config.orderNumber || '-'} · ${config.status || '-'}`, 72, 1842, 900, 34, 2);
+    },
+    async drawQr(ctx) {
+        const qr = await this.loadImage(config.qrUrl).catch(() => null);
+        const boxX = 240;
+        const boxY = 1328;
+        const boxSize = 600;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#e4e4e7';
+        ctx.lineWidth = 4;
+        this.roundRect(ctx, boxX, boxY, boxSize, boxSize, 28, true, true);
+
+        if (qr) {
+            ctx.drawImage(qr, boxX + 54, boxY + 42, 492, 492);
+        }
+
+        ctx.fillStyle = '#18181b';
+        ctx.font = '400 24px monospace';
+        this.wrapText(ctx, config.uuid || '', boxX + 54, boxY + 558, 492, 28, 2, 'center');
+    },
+    drawInactiveNotice(ctx) {
+        ctx.fillStyle = '#fffbeb';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 4;
+        this.roundRect(ctx, 72, 1370, 936, 250, 28, true, true);
+        ctx.fillStyle = '#92400e';
+        ctx.font = '700 42px sans-serif';
+        ctx.fillText('Ticket not active yet', 120, 1460);
+        ctx.font = '400 30px sans-serif';
+        this.wrapText(ctx, 'QR code will show after payment is approved. / QR จะแสดงหลังอนุมัติการชำระเงิน', 120, 1518, 820, 38, 3);
+    },
+    loadImage(src) {
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            image.crossOrigin = 'anonymous';
+            image.onload = () => resolve(image);
+            image.onerror = reject;
+            image.src = src;
+        });
+    },
+    coverImage(ctx, image, x, y, width, height) {
+        const ratio = Math.max(width / image.width, height / image.height);
+        const drawWidth = image.width * ratio;
+        const drawHeight = image.height * ratio;
+        ctx.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+    },
+    wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 3, align = 'left') {
+        const words = String(text || '').split(/\s+/).filter(Boolean);
+        let line = '';
+        let lines = 0;
+        const originalAlign = ctx.textAlign;
+        ctx.textAlign = align;
+        const drawX = align === 'center' ? x + maxWidth / 2 : x;
+
+        words.forEach((word) => {
+            if (lines >= maxLines) {
+                return;
+            }
+
+            const next = line ? `${line} ${word}` : word;
+            if (ctx.measureText(next).width > maxWidth && line) {
+                ctx.fillText(line, drawX, y + lines * lineHeight);
+                line = word;
+                lines += 1;
+            } else {
+                line = next;
+            }
+        });
+
+        if (line && lines < maxLines) {
+            ctx.fillText(line, drawX, y + lines * lineHeight);
+        }
+
+        ctx.textAlign = originalAlign;
+    },
+    roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.arcTo(x + width, y, x + width, y + height, radius);
+        ctx.arcTo(x + width, y + height, x, y + height, radius);
+        ctx.arcTo(x, y + height, x, y, radius);
+        ctx.arcTo(x, y, x + width, y, radius);
+        ctx.closePath();
+        if (fill) ctx.fill();
+        if (stroke) ctx.stroke();
+    },
+    downloadCanvas(canvas) {
+        const link = document.createElement('a');
+        link.download = `${config.filename || 'ticket'}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
     },
 }));
 
@@ -680,6 +895,17 @@ Alpine.data('adminTicketTypes', (config) => {
         addRow() {
             this.rows.push(this.blankRow());
         },
+        reflectTicketEnd(ticket) {
+            if (!ticket.sale_starts_at) {
+                return;
+            }
+
+            if (!ticket.sale_ends_at || ticket.sale_ends_at < ticket.sale_starts_at) {
+                const end = new Date(ticket.sale_starts_at);
+                end.setDate(end.getDate() + 7);
+                ticket.sale_ends_at = end.toISOString().slice(0, 16);
+            }
+        },
         removeRow(index) {
             const row = this.rows[index];
 
@@ -694,6 +920,54 @@ Alpine.data('adminTicketTypes', (config) => {
             }
         },
     };
+});
+
+Alpine.data('adminEventForm', (config) => ({
+    description: config.description || '',
+    descriptionFormat: config.descriptionFormat || 'html',
+    previewOpen: false,
+    escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value || '';
+
+        return div.innerHTML;
+    },
+    previewHtml() {
+        if (this.descriptionFormat === 'html') {
+            return this.description || '<p class="text-zinc-500">No description yet / ยังไม่มีรายละเอียด</p>';
+        }
+
+        return this.escapeHtml(this.description)
+            .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+            .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+            .replace(/(?:^|\n)- (.*)/g, '<br>• $1')
+            .replace(/\n/g, '<br>');
+    },
+}));
+
+document.addEventListener('change', (event) => {
+    const start = event.target.closest('[data-date-start]');
+    if (!start) {
+        return;
+    }
+
+    const key = start.dataset.dateStart;
+    const end = document.querySelector(`[data-date-end="${key}"]`);
+    if (!end || !start.value) {
+        return;
+    }
+
+    if (end.value && end.value >= start.value) {
+        return;
+    }
+
+    const date = new Date(start.value);
+    date.setHours(date.getHours() + Number(start.dataset.defaultHours || 0));
+    date.setDate(date.getDate() + Number(start.dataset.defaultDays || 0));
+    end.value = date.toISOString().slice(0, 16);
 });
 
 Alpine.data('lineLiffLogin', (config) => ({

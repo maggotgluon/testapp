@@ -3,6 +3,8 @@
     $qrAmountMatches = $payment?->slip_qr_amount_thb !== null
         ? abs((float) $payment->slip_qr_amount_thb - (float) $order->total_thb) < 0.01
         : null;
+    $emvco = $payment?->slip_qr_data['emv']['emvco'] ?? null;
+    $duplicate = $payment?->slip_qr_data['duplicate'] ?? null;
 @endphp
 
 <x-layouts.app :title="$order->order_number">
@@ -41,13 +43,34 @@
                 <div class="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="scan-line" class="h-5 w-5 text-emerald-500" />Slip QR assist / ช่วยอ่าน QR จากสลิป</h2>
-                        <span class="rounded px-2 py-1 text-xs font-semibold {{ $payment->slip_qr_status === 'decoded' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100' : 'bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-100' }}">{{ str_replace('_', ' ', $payment->slip_qr_status) }}</span>
+                        <span class="rounded px-2 py-1 text-xs font-semibold {{ $payment->slip_qr_status === 'decoded' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100' : ($payment->slip_qr_status === 'duplicate' ? 'bg-rose-100 text-rose-800 dark:bg-rose-400/15 dark:text-rose-100' : 'bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-100') }}">{{ str_replace('_', ' ', $payment->slip_qr_status) }}</span>
                     </div>
-                    @if($payment->slip_qr_status === 'decoded')
+                    @if(in_array($payment->slip_qr_status, ['decoded', 'duplicate'], true))
+                        @if($duplicate)
+                            <div class="mt-4 rounded-md border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-100">
+                                <div class="font-semibold">Possible duplicate slip / อาจเป็นสลิปซ้ำ</div>
+                                <p class="mt-1">Matched {{ $duplicate['matched_by'] ?? 'QR data' }} with order {{ $duplicate['order_number'] ?? ('#'.($duplicate['ticket_order_id'] ?? '-')) }}. Please treat this slip as used/invalid until manually verified. / พบข้อมูลซ้ำกับออเดอร์เดิม กรุณาถือว่าสลิปนี้ถูกใช้แล้วหรือไม่ถูกต้องจนกว่าจะตรวจสอบเอง</p>
+                            </div>
+                        @endif
                         <dl class="mt-4 grid gap-3 text-sm text-zinc-700 dark:text-zinc-300 sm:grid-cols-2">
                             @if(($payment->slip_qr_data['format'] ?? null) === 'slip_verify')
                                 <div><dt class="text-zinc-500 dark:text-zinc-400">Slip QR type / ประเภท QR</dt><dd class="font-semibold text-zinc-950 dark:text-white">Thai Slip Verify / ตรวจสอบสลิปไทย</dd></div>
                                 <div><dt class="text-zinc-500 dark:text-zinc-400">Sending bank / ธนาคารต้นทาง</dt><dd>{{ $payment->slip_qr_data['slip_verify']['sending_bank_name'] ?? 'Not found / ไม่พบข้อมูล' }} @if($payment->slip_qr_data['slip_verify']['sending_bank'] ?? null)({{ $payment->slip_qr_data['slip_verify']['sending_bank'] }})@endif</dd></div>
+                            @endif
+                            @if($emvco)
+                                <div><dt class="text-zinc-500 dark:text-zinc-400">EMVCo initiation / รูปแบบ QR</dt><dd class="font-semibold text-zinc-950 dark:text-white">{{ ucfirst($emvco['initiation_method'] ?? 'unknown') }} @if($emvco['initiation_method_code'] ?? null)({{ $emvco['initiation_method_code'] }})@endif</dd></div>
+                                <div><dt class="text-zinc-500 dark:text-zinc-400">PromptPay ID / พร้อมเพย์</dt><dd>{{ $emvco['merchant_account_information']['promptpay_id'] ?? 'Not found / ไม่พบข้อมูล' }} @if($emvco['merchant_account_information']['promptpay_type'] ?? null)({{ str_replace('_', ' ', $emvco['merchant_account_information']['promptpay_type']) }})@endif</dd></div>
+                                <div><dt class="text-zinc-500 dark:text-zinc-400">Currency / สกุลเงิน</dt><dd>{{ $emvco['currency'] ?? '-' }} @if($emvco['currency_code'] ?? null)({{ $emvco['currency_code'] }})@endif</dd></div>
+                                <div><dt class="text-zinc-500 dark:text-zinc-400">Country / ประเทศ</dt><dd>{{ $emvco['country_code'] ?? '-' }}</dd></div>
+                                <div class="sm:col-span-2">
+                                    <dt class="text-zinc-500 dark:text-zinc-400">CRC checksum / ตรวจสอบ CRC</dt>
+                                    <dd class="{{ ($emvco['crc_checksum']['valid'] ?? false) ? 'text-emerald-700 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-200' }}">
+                                        {{ ($emvco['crc_checksum']['valid'] ?? false) ? 'Valid / ถูกต้อง' : 'Invalid / ไม่ถูกต้อง' }}
+                                        @if($emvco['crc_checksum']['value'] ?? null)
+                                            · {{ $emvco['crc_checksum']['value'] }}
+                                        @endif
+                                    </dd>
+                                </div>
                             @endif
                             <div>
                                 <dt class="text-zinc-500 dark:text-zinc-400">Decoded amount / ยอดที่อ่านได้</dt>

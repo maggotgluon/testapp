@@ -9,6 +9,7 @@ use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\User;
 use App\Services\CustomerNotificationService;
+use App\Services\EventDescriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,10 @@ use Illuminate\View\View;
 
 class EventController extends Controller
 {
+    public function __construct(private EventDescriptionService $descriptions)
+    {
+    }
+
     public function index(): View
     {
         $events = Event::with('ticketTypes')->latest('starts_at');
@@ -177,7 +182,7 @@ class EventController extends Controller
     {
         abort_unless($request->user()->canManageEvent($event), 403);
 
-        $event->update($this->validated($request));
+        $event->update($this->validated($request, $event));
         $this->syncTicketTypes($request, $event);
 
         return redirect()->route('admin.events.index')->with('status', 'Event updated.');
@@ -221,11 +226,12 @@ class EventController extends Controller
         return back()->with('status', 'Ticket status updated.');
     }
 
-    private function validated(Request $request): array
+    private function validated(Request $request, ?Event $event = null): array
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'description_format' => ['nullable', 'in:html,markdown'],
             'social_description' => ['nullable', 'string', 'max:500'],
             'venue' => ['required', 'string', 'max:255'],
             'location' => ['nullable', 'string', 'max:255'],
@@ -244,6 +250,8 @@ class EventController extends Controller
             'qr_payment_account_name' => ['nullable', 'string', 'max:255'],
             'qr_payment_account' => ['nullable', 'string', 'max:255'],
             'payment_instructions' => ['nullable', 'string'],
+            'payment_methods' => ['nullable', 'array'],
+            'payment_methods.*' => ['required', 'in:qr_payment,bank_transfer,cash'],
             'is_published' => ['nullable', 'boolean'],
             'show_countdown' => ['nullable', 'boolean'],
         ]);
@@ -264,9 +272,16 @@ class EventController extends Controller
             $data['qr_payment_image_path'] = $request->file('qr_payment_image')->store('payment-qr', 'uploads');
         }
 
+        $data['description_format'] = $data['description_format'] ?? 'html';
         $data['is_published'] = $request->boolean('is_published');
         $data['show_countdown'] = $request->boolean('show_countdown');
-        $data['description'] = $this->safeHtml($data['description'] ?? null);
+        $paymentMethods = $request->has('payment_methods')
+            ? ($data['payment_methods'] ?? [])
+            : ($event?->enabledPaymentMethods() ?? ['qr_payment', 'bank_transfer']);
+        $data['payment_methods'] = array_values(array_intersect($paymentMethods, ['qr_payment', 'bank_transfer', 'cash'])) ?: ['qr_payment'];
+        $data['description'] = $data['description_format'] === 'markdown'
+            ? ($data['description'] ?? null)
+            : $this->descriptions->safeHtml($data['description'] ?? null);
 
         return $data;
     }
@@ -291,19 +306,6 @@ class EventController extends Controller
         $ticket->delete();
 
         return back()->with('status', 'Ticket deleted.');
-    }
-
-    private function safeHtml(?string $html): ?string
-    {
-        if ($html === null) {
-            return null;
-        }
-
-        $html = preg_replace('/<\s*(script|style|iframe|object|embed)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html);
-        $html = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/is', '', $html);
-        $html = preg_replace('/\s+(href|src)\s*=\s*("[^"]*javascript:[^"]*"|\'[^\']*javascript:[^\']*\'|[^\s>]*javascript:[^\s>]*)/is', '', $html);
-
-        return strip_tags($html, '<p><br><strong><b><em><i><u><ul><ol><li><a><h2><h3><blockquote>');
     }
 
     private function syncTicketTypes(Request $request, Event $event): void

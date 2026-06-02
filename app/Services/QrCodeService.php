@@ -43,12 +43,12 @@ class QrCodeService
         return $ticket->uuid;
     }
 
-    public function paymentPayload(Event $event, int $amountThb): string
+    public function paymentPayload(Event $event, int|float|null $amountThb): string
     {
         return $this->promptPayPayload((string) $event->qr_payment_account, $amountThb > 0 ? $amountThb : null);
     }
 
-    public function promptPayPayload(string $target, ?int $amountThb = null): string
+    public function promptPayPayload(string $target, int|float|null $amountThb = null): string
     {
         $target = $this->sanitizeTarget($target);
         $targetType = match (true) {
@@ -66,7 +66,7 @@ class QrCodeService
             ])),
             $this->field(self::ID_COUNTRY_CODE, self::COUNTRY_CODE_TH),
             $this->field(self::ID_TRANSACTION_CURRENCY, self::TRANSACTION_CURRENCY_THB),
-            $amountThb ? $this->field(self::ID_TRANSACTION_AMOUNT, number_format($amountThb, 2, '.', '')) : null,
+            $amountThb ? $this->field(self::ID_TRANSACTION_AMOUNT, number_format((float) $amountThb, 2, '.', '')) : null,
         ];
 
         $dataToCrc = $this->serialize($data).self::ID_CRC.'04';

@@ -86,10 +86,12 @@ class CouponController extends Controller
             'starts_at' => ['nullable', 'date'],
             'expires_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'is_active' => ['nullable', 'boolean'],
+            'show_on_checkout' => ['nullable', 'boolean'],
         ]);
 
         $data['code'] = strtoupper($data['code']);
         $data['is_active'] = $request->boolean('is_active');
+        $data['show_on_checkout'] = $request->boolean('show_on_checkout');
 
         return $data;
     }

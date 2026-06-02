@@ -7,6 +7,7 @@ use App\Mail\EventAttendeeAnnouncement;
 use App\Models\Coupon;
 use App\Models\Event;
 use App\Models\OrderItem;
+use App\Models\Payment;
 use App\Models\Promotion;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
@@ -222,6 +223,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'bank_transfer',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -291,6 +293,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -317,6 +320,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -472,6 +476,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 [
                     'ticket_type_id' => $ticketType->id,
@@ -514,6 +519,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 [
                     'ticket_type_id' => $ticketType->id,
@@ -538,6 +544,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -549,6 +556,8 @@ class AuthAndOrderFlowTest extends TestCase
         $this->get('/tickets/'.$ticket->uuid.'?phone=0812345678')
             ->assertOk()
             ->assertSee('Ticket not active yet')
+            ->assertDontSee('Save image / บันทึกรูป')
+            ->assertDontSee('Save PDF / บันทึก PDF')
             ->assertDontSee('/tickets/'.$ticket->uuid.'/qr', false);
 
         $order->update(['status' => 'approved']);
@@ -566,11 +575,51 @@ class AuthAndOrderFlowTest extends TestCase
         $this->assertSame('00020101021229370016A000000677010111011300668123456785802TH53037645406123.006304B598', $payload);
     }
 
+    public function test_promptpay_emvco_payload_can_include_decimal_amount_and_valid_crc(): void
+    {
+        $payload = app(QrCodeService::class)->promptPayPayload('081-234-5678', 100.50);
+        $result = app(SlipQrDecoderService::class)->parsePayloadForReview($payload);
+        $emvco = $result['slip_qr_data']['emv']['emvco'];
+
+        $this->assertSame('decoded', $result['slip_qr_status']);
+        $this->assertSame('dynamic', $emvco['initiation_method']);
+        $this->assertSame('phone', $emvco['merchant_account_information']['promptpay_type']);
+        $this->assertSame('0066812345678', $emvco['merchant_account_information']['promptpay_id']);
+        $this->assertSame('THB', $emvco['currency']);
+        $this->assertSame(100.50, $emvco['amount']);
+        $this->assertSame('TH', $emvco['country_code']);
+        $this->assertTrue($emvco['crc_checksum']['valid']);
+    }
+
+    public function test_promptpay_static_payload_has_no_amount(): void
+    {
+        $payload = app(QrCodeService::class)->promptPayPayload('081-234-5678');
+        $result = app(SlipQrDecoderService::class)->parsePayloadForReview($payload);
+        $emvco = $result['slip_qr_data']['emv']['emvco'];
+
+        $this->assertSame('static', $emvco['initiation_method']);
+        $this->assertNull($result['slip_qr_amount_thb']);
+        $this->assertTrue($emvco['crc_checksum']['valid']);
+    }
+
     public function test_ticket_qr_payload_is_only_ticket_uuid(): void
     {
         $ticket = new \App\Models\Ticket(['uuid' => 'ticket-uuid-123']);
 
         $this->assertSame('ticket-uuid-123', app(QrCodeService::class)->ticketPayload($ticket));
+    }
+
+    public function test_ticket_page_has_save_image_and_pdf_actions(): void
+    {
+        $this->seed();
+        $ticket = $this->createApprovedTicket();
+
+        $this->get('/tickets/'.$ticket->uuid.'?phone=0812345678')
+            ->assertOk()
+            ->assertSee('Save image / บันทึกรูป')
+            ->assertSee('Save PDF / บันทึก PDF')
+            ->assertSee('ticketExport', false)
+            ->assertSee('/tickets/'.$ticket->uuid.'/qr', false);
     }
 
     public function test_checkout_updates_logged_in_customer_profile(): void
@@ -593,6 +642,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_email' => 'updated@example.com',
                 'payment_method' => 'bank_transfer',
                 'terms_accepted' => '1',
+                'slip' => $this->paymentSlip(),
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -724,6 +774,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_phone' => '0811111111',
                 'payment_method' => 'qr_payment',
                 'terms_accepted' => '1',
+                'slip' => $this->paymentSlip(),
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -764,6 +815,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_phone' => '0811111111',
                 'payment_method' => 'qr_payment',
                 'terms_accepted' => '1',
+                'slip' => $this->paymentSlip(),
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -799,6 +851,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'bank_transfer',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -827,6 +880,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'qr_payment',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -857,6 +911,46 @@ class AuthAndOrderFlowTest extends TestCase
         ]);
     }
 
+    public function test_reused_slip_qr_is_marked_duplicate(): void
+    {
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $existingOrder = TicketOrder::query()->create([
+            'order_number' => 'DUP-001',
+            'customer_name' => 'First Buyer',
+            'customer_phone' => '0811111111',
+            'status' => 'pending',
+            'subtotal_thb' => 100,
+            'discount_thb' => 0,
+            'total_thb' => 100,
+            'payment_method' => 'qr_payment',
+        ]);
+        Payment::query()->create([
+            'ticket_order_id' => $existingOrder->id,
+            'method' => 'qr_payment',
+            'amount_thb' => 100,
+            'status' => 'submitted',
+            'slip_qr_status' => 'decoded',
+            'slip_qr_payload' => 'duplicate-payload',
+            'slip_qr_reference' => 'DUP-REF-001',
+        ]);
+
+        $result = app(SlipQrDecoderService::class)->withDuplicateReview([
+            'slip_qr_status' => 'decoded',
+            'slip_qr_payload' => 'duplicate-payload',
+            'slip_qr_reference' => 'DUP-REF-001',
+            'slip_qr_data' => ['format' => 'emv'],
+        ], new Payment);
+
+        $this->assertSame('duplicate', $result['slip_qr_status']);
+        $this->assertSame('DUP-001', $result['slip_qr_data']['duplicate']['order_number']);
+        $this->assertSame('payload', $result['slip_qr_data']['duplicate']['matched_by']);
+
+        $this->actingAs($admin)
+            ->get('/admin/orders/'.$existingOrder->id)
+            ->assertOk();
+    }
+
     public function test_super_admin_can_delete_order_with_tickets(): void
     {
         $this->seed();
@@ -871,6 +965,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'bank_transfer',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -970,6 +1065,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_email' => 'attendee@example.com',
             'payment_method' => 'bank_transfer',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -1020,6 +1116,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_phone' => '0812222222',
                 'payment_method' => 'qr_payment',
                 'terms_accepted' => '1',
+                'slip' => $this->paymentSlip(),
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -1112,6 +1209,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_email' => 'crm-activity@example.com',
                 'payment_method' => 'qr_payment',
                 'terms_accepted' => '1',
+                'slip' => $this->paymentSlip(),
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -1136,6 +1234,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0815555555',
             'payment_method' => 'qr_payment',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
             ],
@@ -1210,6 +1309,7 @@ class AuthAndOrderFlowTest extends TestCase
                 'customer_phone' => '0812222222',
                 'payment_method' => 'qr_payment',
                 'terms_accepted' => '1',
+                'slip' => $this->paymentSlip(),
                 'items' => [
                     ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
                 ],
@@ -1285,6 +1385,7 @@ class AuthAndOrderFlowTest extends TestCase
             'payment_method' => 'bank_transfer',
             'terms_accepted' => '1',
             'coupon_code' => 'ITEM100',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 2],
             ],
@@ -1320,6 +1421,7 @@ class AuthAndOrderFlowTest extends TestCase
             'customer_phone' => '0812345678',
             'payment_method' => 'bank_transfer',
             'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 3],
             ],
@@ -1366,6 +1468,7 @@ class AuthAndOrderFlowTest extends TestCase
             'payment_method' => 'bank_transfer',
             'terms_accepted' => '1',
             'coupon_code' => 'SAVE100',
+            'slip' => $this->paymentSlip(),
             'items' => [
                 ['ticket_type_id' => $ticketType->id, 'quantity' => 3],
             ],
@@ -1376,6 +1479,146 @@ class AuthAndOrderFlowTest extends TestCase
             'discount_thb' => 100,
             'total_thb' => ($ticketType->price_thb * 3) - 100,
         ]);
+    }
+
+    public function test_cash_payment_bypasses_slip_but_still_waits_for_admin_approval(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+        $ticketType->event->update(['payment_methods' => ['cash']]);
+
+        $this->post('/orders', [
+            'customer_name' => 'Cash Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'cash',
+            'terms_accepted' => '1',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::with('tickets')->firstOrFail();
+
+        $this->assertSame('pending', $order->status);
+        $this->assertSame('pending', $order->tickets->first()->status);
+        $this->assertDatabaseHas('payments', [
+            'ticket_order_id' => $order->id,
+            'method' => 'cash',
+            'status' => 'cash_pending',
+        ]);
+    }
+
+    public function test_free_ticket_auto_approves_without_payment_slip(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+        $ticketType->update(['price_thb' => 0]);
+
+        $this->post('/orders', [
+            'customer_name' => 'Free Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'terms_accepted' => '1',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::with('tickets')->firstOrFail();
+
+        $this->assertSame('approved', $order->status);
+        $this->assertSame(0, $order->total_thb);
+        $this->assertNotNull($order->approved_at);
+        $this->assertSame('approved', $order->tickets->first()->status);
+        $this->assertDatabaseHas('payments', [
+            'ticket_order_id' => $order->id,
+            'status' => 'waived',
+        ]);
+    }
+
+    public function test_hidden_coupon_is_not_suggested_but_can_still_be_applied(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        Coupon::create([
+            'event_id' => $ticketType->event_id,
+            'ticket_type_id' => $ticketType->id,
+            'code' => 'QUIET100',
+            'discount_type' => 'fixed',
+            'discount_scope' => 'order',
+            'discount_value' => 100,
+            'show_on_checkout' => false,
+            'is_active' => true,
+        ]);
+
+        $this->get('/events/'.$ticketType->event_id)
+            ->assertOk()
+            ->assertDontSee('QUIET100');
+
+        $this->post('/orders', [
+            'customer_name' => 'Coupon Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'coupon_code' => 'QUIET100',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'discount_thb' => 100,
+            'total_thb' => $ticketType->price_thb - 100,
+        ]);
+    }
+
+    public function test_hidden_promotion_does_not_show_on_event_page(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        Promotion::create([
+            'event_id' => $ticketType->event_id,
+            'ticket_type_id' => $ticketType->id,
+            'name' => 'Secret bulk discount',
+            'promotion_type' => 'quantity_discount',
+            'min_quantity' => 2,
+            'discount_type' => 'fixed',
+            'discount_value' => 100,
+            'show_on_event_page' => false,
+            'is_active' => true,
+        ]);
+
+        $this->get('/events/'.$ticketType->event_id)
+            ->assertOk()
+            ->assertDontSee('Secret bulk discount');
+    }
+
+    public function test_markdown_event_description_renders_safe_html(): void
+    {
+        $this->seed();
+        $event = Event::firstOrFail();
+        $event->update([
+            'description_format' => 'markdown',
+            'description' => "## Race pack\n\n- Shirt\n- Bib\n\n[Map](https://example.com)\n\n<script>alert('x')</script>",
+        ]);
+
+        $this->get('/events/'.$event->id)
+            ->assertOk()
+            ->assertSee('<h2>Race pack</h2>', false)
+            ->assertSee('<li>Shirt</li>', false)
+            ->assertSee('href="https://example.com"', false)
+            ->assertDontSee('<script>', false);
     }
 
     private function createApprovedTicket(): Ticket
@@ -1412,5 +1655,10 @@ class AuthAndOrderFlowTest extends TestCase
             'holder_phone' => '0812345678',
             'status' => 'approved',
         ]);
+    }
+
+    private function paymentSlip(): UploadedFile
+    {
+        return UploadedFile::fake()->image('payment-slip.jpg', 640, 640);
     }
 }

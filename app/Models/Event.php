@@ -12,6 +12,7 @@ class Event extends Model
         'created_by',
         'name',
         'description',
+        'description_format',
         'social_description',
         'venue',
         'location',
@@ -30,6 +31,7 @@ class Event extends Model
         'qr_payment_account',
         'qr_payment_image_path',
         'payment_instructions',
+        'payment_methods',
         'is_published',
         'show_countdown',
     ];
@@ -39,9 +41,18 @@ class Event extends Model
         return [
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'payment_methods' => 'array',
             'is_published' => 'boolean',
             'show_countdown' => 'boolean',
         ];
+    }
+
+    public function enabledPaymentMethods(): array
+    {
+        $methods = is_array($this->payment_methods) ? $this->payment_methods : ['qr_payment', 'bank_transfer'];
+        $enabled = array_values(array_intersect($methods, ['qr_payment', 'bank_transfer', 'cash']));
+
+        return $enabled ?: ['qr_payment'];
     }
 
     public function ticketTypes(): HasMany

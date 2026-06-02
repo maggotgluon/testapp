@@ -18,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -29,7 +30,7 @@ class OrderController extends Controller
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:40'],
             'customer_email' => ['nullable', 'email'],
-            'payment_method' => ['required', 'in:bank_transfer,qr_payment'],
+            'payment_method' => ['required', 'in:bank_transfer,qr_payment,cash'],
             'payment_note' => ['nullable', 'string', 'max:1000'],
             'terms_accepted' => ['required', 'accepted'],
             'coupon_code' => ['nullable', 'string', 'max:40'],
@@ -50,7 +51,7 @@ class OrderController extends Controller
         $slipPath = $request->file('slip')?->store('payment-slips', 'uploads');
         $slipQrData = $slipQrDecoder->decode($slipPath);
 
-        $order = DB::transaction(function () use ($data, $selected, $slipPath, $slipQrData, $request, $crm) {
+        $order = DB::transaction(function () use ($data, $selected, $slipPath, $slipQrData, $request, $crm, $slipQrDecoder) {
             $user = $this->syncCustomerProfile($request->user(), $data, $crm);
             $ticketTypes = TicketType::query()
                 ->with('event')
@@ -58,6 +59,15 @@ class OrderController extends Controller
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
+            $eventIds = $ticketTypes->pluck('event_id')->unique();
+            $events = $ticketTypes->pluck('event')->unique('id');
+
+            $paymentAllowed = $events->every(fn (Event $event) => in_array($data['payment_method'], $event->enabledPaymentMethods(), true));
+            if (! $paymentAllowed) {
+                throw ValidationException::withMessages([
+                    'payment_method' => 'This payment method is not available for the selected ticket. / วิธีชำระเงินนี้ยังไม่เปิดใช้สำหรับตั๋วที่เลือก',
+                ]);
+            }
 
             $subtotal = 0;
             foreach ($selected as $item) {
@@ -70,7 +80,6 @@ class OrderController extends Controller
             $coupon = null;
             $couponDiscount = 0;
             if (! empty($data['coupon_code'])) {
-                $eventIds = $ticketTypes->pluck('event_id')->unique();
                 $coupon = Coupon::query()
                     ->where('code', strtoupper($data['coupon_code']))
                     ->where(fn ($query) => $query->whereNull('event_id')->orWhereIn('event_id', $eventIds))
@@ -83,7 +92,6 @@ class OrderController extends Controller
                 }
             }
 
-            $eventIds = $ticketTypes->pluck('event_id')->unique();
             $promotions = Promotion::query()
                 ->where(fn ($query) => $query->whereNull('event_id')->orWhereIn('event_id', $eventIds))
                 ->get();
@@ -101,6 +109,14 @@ class OrderController extends Controller
             }
 
             $discount = $couponDiscount + $promotionDiscount;
+            $total = max(0, $subtotal - $discount);
+            $autoApprove = $total === 0;
+
+            if ($total > 0 && $data['payment_method'] !== 'cash' && ! $slipPath) {
+                throw ValidationException::withMessages([
+                    'slip' => 'Please attach a payment slip for QR payment or bank transfer. / กรุณาแนบสลิปสำหรับการชำระด้วย QR หรือโอนธนาคาร',
+                ]);
+            }
 
             $order = TicketOrder::create([
                 'order_number' => $this->generateOrderNumber($ticketTypes),
@@ -109,13 +125,15 @@ class OrderController extends Controller
                 'customer_name' => $data['customer_name'],
                 'customer_phone' => $data['customer_phone'],
                 'customer_email' => $data['customer_email'] ?? null,
-                'status' => 'pending',
+                'status' => $autoApprove ? 'approved' : 'pending',
                 'subtotal_thb' => $subtotal,
                 'discount_thb' => $discount,
-                'total_thb' => max(0, $subtotal - $discount),
+                'total_thb' => $total,
                 'payment_method' => $data['payment_method'],
                 'payment_note' => $data['payment_note'] ?? null,
                 'payment_slip_path' => $slipPath,
+                'approved_at' => $autoApprove ? now() : null,
+                'approved_by' => $autoApprove ? $user?->id : null,
             ]);
 
             foreach ($selected as $item) {
@@ -132,7 +150,7 @@ class OrderController extends Controller
                 for ($i = 0; $i < $quantity; $i++) {
                     $holderName = trim((string) ($item['holders'][$i] ?? ''));
 
-                    $order->tickets()->create([
+                    $ticket = $order->tickets()->create([
                         'uuid' => (string) Str::uuid(),
                         'order_item_id' => $orderItem->id,
                         'event_id' => $ticketType->event_id,
@@ -140,18 +158,25 @@ class OrderController extends Controller
                         'user_id' => $user?->id,
                         'holder_name' => $holderName ?: $data['customer_name'],
                         'holder_phone' => $data['customer_phone'],
+                        'status' => $autoApprove ? 'approved' : 'pending',
                     ]);
+
+                    if ($autoApprove) {
+                        $ticket->ticketType()->increment('sold_count');
+                    }
                 }
             }
 
-            Payment::create(array_merge([
+            $payment = Payment::create(array_merge([
                 'ticket_order_id' => $order->id,
                 'method' => $data['payment_method'],
                 'amount_thb' => $order->total_thb,
-                'status' => 'submitted',
+                'status' => $autoApprove ? 'waived' : ($data['payment_method'] === 'cash' ? 'cash_pending' : 'submitted'),
                 'slip_path' => $slipPath,
                 'note' => $data['payment_note'] ?? null,
             ], $slipQrData));
+
+            $payment->update($slipQrDecoder->withDuplicateReview($slipQrData, $payment));
 
             return $order;
         });
@@ -232,7 +257,7 @@ class OrderController extends Controller
 
     public function paymentQr(Event $event, Request $request, QrCodeService $qrCode): Response
     {
-        $amount = max(0, (int) $request->integer('amount'));
+        $amount = max(0, (float) $request->input('amount', 0));
 
         return response($qrCode->svg($qrCode->paymentPayload($event, $amount)), 200)
             ->header('Content-Type', 'image/svg+xml');

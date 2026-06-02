@@ -1,12 +1,33 @@
 <x-layouts.app :title="$event->exists ? 'Edit event' : 'New event'">
-    <form method="POST" enctype="multipart/form-data" action="{{ $event->exists ? route('admin.events.update', $event) : route('admin.events.store') }}" class="grid gap-6 lg:grid-cols-[1fr_.8fr]">
+    <form method="POST" enctype="multipart/form-data" action="{{ $event->exists ? route('admin.events.update', $event) : route('admin.events.store') }}" class="grid gap-6 lg:grid-cols-[1fr_.8fr]" x-data="adminEventForm({
+        description: @js(old('description', $event->description)),
+        descriptionFormat: @js(old('description_format', $event->description_format ?: 'html')),
+        previewUrl: @js(route('admin.events.index')),
+    })">
         @csrf
         @if($event->exists) @method('PUT') @endif
         <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
             <h1 class="text-2xl font-semibold text-zinc-950 dark:text-white">{{ $event->exists ? 'Edit event / แก้ไขอีเวนต์' : 'New event / เพิ่มอีเวนต์' }}</h1>
             <div class="mt-5 grid gap-4 sm:grid-cols-2">
                 <label class="text-sm text-zinc-700 dark:text-zinc-300 sm:col-span-2">Event name / ชื่ออีเวนต์<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="name" value="{{ old('name', $event->name) }}" required></label>
-                <label class="text-sm text-zinc-700 dark:text-zinc-300 sm:col-span-2">Description / รายละเอียด <span class="text-xs text-zinc-500">safe HTML allowed / ใช้ HTML ที่ปลอดภัยได้</span><textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="description" rows="6">{{ old('description', $event->description) }}</textarea><span class="mt-1 block text-xs text-zinc-500">Allowed tags: p, br, strong, em, u, ul, ol, li, a, h2, h3, blockquote.</span></label>
+                <div class="sm:col-span-2">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <label class="text-sm text-zinc-700 dark:text-zinc-300">Description / รายละเอียด</label>
+                        <div class="inline-grid grid-cols-2 overflow-hidden rounded-md border border-zinc-200 text-sm dark:border-white/10">
+                            <label class="px-3 py-2" x-bind:class="descriptionFormat === 'html' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 dark:text-zinc-200'"><input class="sr-only" type="radio" name="description_format" value="html" x-model="descriptionFormat">Safe HTML</label>
+                            <label class="px-3 py-2" x-bind:class="descriptionFormat === 'markdown' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 dark:text-zinc-200'"><input class="sr-only" type="radio" name="description_format" value="markdown" x-model="descriptionFormat">Markdown</label>
+                        </div>
+                    </div>
+                    <textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="description" rows="7" x-model="description">{{ old('description', $event->description) }}</textarea>
+                    <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <span class="text-xs text-zinc-500" x-text="descriptionFormat === 'markdown' ? 'Markdown supported: headings, links, lists, bold, italic. / รองรับ Markdown เช่น หัวข้อ ลิงก์ รายการ ตัวหนา ตัวเอียง' : 'Allowed HTML tags: p, br, strong, em, u, ul, ol, li, a, h2, h3, blockquote.'"></span>
+                        <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-700 dark:border-white/10 dark:text-zinc-200" type="button" @click="previewOpen = !previewOpen"><x-icon name="eye" />Preview / ดูตัวอย่าง</button>
+                    </div>
+                    <div class="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-300" x-cloak x-show="previewOpen">
+                        <div class="mb-2 font-semibold text-zinc-950 dark:text-white">Preview / ตัวอย่าง</div>
+                        <div class="space-y-2" x-html="previewHtml()"></div>
+                    </div>
+                </div>
                 <label class="text-sm text-zinc-700 dark:text-zinc-300 sm:col-span-2">Social snippet / ข้อความตัวอย่างเวลาแชร์<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="social_description" rows="2" maxlength="500">{{ old('social_description', $event->social_description) }}</textarea></label>
                 <label class="text-sm text-zinc-700 dark:text-zinc-300">Venue / สถานที่<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="venue" value="{{ old('venue', $event->venue) }}" required></label>
                 <label class="text-sm text-zinc-700 dark:text-zinc-300">Location / ที่ตั้ง<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="location" value="{{ old('location', $event->location) }}"></label>
@@ -16,8 +37,8 @@
                 <label class="text-sm text-zinc-700 dark:text-zinc-300">Event poster 4:5 / โปสเตอร์อีเวนต์ 4:5<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="file" name="poster" accept="image/*"></label>
                 <label class="text-sm text-zinc-700 dark:text-zinc-300">Ticket image 4:5 / รูปตั๋ว 4:5<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="file" name="ticket_image" accept="image/*"></label>
                 <label class="text-sm text-zinc-700 dark:text-zinc-300 sm:col-span-2">Social share image / รูปสำหรับแชร์โซเชียล<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="file" name="social_image" accept="image/*"></label>
-                <label class="text-sm text-zinc-700 dark:text-zinc-300">Starts at / เริ่มงาน<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" name="starts_at" value="{{ old('starts_at', $event->starts_at?->format('Y-m-d\TH:i')) }}" required></label>
-                <label class="text-sm text-zinc-700 dark:text-zinc-300">Ends at / จบงาน<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" name="ends_at" value="{{ old('ends_at', $event->ends_at?->format('Y-m-d\TH:i')) }}" required></label>
+                <label class="text-sm text-zinc-700 dark:text-zinc-300">Starts at / เริ่มงาน<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" name="starts_at" value="{{ old('starts_at', $event->starts_at?->format('Y-m-d\TH:i')) }}" data-date-start="event" data-default-hours="3" required></label>
+                <label class="text-sm text-zinc-700 dark:text-zinc-300">Ends at / จบงาน<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" name="ends_at" value="{{ old('ends_at', $event->ends_at?->format('Y-m-d\TH:i')) }}" data-date-end="event" required></label>
                 <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="is_published" value="1" @checked(old('is_published', $event->is_published ?? true))> Published / เผยแพร่</label>
                 <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="show_countdown" value="1" @checked(old('show_countdown', $event->show_countdown ?? false))> Show countdown / แสดงเวลานับถอยหลัง</label>
             </div>
@@ -28,6 +49,14 @@
             @endphp
             <div class="mt-6 border-t border-zinc-200 dark:border-white/10 pt-6" x-data="{ bank: @js($selectedBank), banks: @js($banks) }">
                 <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Payment accounts / บัญชีรับชำระเงิน</h2>
+                @php
+                    $enabledPaymentMethods = old('payment_methods', $event->enabledPaymentMethods());
+                @endphp
+                <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <label class="flex items-center gap-2 rounded-md border border-zinc-200 p-3 text-sm text-zinc-700 dark:border-white/10 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="payment_methods[]" value="qr_payment" @checked(in_array('qr_payment', $enabledPaymentMethods, true))> QR payment / QR</label>
+                    <label class="flex items-center gap-2 rounded-md border border-zinc-200 p-3 text-sm text-zinc-700 dark:border-white/10 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="payment_methods[]" value="bank_transfer" @checked(in_array('bank_transfer', $enabledPaymentMethods, true))> Bank transfer / โอนธนาคาร</label>
+                    <label class="flex items-center gap-2 rounded-md border border-zinc-200 p-3 text-sm text-zinc-700 dark:border-white/10 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="payment_methods[]" value="cash" @checked(in_array('cash', $enabledPaymentMethods, true))> Cash sale / เงินสด</label>
+                </div>
                 <div class="mt-4 grid gap-4 sm:grid-cols-2">
                     <label class="text-sm text-zinc-700 dark:text-zinc-300">Bank name / ชื่อธนาคาร
                         <select class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="bank_name" x-model="bank">
@@ -87,7 +116,7 @@
                             <label class="text-sm text-zinc-700 dark:text-zinc-300">Sale price THB / ราคาขาย<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="number" :name="`tickets[${index}][price_thb]`" x-model="ticket.price_thb"></label>
                             <label class="text-sm text-zinc-700 dark:text-zinc-300">Full price THB / ราคาเต็ม <span class="text-xs text-zinc-500">optional / ไม่บังคับ</span><input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="number" :name="`tickets[${index}][full_price_thb]`" x-model="ticket.full_price_thb"></label>
                             <label class="text-sm text-zinc-700 dark:text-zinc-300">Capacity / จำนวนจำกัด<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="number" :name="`tickets[${index}][capacity]`" x-model="ticket.capacity"></label>
-                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Sale starts / เริ่มขาย<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" :name="`tickets[${index}][sale_starts_at]`" x-model="ticket.sale_starts_at"></label>
+                            <label class="text-sm text-zinc-700 dark:text-zinc-300">Sale starts / เริ่มขาย<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" :name="`tickets[${index}][sale_starts_at]`" x-model="ticket.sale_starts_at" @change="reflectTicketEnd(ticket)"></label>
                             <label class="text-sm text-zinc-700 dark:text-zinc-300">Sale ends / สิ้นสุดขาย<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="datetime-local" :name="`tickets[${index}][sale_ends_at]`" x-model="ticket.sale_ends_at"></label>
                         </div>
                         <label class="mt-3 block text-sm text-zinc-700 dark:text-zinc-300">Description / รายละเอียด<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`tickets[${index}][description]`" rows="2" x-model="ticket.description"></textarea></label>
