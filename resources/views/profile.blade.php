@@ -109,18 +109,19 @@
                     </div>
                     <div class="grid gap-4 p-4">
                         @foreach($orders->filter(fn ($order) => $order->items->contains('event_id', $event->id)) as $order)
-                            <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-5 dark:border-white/10 dark:bg-zinc-900">
+                            <div class="interactive-card group rounded-lg border border-zinc-200 bg-zinc-50 p-5 dark:border-white/10 dark:bg-zinc-900">
+                                <a class="click-area-link" href="{{ route('orders.show', $order) }}" aria-label="View order {{ $order->order_number }}"></a>
                                 <div class="flex flex-wrap items-center justify-between gap-3">
-                                    <div>
-                                        <h3 class="font-semibold text-zinc-950 dark:text-white">{{ $order->order_number }}</h3>
+                                    <div class="click-area-content">
+                                        <h3 class="font-semibold text-zinc-950 group-hover:text-emerald-700 dark:text-white">{{ $order->order_number }}</h3>
                                         <p class="text-sm text-zinc-600 dark:text-zinc-400">{{ $order->created_at->format('M j, Y H:i') }} · THB {{ number_format($order->total_thb) }}</p>
                                     </div>
-                                    <span class="rounded bg-zinc-100 px-3 py-1 text-sm text-emerald-700 dark:bg-white/10 dark:text-emerald-200">{{ str_replace('_', ' ', $order->status) }}</span>
+                                    <span class="click-area-content rounded bg-zinc-100 px-3 py-1 text-sm text-emerald-700 dark:bg-white/10 dark:text-emerald-200">{{ str_replace('_', ' ', $order->status) }}</span>
                                 </div>
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-200" href="{{ route('orders.show', $order) }}"><x-icon name="receipt" />View order / ดูออเดอร์</a>
+                                <div class="click-area-content mt-4 flex flex-wrap gap-2">
+                                    <a class="interactive-action inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 dark:border-white/10 dark:text-zinc-200" href="{{ route('orders.show', $order) }}"><x-icon name="receipt" />View order / ดูออเดอร์</a>
                                     @foreach($order->tickets->where('event_id', $event->id) as $ticket)
-                                        <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-200" href="{{ route('tickets.show', $ticket->uuid) }}"><x-icon name="ticket" />{{ $ticket->ticketType->name }} · {{ $ticket->holder_name }}</a>
+                                        <a class="interactive-action inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 dark:border-white/10 dark:text-zinc-200" href="{{ route('tickets.show', $ticket->uuid) }}"><x-icon name="ticket" />{{ $ticket->ticketType->name }} · {{ $ticket->holder_name }}</a>
                                     @endforeach
                                 </div>
                             </div>
@@ -148,13 +149,14 @@
                     </div>
                     <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
                         @foreach($tickets->where('event_id', $event->id) as $ticket)
-                            <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-zinc-900">
-                                <a class="block hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('tickets.show', $ticket->uuid) }}">
-                                    <div class="font-semibold text-zinc-950 dark:text-white">{{ $ticket->ticketType->name }}</div>
+                            <div class="interactive-card group rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-zinc-900">
+                                <a class="click-area-link" href="{{ route('tickets.show', $ticket->uuid) }}" aria-label="Open ticket {{ $ticket->ticketType->name }}"></a>
+                                <div class="click-area-content">
+                                    <div class="font-semibold text-zinc-950 group-hover:text-emerald-700 dark:text-white">{{ $ticket->ticketType->name }}</div>
                                     <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->holder_name }} · {{ str_replace('_', ' ', $ticket->status) }}</div>
-                                </a>
+                                </div>
                                 @if($ticket->order)
-                                    <a class="mt-3 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-200" href="{{ route('orders.show', $ticket->order) }}"><x-icon name="receipt" class="h-3.5 w-3.5" />{{ $ticket->order->order_number }} · View order / ดูออเดอร์</a>
+                                    <a class="click-area-content interactive-action mt-3 inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-700 dark:border-white/10 dark:text-zinc-200" href="{{ route('orders.show', $ticket->order) }}"><x-icon name="receipt" class="h-3.5 w-3.5" />{{ $ticket->order->order_number }} · View order / ดูออเดอร์</a>
                                 @endif
                             </div>
                         @endforeach

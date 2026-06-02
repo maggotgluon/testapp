@@ -21,6 +21,7 @@ Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap');
 
 Route::get('/', [EventController::class, 'index'])->name('events.index');
+Route::view('/about', 'about')->name('about');
 Route::view('/guides/how-to-buy-ticket', 'guides.how-to-buy-ticket')->name('guides.buy-ticket');
 Route::view('/guides/gate-check-in', 'guides.gate-check-in')->name('guides.gate-check-in');
 Route::get('/legal/terms', [LegalDocumentController::class, 'show'])->defaults('document', 'terms')->name('legal.terms');

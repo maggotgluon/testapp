@@ -114,7 +114,7 @@
                             </div>
                         </div>
                     @endif
-                    <div class="mt-3 space-y-3 text-zinc-700 dark:text-zinc-300 [&_a]:text-emerald-700 [&_a]:underline dark:[&_a]:text-emerald-200 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-300 [&_blockquote]:pl-4 [&_li]:ml-5 [&_li]:list-disc">
+                    <div class="mt-3 space-y-3 text-zinc-700 dark:text-zinc-300 [&_a]:text-emerald-700 [&_a]:underline dark:[&_a]:text-emerald-200 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-300 [&_blockquote]:pl-4 [&_li]:ml-5 [&_li]:list-disc" data-i18n-skip>
                         {!! $eventDescriptionHtml !!}
                     </div>
                     <dl class="mt-5 grid gap-3 text-sm text-zinc-700 dark:text-zinc-300">

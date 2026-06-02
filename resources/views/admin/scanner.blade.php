@@ -2,6 +2,7 @@
     <div class="mx-auto max-w-5xl" x-data="scanner({
         events: @js($events->map(fn ($event) => ['id' => $event->id, 'name' => $event->name])->values()),
         recentScans: @js($recentScans),
+        recentLimit: @js($perPage),
     })" x-init="init()">
         <div class="pointer-events-none fixed inset-0 z-50 transition-opacity duration-300" :class="flash === 'success' ? 'bg-emerald-400/30 opacity-100' : (flash === 'error' ? 'bg-rose-500/30 opacity-100' : 'opacity-0')"></div>
 
@@ -122,17 +123,55 @@
         </div>
 
         <section class="mt-6 rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/[0.04]">
-            <div class="border-b border-zinc-200 p-4 dark:border-white/10">
-                <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="clock" class="h-5 w-5 text-emerald-500" />Latest 20 scans / รายการสแกนล่าสุด 20 รายการ</h2>
+            <div class="grid gap-4 border-b border-zinc-200 p-4 dark:border-white/10 lg:grid-cols-[1fr_auto]">
+                <div>
+                    <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="clock" class="h-5 w-5 text-emerald-500" />Latest {{ $perPage }} scans / รายการสแกนล่าสุด {{ $perPage }} รายการ</h2>
+                    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Click a scan row to open the ticket details. / คลิกแถวรายการสแกนเพื่อเปิดรายละเอียดตั๋ว</p>
+                </div>
+                <form class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">Event / อีเวนต์
+                        <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="event_id" onchange="this.form.submit()">
+                            <option value="">All events / ทุกอีเวนต์</option>
+                            @foreach($events as $event)
+                                <option value="{{ $event->id }}" @selected(request('event_id') == $event->id)>{{ $event->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">Action / รายการ
+                        <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="action" onchange="this.form.submit()">
+                            <option value="">All actions / ทุกการทำรายการ</option>
+                            <option value="check_in" @selected(request('action') === 'check_in')>Check in / เช็กอิน</option>
+                            <option value="check_out" @selected(request('action') === 'check_out')>Check out / เช็กเอาต์</option>
+                        </select>
+                    </label>
+                    <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">Status / สถานะ
+                        <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="ticket_status" onchange="this.form.submit()">
+                            <option value="">All statuses / ทุกสถานะ</option>
+                            @foreach(['approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'cancelled', 'refunded'] as $status)
+                                <option value="{{ $status }}" @selected(request('ticket_status') === $status)>{{ str_replace('_', ' ', $status) }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">Show / แสดง
+                        <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="per_page" onchange="this.form.submit()">
+                            @foreach([10, 20, 50, 100] as $count)
+                                <option value="{{ $count }}" @selected($perPage === $count)>{{ $count }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                </form>
             </div>
             <div class="divide-y divide-zinc-200 dark:divide-white/10">
                 <template x-for="scan in recentScans" :key="scan.clientId">
-                    <div class="grid gap-2 p-4 sm:grid-cols-[1fr_auto]">
-                        <div>
-                            <div class="font-semibold text-zinc-950 dark:text-white" x-text="scan.ticket?.holder || 'Unknown ticket / ไม่ทราบตั๋ว'"></div>
+                    <div class="interactive-row group grid gap-2 p-4 sm:grid-cols-[1fr_auto]">
+                        <template x-if="scan.ticket?.url">
+                            <a class="click-area-link" :href="scan.ticket.url" :aria-label="`Open ticket for ${scan.ticket.holder}`"></a>
+                        </template>
+                        <div class="click-area-content">
+                            <div class="font-semibold text-zinc-950 group-hover:text-emerald-700 dark:text-white" x-text="scan.ticket?.holder || 'Unknown ticket / ไม่ทราบตั๋ว'"></div>
                             <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400" x-text="scan.ticket ? `${scan.ticket.event} · ${scan.ticket.type} · ${scan.ticket.order_number || '-'}` : scan.message"></div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+                        <div class="click-area-content flex flex-wrap items-center gap-2 sm:justify-end">
                             <span class="rounded px-3 py-1 text-sm font-semibold" :class="scan.ok ? 'bg-emerald-400/10 text-emerald-700 dark:text-emerald-200' : 'bg-rose-400/10 text-rose-700 dark:text-rose-200'" x-text="scan.ticket ? statusLabel(scan.ticket.status) : 'invalid / ไม่ถูกต้อง'"></span>
                             <span class="font-mono text-xs text-zinc-500" x-text="scan.scanned_at"></span>
                         </div>
@@ -140,6 +179,7 @@
                 </template>
                 <div class="p-6 text-sm text-zinc-600 dark:text-zinc-400" x-show="recentScans.length === 0">No scans yet. / ยังไม่มีรายการสแกน</div>
             </div>
+            <div class="p-4">{{ $recentScanLogs->links() }}</div>
         </section>
     </div>
 </x-layouts.app>

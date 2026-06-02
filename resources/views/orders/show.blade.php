@@ -74,7 +74,7 @@
             <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="ticket" class="h-5 w-5 text-emerald-500" />Tickets / ตั๋ว</h2>
             <div class="mt-4 grid gap-3">
                 @foreach($order->tickets as $ticket)
-                    <a class="rounded-md border border-zinc-200 dark:border-white/10 p-4 hover:border-emerald-300" href="{{ route('tickets.show', ['uuid' => $ticket->uuid, 'phone' => $ticket->holder_phone]) }}">
+                    <a class="interactive-card rounded-md border border-zinc-200 p-4 dark:border-white/10" href="{{ route('tickets.show', ['uuid' => $ticket->uuid, 'phone' => $ticket->holder_phone]) }}">
                         <div class="font-medium text-zinc-950 dark:text-white">{{ $ticket->event->name }}</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"><x-icon name="ticket" class="h-3.5 w-3.5" />{{ $ticket->ticketType->name }} · {{ $ticket->holder_name }} · {{ str_replace('_', ' ', $ticket->status) }}</div>
                     </a>

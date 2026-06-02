@@ -169,9 +169,10 @@
         </div>
         <div class="divide-y divide-white/10">
             @forelse($orders as $order)
-                <div class="grid gap-4 p-4 lg:grid-cols-[1fr_auto]">
-                    <div>
-                        <a class="font-semibold text-zinc-950 dark:text-white hover:text-emerald-600 dark:text-emerald-300" href="{{ route('admin.orders.show', $order) }}">{{ $order->order_number }}</a>
+                <div class="interactive-row group grid gap-4 p-4 lg:grid-cols-[1fr_auto]">
+                    <a class="click-area-link" href="{{ route('admin.orders.show', $order) }}" aria-label="Open order {{ $order->order_number }}"></a>
+                    <div class="click-area-content">
+                        <div class="font-semibold text-zinc-950 group-hover:text-emerald-700 dark:text-white">{{ $order->order_number }}</div>
                         <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">{{ $order->customer_name }} · {{ $order->customer_phone }} <x-status-badge :status="$order->status" /></div>
                         <div class="mt-2 flex flex-wrap gap-2 text-xs text-zinc-700 dark:text-zinc-300">
                             @foreach($order->items as $item)
@@ -179,7 +180,7 @@
                             @endforeach
                         </div>
                     </div>
-                    <div class="flex flex-wrap items-start gap-2" x-data="{ editStatus: false }">
+                    <div class="click-area-content flex flex-wrap items-start gap-2" x-data="{ editStatus: false }">
                         @if($order->status === 'pending')
                             <form method="POST" action="{{ route('admin.orders.approve', $order) }}" onsubmit="return confirm('Approve this order? / ยืนยันอนุมัติออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="check" />Approve</button></form>
                             <form method="POST" action="{{ route('admin.orders.reject', $order) }}" onsubmit="return confirm('Reject this order? / ยืนยันปฏิเสธออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-rose-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="x" />Reject</button></form>
@@ -217,9 +218,10 @@
         </div>
         <div class="divide-y divide-white/10">
             @forelse($tickets as $ticket)
-                <div class="grid gap-4 p-4 lg:grid-cols-[1fr_auto]">
-                    <div>
-                        <a class="font-semibold text-zinc-950 dark:text-white hover:text-emerald-600 dark:text-emerald-300" href="{{ route('tickets.show', $ticket->uuid) }}">{{ $ticket->holder_name }}</a>
+                <div class="interactive-row group grid gap-4 p-4 lg:grid-cols-[1fr_auto]">
+                    <a class="click-area-link" href="{{ route('tickets.show', $ticket->uuid) }}" aria-label="Open ticket for {{ $ticket->holder_name }}"></a>
+                    <div class="click-area-content">
+                        <div class="font-semibold text-zinc-950 group-hover:text-emerald-700 dark:text-white">{{ $ticket->holder_name }}</div>
                         <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
                             <span>{{ $ticket->ticketType->name }}</span>
                             <a class="font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-200" href="{{ route('admin.orders.show', $ticket->order) }}">{{ $ticket->order->order_number }}</a>
@@ -227,7 +229,7 @@
                         </div>
                         <div class="mt-1 text-xs text-zinc-500">In / เข้า: {{ $ticket->checked_in_at?->format('M j H:i') ?? '-' }} · Out / ออก: {{ $ticket->checked_out_at?->format('M j H:i') ?? '-' }}</div>
                     </div>
-                    <div class="flex flex-wrap items-start gap-2">
+                    <div class="click-area-content flex flex-wrap items-start gap-2">
                         <form method="POST" action="{{ route('admin.events.tickets.status', [$event, $ticket]) }}" class="flex flex-wrap items-start gap-2">
                             @csrf
                             @method('PATCH')

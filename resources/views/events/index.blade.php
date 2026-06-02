@@ -32,7 +32,7 @@
 
     <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         @forelse($events as $event)
-            <a href="{{ route('events.show', $event) }}" class="group overflow-hidden rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] transition hover:-translate-y-0.5 hover:border-emerald-300/50">
+            <a href="{{ route('events.show', $event) }}" class="interactive-card group overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/[0.04]">
                 <div class="aspect-[4/5] bg-gradient-to-br from-emerald-500 via-sky-500 to-zinc-800">
                     @if($event->poster_path)
                         <img class="h-full w-full object-cover" src="{{ asset('uploads/'.$event->poster_path) }}" alt="{{ $event->name }}">

@@ -159,16 +159,17 @@
             <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="ticket" class="h-5 w-5 text-emerald-500" />Tickets / ตั๋ว</h2>
             <div class="mt-4 grid gap-3">
                 @foreach($order->tickets as $ticket)
-                    <div class="rounded-md border border-zinc-200 p-4 dark:border-white/10" x-data="{ editHolder: false }">
-                        <a class="block hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('tickets.show', $ticket->uuid) }}">
-                            <div class="font-medium text-zinc-950 dark:text-white">{{ $ticket->event->name }}</div>
+                    <div class="interactive-card group rounded-md border border-zinc-200 p-4 dark:border-white/10" x-data="{ editHolder: false }">
+                        <a class="click-area-link" href="{{ route('tickets.show', $ticket->uuid) }}" aria-label="Open ticket for {{ $ticket->holder_name }}"></a>
+                        <div class="click-area-content">
+                            <div class="font-medium text-zinc-950 group-hover:text-emerald-700 dark:text-white">{{ $ticket->event->name }}</div>
                             <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"><span>{{ $ticket->ticketType->name }}</span><x-status-badge :status="$ticket->status" type="ticket" /></div>
-                        </a>
-                        <div class="mt-2 flex flex-wrap gap-2 text-sm">
+                        </div>
+                        <div class="click-area-content mt-2 flex flex-wrap gap-2 text-sm">
                             <a class="inline-flex items-center gap-1 font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-200" href="{{ route('tickets.show', $ticket->uuid) }}"><x-icon name="ticket" />Open ticket / เปิดตั๋ว</a>
                             <a class="inline-flex items-center gap-1 font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-200" href="{{ route('admin.events.overview', $ticket->event) }}"><x-icon name="calendar-days" />Event overview / ภาพรวมอีเวนต์</a>
                         </div>
-                        <div class="mt-3 rounded-md bg-zinc-50 p-3 text-sm dark:bg-white/5">
+                        <div class="click-area-content mt-3 rounded-md bg-zinc-50 p-3 text-sm dark:bg-white/5">
                             <div class="flex flex-wrap items-center justify-between gap-2">
                                 <div>
                                     <div class="text-zinc-500">Holder / ผู้ถือบัตร</div>
@@ -188,7 +189,7 @@
                             </form>
                         </div>
                         @if(in_array($order->status, ['cancelled', 'refunded'], true))
-                            <form class="mt-3" method="POST" action="{{ route('admin.events.tickets.destroy', [$ticket->event, $ticket]) }}" onsubmit="return confirm('Delete this ticket? / ลบตั๋วนี้?')">
+                            <form class="click-area-content mt-3" method="POST" action="{{ route('admin.events.tickets.destroy', [$ticket->event, $ticket]) }}" onsubmit="return confirm('Delete this ticket? / ลบตั๋วนี้?')">
                                 @csrf
                                 @method('DELETE')
                                 <button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete ticket / ลบตั๋ว</button>

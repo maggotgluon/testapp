@@ -14,7 +14,7 @@ use Illuminate\View\View;
 
 class ScannerController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $user = request()->user();
         $events = Event::query()
@@ -24,13 +24,22 @@ class ScannerController extends Controller
             ->filter(fn (Event $event) => $user->canManageEvent($event))
             ->values();
 
-        $recentScans = CheckInLog::query()
-            ->with(['ticket.event', 'ticket.ticketType'])
+        $manageableEventIds = $events->pluck('id');
+        $perPage = (int) $request->integer('per_page', 20);
+        $perPage = in_array($perPage, [10, 20, 50, 100], true) ? $perPage : 20;
+
+        $recentScanLogs = CheckInLog::query()
+            ->with(['ticket.event', 'ticket.ticketType', 'ticket.order'])
             ->where('scanned_by', $user->id)
+            ->whereHas('ticket', fn ($query) => $query->whereIn('event_id', $manageableEventIds))
+            ->when($request->filled('event_id'), fn ($query) => $query->whereHas('ticket', fn ($ticketQuery) => $ticketQuery->where('event_id', $request->integer('event_id'))))
+            ->when($request->filled('action'), fn ($query) => $query->where('action', $request->input('action')))
+            ->when($request->filled('ticket_status'), fn ($query) => $query->whereHas('ticket', fn ($ticketQuery) => $ticketQuery->where('status', $request->input('ticket_status'))))
             ->latest()
-            ->limit(20)
-            ->get()
-            ->map(fn (CheckInLog $log) => [
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $recentScans = $recentScanLogs->getCollection()->map(fn (CheckInLog $log) => [
                 'ok' => true,
                 'message' => str_replace('_', ' ', $log->action),
                 'action' => $log->action,
@@ -40,6 +49,8 @@ class ScannerController extends Controller
 
         return view('admin.scanner', [
             'events' => $events,
+            'perPage' => $perPage,
+            'recentScanLogs' => $recentScanLogs,
             'recentScans' => $recentScans,
         ]);
     }
@@ -152,6 +163,7 @@ class ScannerController extends Controller
             'status' => $ticket->status,
             'checked_in_at' => $ticket->checked_in_at?->format('M j, H:i'),
             'checked_out_at' => $ticket->checked_out_at?->format('M j, H:i'),
+            'url' => route('tickets.show', $ticket->uuid),
         ];
     }
 }

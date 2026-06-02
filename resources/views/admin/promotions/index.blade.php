@@ -35,12 +35,13 @@
     <div class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
         <div class="divide-y divide-white/10">
             @foreach($promotions as $promotion)
-                <div class="flex flex-wrap items-center justify-between gap-4 p-4 hover:bg-zinc-50 dark:bg-white/[0.03]">
-                    <div>
-                        <a class="font-semibold text-zinc-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-200" href="{{ route('admin.promotions.edit', $promotion) }}">{{ $promotion->name }}</a>
+                <div class="interactive-row group flex flex-wrap items-center justify-between gap-4 p-4 dark:bg-white/[0.03]">
+                    <a class="click-area-link" href="{{ route('admin.promotions.edit', $promotion) }}" aria-label="Edit promotion {{ $promotion->name }}"></a>
+                    <div class="click-area-content">
+                        <div class="font-semibold text-zinc-950 group-hover:text-emerald-700 dark:text-white">{{ $promotion->name }}</div>
                         <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $promotion->event?->name ?? 'All events / ทุกอีเวนต์' }} · {{ $promotion->ticketType?->name ?? 'Any ticket / ทุกตั๋ว' }} · {{ $promotion->displaySummary() }} · {{ $promotion->combines_with_coupons ? 'stacks with coupons / ใช้ร่วมคูปองได้' : 'no coupon stacking / ไม่ร่วมคูปอง' }}</div>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
+                    <div class="click-area-content flex flex-wrap items-center gap-2">
                         <span class="rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm {{ $promotion->is_active ? 'text-emerald-700 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-400' }}">{{ $promotion->is_active ? 'active / ใช้งาน' : 'inactive / ปิดอยู่' }}</span>
                         <form method="POST" action="{{ route('admin.promotions.destroy', $promotion) }}" onsubmit="return confirm('Delete this promotion? / ลบโปรโมชันนี้?')">
                             @csrf

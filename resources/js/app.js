@@ -2,6 +2,263 @@ import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
 
+const uiLanguage = (() => {
+    const storageKey = 'ticketflow.uiLanguage';
+    const supported = ['en', 'th', 'both'];
+    const thaiPattern = /[\u0E00-\u0E7F]/;
+    const skipSelector = [
+        'script',
+        'style',
+        'svg',
+        'canvas',
+        'input',
+        'textarea',
+        'code',
+        'pre',
+        '[contenteditable="true"]',
+        '[data-i18n-auto]',
+        '[data-i18n-skip]',
+        '[data-i18n-skip] *',
+    ].join(',');
+
+    const deviceLanguage = () => {
+        const language = (navigator.language || '').toLowerCase();
+
+        if (language.startsWith('th')) {
+            return 'th';
+        }
+
+        if (language.startsWith('en')) {
+            return 'en';
+        }
+
+        return 'both';
+    };
+
+    const savedLanguage = () => {
+        try {
+            return localStorage.getItem(storageKey);
+        } catch (error) {
+            return null;
+        }
+    };
+
+    const saveLanguage = (language) => {
+        try {
+            localStorage.setItem(storageKey, language);
+        } catch (error) {
+            // Some in-app browsers can block localStorage; the current page can still switch.
+        }
+    };
+
+    const current = () => {
+        const saved = savedLanguage();
+
+        return supported.includes(saved) ? saved : deviceLanguage();
+    };
+
+    const split = (value) => {
+        if (!value || !value.includes(' / ')) {
+            return null;
+        }
+
+        const match = value.match(/^(\s*)(.*?)(\s*)$/s);
+        const body = match?.[2] || value.trim();
+        const parts = body.split(/\s+\/\s+/);
+
+        if (parts.length < 2) {
+            return null;
+        }
+
+        const thaiIndex = parts.findIndex((part) => thaiPattern.test(part));
+
+        if (thaiIndex < 1) {
+            return null;
+        }
+
+        return {
+            prefix: match?.[1] || '',
+            suffix: match?.[3] || '',
+            en: parts.slice(0, thaiIndex).join(' / ').trim(),
+            th: parts.slice(thaiIndex).join(' / ').trim(),
+        };
+    };
+
+    const localized = (parts, language = current()) => {
+        if (!parts) {
+            return null;
+        }
+
+        const text = language === 'th'
+            ? parts.th
+            : (language === 'en' ? parts.en : `${parts.en} / ${parts.th}`);
+
+        return `${parts.prefix}${text}${parts.suffix}`;
+    };
+
+    const updateNode = (node, language = current()) => {
+        if (!node.dataset?.i18nEn || !node.dataset?.i18nTh) {
+            return;
+        }
+
+        node.textContent = localized({
+            prefix: node.dataset.i18nPrefix || '',
+            suffix: node.dataset.i18nSuffix || '',
+            en: node.dataset.i18nEn,
+            th: node.dataset.i18nTh,
+        }, language);
+    };
+
+    const localizeAttribute = (element, attribute, language = current()) => {
+        if (element.closest?.(skipSelector)) {
+            return;
+        }
+
+        const originalKey = `i18n${attribute.replace(/(^|-)([a-z])/g, (_, __, char) => char.toUpperCase())}`;
+        const original = element.dataset?.[originalKey] || element.getAttribute(attribute);
+        const parts = split(original);
+
+        if (!parts) {
+            return;
+        }
+
+        element.dataset[originalKey] = `${parts.prefix}${parts.en} / ${parts.th}${parts.suffix}`;
+        element.setAttribute(attribute, localized(parts, language));
+    };
+
+    const processTextNode = (node, language = current()) => {
+        if (!node.textContent?.trim() || node.parentElement?.closest(skipSelector)) {
+            return;
+        }
+
+        const parts = split(node.textContent);
+
+        if (!parts) {
+            return;
+        }
+
+        const span = document.createElement('span');
+        span.dataset.i18nAuto = 'true';
+        span.dataset.i18nPrefix = parts.prefix;
+        span.dataset.i18nSuffix = parts.suffix;
+        span.dataset.i18nEn = parts.en;
+        span.dataset.i18nTh = parts.th;
+        span.textContent = localized(parts, language);
+        node.replaceWith(span);
+    };
+
+    const processElement = (root = document.body, language = current()) => {
+        if (!root) {
+            return;
+        }
+
+        if (root.nodeType === Node.ELEMENT_NODE && root.matches?.('[data-i18n-auto]')) {
+            updateNode(root, language);
+            return;
+        }
+
+        if (root.closest?.(skipSelector)) {
+            return;
+        }
+
+        if (root.nodeType === Node.TEXT_NODE) {
+            processTextNode(root, language);
+            return;
+        }
+
+        if (root.nodeType !== Node.ELEMENT_NODE) {
+            return;
+        }
+
+        ['placeholder', 'title', 'aria-label', 'alt'].forEach((attribute) => {
+            if (root.hasAttribute?.(attribute)) {
+                localizeAttribute(root, attribute, language);
+            }
+        });
+
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                return node.parentElement?.closest(skipSelector)
+                    ? NodeFilter.FILTER_REJECT
+                    : NodeFilter.FILTER_ACCEPT;
+            },
+        });
+        const textNodes = [];
+        let node = walker.nextNode();
+
+        while (node) {
+            textNodes.push(node);
+            node = walker.nextNode();
+        }
+
+        textNodes.forEach((textNode) => processTextNode(textNode, language));
+        root.querySelectorAll?.('[data-i18n-auto]').forEach((node) => updateNode(node, language));
+        root.querySelectorAll?.('[placeholder], [title], [aria-label], [alt]').forEach((element) => {
+            ['placeholder', 'title', 'aria-label', 'alt'].forEach((attribute) => {
+                if (element.hasAttribute(attribute)) {
+                    localizeAttribute(element, attribute, language);
+                }
+            });
+        });
+    };
+
+    const apply = (language = current()) => {
+        document.documentElement.dataset.uiLang = language;
+        document.documentElement.lang = language === 'th' ? 'th' : 'en';
+        document.querySelectorAll('[data-language-switcher]').forEach((select) => {
+            select.value = language;
+        });
+        document.querySelectorAll('[data-language-option]').forEach((button) => {
+            const active = button.dataset.languageOption === language;
+            button.dataset.active = active ? 'true' : 'false';
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        processElement(document.body, language);
+        window.dispatchEvent(new CustomEvent('ticketflow:language-change', {
+            detail: { language },
+        }));
+    };
+
+    const set = (language) => {
+        const next = supported.includes(language) ? language : deviceLanguage();
+        saveLanguage(next);
+        apply(next);
+    };
+
+    const init = () => {
+        apply();
+        document.addEventListener('change', (event) => {
+            const switcher = event.target.closest?.('[data-language-switcher]');
+
+            if (switcher) {
+                set(switcher.value);
+            }
+        });
+        document.addEventListener('click', (event) => {
+            const option = event.target.closest?.('[data-language-option]');
+
+            if (option) {
+                set(option.dataset.languageOption);
+            }
+        });
+
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                mutation.addedNodes.forEach((node) => processElement(node));
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    };
+
+    return { init, set, current, apply };
+})();
+
+window.TicketFlowLanguage = uiLanguage;
+
+const initialUiLanguage = uiLanguage.current();
+document.documentElement.dataset.uiLang = initialUiLanguage;
+document.documentElement.lang = initialUiLanguage === 'th' ? 'th' : 'en';
+
 Alpine.data('scanner', (config = {}) => ({
     code: '',
     message: '',
@@ -18,6 +275,7 @@ Alpine.data('scanner', (config = {}) => ({
     cameraStream: null,
     cameraLoopActive: false,
     events: config.events || [],
+    recentLimit: Number(config.recentLimit || 20),
     recentScans: (config.recentScans || []).map((scan, index) => ({ ...scan, clientId: `server-${index}` })),
     flash: '',
     scanning: false,
@@ -172,7 +430,7 @@ Alpine.data('scanner', (config = {}) => ({
                 scanned_at: payload.scanned_at || new Date().toLocaleTimeString('th-TH', { hour12: false }),
             },
             ...this.recentScans,
-        ].slice(0, 20);
+        ].slice(0, this.recentLimit);
     },
     statusLabel(status) {
         return String(status || '').replaceAll('_', ' ');
@@ -1272,6 +1530,12 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
     });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => uiLanguage.init(), { once: true });
+} else {
+    uiLanguage.init();
 }
 
 Alpine.start();

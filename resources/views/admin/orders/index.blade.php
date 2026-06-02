@@ -37,13 +37,14 @@
                     $eventNames = $order->items->pluck('event.name')->filter()->unique();
                     $ticketSummary = $order->items->map(fn ($item) => $item->ticketType?->name.' x '.$item->quantity)->filter()->join(', ');
                 @endphp
-                <div class="flex flex-wrap items-center justify-between gap-4 p-4 hover:bg-zinc-50 dark:bg-white/[0.03]">
-                    <div>
-                        <a class="font-semibold text-zinc-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-200" href="{{ route('admin.orders.show', $order) }}">{{ $order->order_number }}</a>
+                <div class="interactive-row group flex flex-wrap items-center justify-between gap-4 p-4 dark:bg-white/[0.03]">
+                    <a class="click-area-link" href="{{ route('admin.orders.show', $order) }}" aria-label="Open order {{ $order->order_number }}"></a>
+                    <div class="click-area-content">
+                        <div class="font-semibold text-zinc-950 group-hover:text-emerald-700 dark:text-white">{{ $order->order_number }}</div>
                         <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $order->customer_name }} · {{ $order->customer_phone }} · THB {{ number_format($order->total_thb) }}</div>
                         <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ $eventNames->join(', ') }} @if($ticketSummary) · {{ $ticketSummary }} @endif</div>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
+                    <div class="click-area-content flex flex-wrap items-center gap-2">
                         <x-status-badge :status="$order->status" />
                         @if(in_array($order->status, ['cancelled', 'refunded'], true))
                             <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">

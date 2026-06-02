@@ -14,7 +14,7 @@
     $siteName = config('app.name', 'TicketFlow');
 @endphp
 <!doctype html>
-<html lang="en">
+<html lang="en" data-ui-lang="both">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -75,10 +75,10 @@
             </a>
             <nav class="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-sm text-zinc-700 dark:text-zinc-300 sm:gap-2">
                 <!-- <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('events.index') }}">Events / อีเวนต์</a> -->
-                <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('guides.buy-ticket') }}"><x-icon name="sparkles" /></a>
-                <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('orders.lookup') }}"><x-icon name="search" /></a>
+                <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('guides.buy-ticket') }}"><x-icon name="sparkles" /></a>
+                <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('orders.lookup') }}"><x-icon name="search" /></a>
                 @auth
-                    <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('profile') }}">
+                    <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('profile') }}">
                         @if(auth()->user()->avatar)
                             <img class="h-8 w-8 rounded-full object-cover ring-2 ring-emerald-400/40" src="{{ auth()->user()->avatar }}" alt="{{ auth()->user()->name }}">
                         @else
@@ -87,10 +87,10 @@
                         {{ auth()->user()->name }}
                     </a>
                     @if(auth()->user()->isAdmin())
-                        <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('admin.dashboard') }}"><x-icon name="shield" />Admin</a>
+                        <a class="interactive-action inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('admin.dashboard') }}"><x-icon name="shield" />Admin</a>
                     @endif
                 @else
-                    <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('login') }}"><x-icon name="log-in" />Login / เข้าสู่ระบบ</a>
+                    <a class="interactive-action inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 font-semibold text-zinc-950" href="{{ route('login') }}"><x-icon name="log-in" />Login / เข้าสู่ระบบ</a>
                     <!-- <a class="rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10" href="{{ route('admin.login') }}">Admin / ผู้ดูแล</a> -->
                 @endauth
             </nav>
@@ -99,16 +99,16 @@
             @if(auth()->user()->isAdmin() && request()->is('admin*'))
                 <div class="border-t border-zinc-200 dark:border-white/10">
                     <div class="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 text-sm sm:px-6 lg:px-8">
-                        <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.dashboard') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.dashboard') }}"><x-icon name="layout-dashboard" />Dashboard</a>
+                        <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.dashboard') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.dashboard') }}"><x-icon name="layout-dashboard" />Dashboard</a>
                         @if(in_array(auth()->user()->role, ['super_admin', 'event_admin'], true))
-                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.events.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.events.index') }}"><x-icon name="calendar-days" />Events</a>
-                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.coupons.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.coupons.index') }}"><x-icon name="tag" />Coupons</a>
-                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.promotions.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.promotions.index') }}"><x-icon name="sparkles" />Promotions</a>
-                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.orders.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.orders.index') }}"><x-icon name="shopping-bag" />Orders</a>
+                            <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.events.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.events.index') }}"><x-icon name="calendar-days" />Events</a>
+                            <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.coupons.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.coupons.index') }}"><x-icon name="tag" />Coupons</a>
+                            <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.promotions.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.promotions.index') }}"><x-icon name="sparkles" />Promotions</a>
+                            <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.orders.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.orders.index') }}"><x-icon name="shopping-bag" />Orders</a>
                         @endif
-                        <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.scanner') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.scanner') }}"><x-icon name="scan-line" />Scanner</a>
+                        <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.scanner') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.scanner') }}"><x-icon name="scan-line" />Scanner</a>
                         @if(auth()->user()->role === 'super_admin')
-                            <a class="inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.users.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.users.index') }}"><x-icon name="users" />Users</a>
+                            <a class="interactive-action inline-flex items-center gap-2 rounded-md px-3 py-2 {{ request()->routeIs('admin.users.*') ? 'bg-emerald-400 text-zinc-950 font-semibold' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10' }}" href="{{ route('admin.users.index') }}"><x-icon name="users" />Users</a>
                         @endif
                     </div>
                 </div>
@@ -128,13 +128,23 @@
     <footer class="border-t border-zinc-200 bg-zinc-50 dark:border-white/10 dark:bg-zinc-950">
         <div class="mx-auto grid max-w-7xl gap-4 px-4 py-6 text-sm text-zinc-600 dark:text-zinc-400 sm:px-6 lg:px-8">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="inline-flex items-center gap-2 font-semibold text-zinc-950 dark:text-white">
+                <a class="interactive-action inline-flex items-center gap-2 font-semibold text-zinc-950 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-200" href="{{ route('about') }}">
                     <span class="grid h-8 w-8 place-items-center rounded-md bg-emerald-400 text-zinc-950"><x-icon name="ticket" class="h-4 w-4" /></span>
                     TicketFlow
-                </div>
-                <nav class="flex flex-wrap gap-x-4 gap-y-2">
-                    <a class="hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('legal.terms') }}">Terms and Conditions / ข้อกำหนดและเงื่อนไข</a>
+                </a>
+                <nav class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <!-- <a class="interactive-action rounded-md px-2 py-1 hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('about') }}">About us / เกี่ยวกับเรา</a> -->
+                    <a class="interactive-action rounded-md px-2 py-1 hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('legal.terms') }}">Terms and Conditions / ข้อกำหนดและเงื่อนไข</a>
+                    <!-- <a class="interactive-action rounded-md px-2 py-1 hover:text-emerald-700 dark:hover:text-emerald-200" href="https://www.mag.codes" target="_blank" rel="noopener">Developed by Magnamm Studio / พัฒนาโดย Magnamm Studio</a> -->
                 </nav>
+                <label class="inline-flex w-fit items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-200" data-i18n-skip>
+                    <!-- <span class="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-500">Language</span> -->
+                    <select class="bg-transparent text-sm font-semibold focus:outline-none" data-language-switcher aria-label="UI language">
+                        <option value="en">🇬🇧 English</option>
+                        <option value="th">🇹🇭 ไทย</option>
+                        <option value="both">🇬🇧 🇹🇭 EN/TH</option>
+                    </select>
+                </label>
             </div>
             <!-- <p>This page provides general service information and is not legal advice. / หน้านี้เป็นข้อมูลทั่วไปของบริการ ไม่ใช่คำแนะนำทางกฎหมาย</p> -->
         </div>

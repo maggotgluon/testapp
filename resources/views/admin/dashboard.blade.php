@@ -40,7 +40,7 @@
         <div class="border-b border-zinc-200 dark:border-white/10 p-4 font-semibold text-zinc-950 dark:text-white">Recent orders / ออเดอร์ล่าสุด</div>
         <div class="divide-y divide-white/10">
             @foreach($recentOrders as $order)
-                <a class="flex items-center justify-between gap-4 p-4 hover:bg-zinc-50 dark:bg-white/[0.03]" href="{{ route('admin.orders.show', $order) }}">
+            <a class="interactive-row flex items-center justify-between gap-4 p-4 dark:bg-white/[0.03]" href="{{ route('admin.orders.show', $order) }}">
                     <div><div class="font-medium text-zinc-950 dark:text-white">{{ $order->order_number }}</div><div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $order->customer_name }} · {{ $order->items->pluck('event.name')->filter()->unique()->join(', ') }} · {{ $order->tickets_count }} tickets / ตั๋ว</div></div>
                     <x-status-badge :status="$order->status" />
                 </a>

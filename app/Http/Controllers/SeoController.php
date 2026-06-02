@@ -41,6 +41,12 @@ ROBOTS;
                 'priority' => '0.8',
             ],
             [
+                'loc' => route('about'),
+                'lastmod' => now()->toDateString(),
+                'changefreq' => 'monthly',
+                'priority' => '0.5',
+            ],
+            [
                 'loc' => route('guides.buy-ticket'),
                 'lastmod' => now()->toDateString(),
                 'changefreq' => 'monthly',
