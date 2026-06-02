@@ -104,8 +104,8 @@
         @if($ticketIsActive)
             <div class="mt-5 grid gap-2 sm:grid-cols-3">
                 <button class="inline-flex items-center justify-center gap-2 rounded-md border border-emerald-300 px-4 py-3 font-semibold text-emerald-700 hover:bg-emerald-400/10 dark:border-emerald-400/40 dark:text-emerald-100" type="button" @click="previewPng()" :disabled="previewLoading"><x-icon name="eye" /><span x-text="previewLoading ? 'Rendering... / กำลังสร้าง...' : 'Preview'"></span></button>
-                <button class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950 hover:bg-emerald-300" type="button" @click="downloadPng()"><x-icon name="image-down" />Save image</button>
-                <button class="inline-flex items-center justify-center gap-2 rounded-md border border-zinc-200 px-4 py-3 font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" type="button" @click="printPdf()"><x-icon name="file-down" />Save PDF</button>
+                <button class="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950 hover:bg-emerald-300" type="button" @click="downloadPng()"><x-icon name="image-down" />Save image / บันทึกรูป</button>
+                <button class="inline-flex items-center justify-center gap-2 rounded-md border border-zinc-200 px-4 py-3 font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" type="button" @click="printPdf()"><x-icon name="file-down" />Save PDF / บันทึก PDF</button>
             </div>
             <div class="fixed inset-0 z-50 grid place-items-center bg-zinc-950/70 p-4" x-cloak x-show="previewOpen" x-transition @keydown.escape.window="closePreview()">
                 <div class="max-h-[92vh] w-full max-w-md overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-950">

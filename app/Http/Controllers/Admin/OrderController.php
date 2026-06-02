@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Event;
+use App\Models\TicketType;
 use App\Models\TicketOrder;
 use App\Services\CrmSyncService;
 use App\Services\CustomerNotificationService;
@@ -16,14 +18,20 @@ class OrderController extends Controller
     public function index(Request $request): View
     {
         $orders = TicketOrder::with(['items.event', 'items.ticketType', 'tickets'])
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')));
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
+            ->when($request->filled('event_id'), fn ($query) => $query->whereHas('items', fn ($items) => $items->where('event_id', $request->integer('event_id'))))
+            ->when($request->filled('ticket_type_id'), fn ($query) => $query->whereHas('items', fn ($items) => $items->where('ticket_type_id', $request->integer('ticket_type_id'))));
+
+        $events = $this->eventsForUser($request);
 
         if ($request->user()->role !== 'super_admin') {
             $orders->whereHas('items.event.assignedUsers', fn ($query) => $query->whereKey($request->user()->id));
         }
 
         return view('admin.orders.index', [
-            'orders' => $orders->latest()->paginate(20),
+            'orders' => $orders->latest()->paginate(20)->withQueryString(),
+            'events' => $events,
+            'ticketTypes' => $this->ticketTypesForEvents($events, $request),
         ]);
     }
 
@@ -38,8 +46,22 @@ class OrderController extends Controller
             'payments' => fn ($query) => $query->latest(),
         ]);
         $this->authorizeOrder($request, $order);
+        $navigationQuery = TicketOrder::query();
 
-        return view('admin.orders.show', compact('order'));
+        if ($request->user()->role !== 'super_admin') {
+            $navigationQuery->whereHas('items.event.assignedUsers', fn ($query) => $query->whereKey($request->user()->id));
+        }
+
+        $previousOrder = (clone $navigationQuery)
+            ->where('id', '<', $order->id)
+            ->latest('id')
+            ->first();
+        $nextOrder = (clone $navigationQuery)
+            ->where('id', '>', $order->id)
+            ->oldest('id')
+            ->first();
+
+        return view('admin.orders.show', compact('order', 'previousOrder', 'nextOrder'));
     }
 
     public function approve(Request $request, TicketOrder $order, CustomerNotificationService $notifications, CrmSyncService $crm): RedirectResponse
@@ -170,5 +192,29 @@ class OrderController extends Controller
         }
 
         abort_unless($order->items->every(fn ($item) => $request->user()->canManageEvent($item->event)), 403);
+    }
+
+    private function eventsForUser(Request $request)
+    {
+        $events = Event::query()->with('ticketTypes')->orderBy('starts_at');
+
+        if ($request->user()->role !== 'super_admin') {
+            $events->whereHas('assignedUsers', fn ($query) => $query->whereKey($request->user()->id));
+        }
+
+        return $events->get();
+    }
+
+    private function ticketTypesForEvents($events, Request $request)
+    {
+        $ticketTypes = TicketType::query()
+            ->with('event')
+            ->whereIn('event_id', $events->pluck('id'))
+            ->when($request->filled('event_id'), fn ($query) => $query->where('event_id', $request->integer('event_id')))
+            ->orderBy('event_id')
+            ->orderBy('name')
+            ->get();
+
+        return $ticketTypes;
     }
 }

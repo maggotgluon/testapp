@@ -54,9 +54,21 @@
                 <input type="hidden" name="payment_instructions" :value="firstPaymentInstructions()">
                 <div class="mt-4 grid gap-4">
                     <template x-for="(account, index) in paymentAccounts" :key="account.key || index">
-                        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-zinc-900">
+                        <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-4 shadow-sm dark:border-white/10 dark:bg-zinc-900">
                             <input type="hidden" :name="`payment_accounts[${index}][key]`" x-model="account.key">
-                            <div class="flex items-start justify-between gap-3">
+                            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 pb-3 dark:border-white/10">
+                                <div>
+                                    <div class="text-sm font-semibold text-zinc-950 dark:text-white"><span x-text="account.label || 'Payment account / บัญชีรับชำระเงิน'"></span></div>
+                                    <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">#<span x-text="index + 1"></span> · <span x-text="account.method.replace('_', ' ')"></span></div>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <label class="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200"><input type="hidden" :name="`payment_accounts[${index}][is_active]`" value="0"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" :name="`payment_accounts[${index}][is_active]`" value="1" x-model="account.is_active"> Active / เปิด</label>
+                                    <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 text-zinc-700 disabled:opacity-40 dark:border-white/10 dark:text-zinc-200" type="button" @click="movePaymentAccount(index, -1)" :disabled="index === 0" title="Move up / เลื่อนขึ้น"><x-icon name="arrow-up" /></button>
+                                    <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 text-zinc-700 disabled:opacity-40 dark:border-white/10 dark:text-zinc-200" type="button" @click="movePaymentAccount(index, 1)" :disabled="index === paymentAccounts.length - 1" title="Move down / เลื่อนลง"><x-icon name="arrow-down" /></button>
+                                    <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-rose-300 text-rose-700 dark:border-rose-400/40 dark:text-rose-200" type="button" @click="removePaymentAccount(index)" title="Remove / ลบ"><x-icon name="trash-2" /></button>
+                                </div>
+                            </div>
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
                                 <label class="text-sm text-zinc-700 dark:text-zinc-300">Method / วิธีชำระเงิน
                                     <select class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`payment_accounts[${index}][method]`" x-model="account.method">
                                         <option value="qr_payment">QR payment / QR</option>
@@ -64,11 +76,7 @@
                                         <option value="cash">Cash sale / เงินสด</option>
                                     </select>
                                 </label>
-                                <button class="mt-6 inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:text-rose-200" type="button" @click="removePaymentAccount(index)"><x-icon name="trash-2" />Remove / ลบ</button>
-                            </div>
-                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
                                 <label class="text-sm text-zinc-700 dark:text-zinc-300">Display name / ชื่อที่แสดง<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`payment_accounts[${index}][label]`" x-model="account.label"></label>
-                                <label class="flex items-center gap-2 pt-7 text-sm text-zinc-700 dark:text-zinc-300"><input type="hidden" :name="`payment_accounts[${index}][is_active]`" value="0"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" :name="`payment_accounts[${index}][is_active]`" value="1" x-model="account.is_active"> Active / เปิดใช้งาน</label>
                                 <label class="text-sm text-zinc-700 dark:text-zinc-300" x-show="account.method === 'bank_transfer'">Bank name / ชื่อธนาคาร
                                     <select class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`payment_accounts[${index}][bank_name]`" x-model="account.bank_name">
                                         <option value="">Select bank / เลือกธนาคาร</option>

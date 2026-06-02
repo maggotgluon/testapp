@@ -1102,6 +1102,18 @@ Alpine.data('adminEventForm', (config) => ({
             this.addPaymentAccount();
         }
     },
+    movePaymentAccount(index, direction) {
+        const target = index + direction;
+
+        if (target < 0 || target >= this.paymentAccounts.length) {
+            return;
+        }
+
+        const accounts = [...this.paymentAccounts];
+        const [account] = accounts.splice(index, 1);
+        accounts.splice(target, 0, account);
+        this.paymentAccounts = accounts;
+    },
     firstAccount(method) {
         return this.paymentAccounts.find((account) => account.method === method && account.is_active) || {};
     },

@@ -1,8 +1,10 @@
 @php
     $lineNotificationsEnabled = filled(config('services.line.messaging_channel_access_token')) && filled(config('services.line.messaging_channel_secret'));
     $webPushEnabled = filled(config('webpush.vapid.public_key')) && filled(config('webpush.vapid.private_key'));
+    $notificationsEnabled = $lineNotificationsEnabled || $webPushEnabled;
 @endphp
 <x-layouts.app :title="$event->name.' overview'">
+    <div x-data="{ tab: (new URLSearchParams(window.location.search).get('tab') === 'notifications' && ! @js($notificationsEnabled)) ? 'operations' : (new URLSearchParams(window.location.search).get('tab') || 'operations'), orderView: new URLSearchParams(window.location.search).has('ticket_status') ? 'tickets' : 'orders' }">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <p class="text-sm font-medium uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-300">Event operations / ภาพรวมการจัดงาน</p>
@@ -10,6 +12,14 @@
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $event->starts_at->format('M j, Y H:i') }} · {{ $event->venue }}</p>
         </div>
         <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100" href="{{ route('admin.events.edit', $event) }}"><x-icon name="edit" />Edit event / แก้ไขอีเวนต์</a>
+    </div>
+
+    <div class="mt-6 flex flex-wrap gap-2 rounded-lg border border-zinc-200 bg-white p-2 dark:border-white/10 dark:bg-white/[0.04]">
+        <button class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold" type="button" @click="tab = 'operations'" :class="tab === 'operations' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"><x-icon name="layout-dashboard" />Event operations / งานอีเวนต์</button>
+        @if($notificationsEnabled)
+        <button class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold" type="button" @click="tab = 'notifications'" :class="tab === 'notifications' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"><x-icon name="bell" />Attendee notifications / แจ้งเตือนผู้เข้าร่วม</button>
+        @endif
+        <button class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold" type="button" @click="tab = 'orders'" :class="tab === 'orders' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"><x-icon name="receipt" />Orders for this event / ออเดอร์ของอีเวนต์</button>
     </div>
 
     <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -31,7 +41,7 @@
         </div>
     </div>
 
-    <div class="mt-6 grid gap-6 xl:grid-cols-[.8fr_1.2fr]">
+    <div class="mt-6 grid gap-6 xl:grid-cols-[.8fr_1.2fr]" x-show="tab === 'operations'" x-cloak>
         <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
             <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Ticket type sales / ยอดขายตามประเภทตั๋ว</h2>
             <div class="mt-4 grid gap-3">
@@ -54,7 +64,7 @@
                 <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Order status / สถานะออเดอร์</h2>
                 <div class="mt-4 grid gap-2 text-sm">
                     @foreach(['pending', 'approved', 'rejected', 'cancelled', 'refunded'] as $status)
-                        <div class="flex justify-between rounded bg-zinc-50 dark:bg-zinc-900 px-3 py-2"><span class="text-zinc-700 dark:text-zinc-300">{{ str_replace('_', ' ', $status) }}</span><span class="font-semibold text-zinc-950 dark:text-white">{{ $orderStatusCounts[$status] ?? 0 }}</span></div>
+                        <div class="flex items-center justify-between rounded bg-zinc-50 dark:bg-zinc-900 px-3 py-2"><x-status-badge :status="$status" /><span class="font-semibold text-zinc-950 dark:text-white">{{ $orderStatusCounts[$status] ?? 0 }}</span></div>
                     @endforeach
                 </div>
             </div>
@@ -62,7 +72,7 @@
                 <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Ticket/check-in status / สถานะตั๋วและเช็กอิน</h2>
                 <div class="mt-4 grid gap-2 text-sm">
                     @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'cancelled', 'refunded'] as $status)
-                        <div class="flex justify-between rounded bg-zinc-50 dark:bg-zinc-900 px-3 py-2"><span class="text-zinc-700 dark:text-zinc-300">{{ str_replace('_', ' ', $status) }}</span><span class="font-semibold text-zinc-950 dark:text-white">{{ $ticketStatusCounts[$status] ?? 0 }}</span></div>
+                        <div class="flex items-center justify-between rounded bg-zinc-50 dark:bg-zinc-900 px-3 py-2"><x-status-badge :status="$status" type="ticket" /><span class="font-semibold text-zinc-950 dark:text-white">{{ $ticketStatusCounts[$status] ?? 0 }}</span></div>
                     @endforeach
                 </div>
             </div>
@@ -96,8 +106,9 @@
         </div>
     </section> -->
 
-    @if(($lineNotificationsEnabled || $webPushEnabled) && $messageRecipientCount > 0)
-    <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
+    @if($notificationsEnabled)
+    <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5" x-show="tab === 'notifications'" x-cloak>
+    @if($messageRecipientCount > 0)
         <div class="grid gap-4 lg:grid-cols-[.7fr_1.3fr]">
             <div>
                 <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Attendee notifications / ส่งการแจ้งเตือนถึงผู้เข้าร่วม</h2>
@@ -130,13 +141,23 @@
                 <button class="inline-flex items-center gap-2 justify-self-start rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 hover:bg-emerald-300"><x-icon name="send" />Send notification / ส่งการแจ้งเตือน</button>
             </form>
         </div>
+    @else
+        <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Attendee notifications / ส่งการแจ้งเตือนถึงผู้เข้าร่วม</h2>
+        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">This event has no logged-in attendees ready to receive messages yet. / ยังไม่มีผู้เข้าร่วมที่ล็อกอินสำหรับรับข้อความ</p>
+    @endif
     </section>
     @endif
 
-    <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
+    <div class="mt-6" x-show="tab === 'orders'" x-cloak>
+    <div class="mb-3 flex flex-wrap gap-2 rounded-lg border border-zinc-200 bg-white p-2 dark:border-white/10 dark:bg-white/[0.04]">
+        <button class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold" type="button" @click="orderView = 'orders'" :class="orderView === 'orders' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"><x-icon name="receipt" />Orders / ออเดอร์</button>
+        <button class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold" type="button" @click="orderView = 'tickets'" :class="orderView === 'tickets' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-white/10'"><x-icon name="ticket" />Tickets / ตั๋ว</button>
+    </div>
+    <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]" x-show="orderView === 'orders'">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 dark:border-white/10 p-4">
             <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Orders for this event / ออเดอร์ของอีเวนต์นี้</h2>
             <form class="flex gap-2">
+                <input type="hidden" name="tab" value="orders">
                 <select class="rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-950 dark:text-white" name="order_status">
                     <option value="">All orders / ทุกออเดอร์</option>
                     @foreach(['pending', 'approved', 'rejected', 'cancelled', 'refunded'] as $status)
@@ -151,7 +172,7 @@
                 <div class="grid gap-4 p-4 lg:grid-cols-[1fr_auto]">
                     <div>
                         <a class="font-semibold text-zinc-950 dark:text-white hover:text-emerald-600 dark:text-emerald-300" href="{{ route('admin.orders.show', $order) }}">{{ $order->order_number }}</a>
-                        <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $order->customer_name }} · {{ $order->customer_phone }} · {{ str_replace('_', ' ', $order->status) }}</div>
+                        <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">{{ $order->customer_name }} · {{ $order->customer_phone }} <x-status-badge :status="$order->status" /></div>
                         <div class="mt-2 flex flex-wrap gap-2 text-xs text-zinc-700 dark:text-zinc-300">
                             @foreach($order->items as $item)
                                 <span class="rounded bg-zinc-100 dark:bg-white/10 px-2 py-1">{{ $item->ticketType->name }} x {{ $item->quantity }}</span>
@@ -180,10 +201,11 @@
         <div class="p-4">{{ $orders->withQueryString()->links() }}</div>
     </section>
 
-    <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
+    <section class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]" x-show="orderView === 'tickets'">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 dark:border-white/10 p-4">
             <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Tickets and check-in / ตั๋วและการเช็กอิน</h2>
             <form class="flex gap-2">
+                <input type="hidden" name="tab" value="orders">
                 <select class="rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-950 dark:text-white" name="ticket_status">
                     <option value="">All tickets / ทุกตั๋ว</option>
                     @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'cancelled', 'refunded'] as $status)
@@ -198,7 +220,11 @@
                 <div class="grid gap-4 p-4 lg:grid-cols-[1fr_auto]">
                     <div>
                         <a class="font-semibold text-zinc-950 dark:text-white hover:text-emerald-600 dark:text-emerald-300" href="{{ route('tickets.show', $ticket->uuid) }}">{{ $ticket->holder_name }}</a>
-                        <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->ticketType->name }} · {{ $ticket->order->order_number }} · {{ str_replace('_', ' ', $ticket->status) }}</div>
+                        <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                            <span>{{ $ticket->ticketType->name }}</span>
+                            <a class="font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-200" href="{{ route('admin.orders.show', $ticket->order) }}">{{ $ticket->order->order_number }}</a>
+                            <x-status-badge :status="$ticket->status" type="ticket" />
+                        </div>
                         <div class="mt-1 text-xs text-zinc-500">In / เข้า: {{ $ticket->checked_in_at?->format('M j H:i') ?? '-' }} · Out / ออก: {{ $ticket->checked_out_at?->format('M j H:i') ?? '-' }}</div>
                     </div>
                     <div class="flex flex-wrap items-start gap-2">
@@ -227,4 +253,6 @@
         </div>
         <div class="p-4">{{ $tickets->withQueryString()->links() }}</div>
     </section>
+    </div>
+    </div>
 </x-layouts.app>

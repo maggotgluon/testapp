@@ -1,6 +1,24 @@
 <x-layouts.app title="Admin">
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">Admin dashboard / แดชบอร์ดผู้ดูแล</h1>
+        <div>
+            <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">Admin dashboard / แดชบอร์ดผู้ดูแล</h1>
+            @if($selectedEvent)
+                <a class="mt-2 inline-flex items-center gap-2 text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-200" href="{{ route('admin.events.overview', $selectedEvent) }}"><x-icon name="calendar-days" />{{ $selectedEvent->name }} overview / ภาพรวมอีเวนต์</a>
+            @endif
+        </div>
+        @if($manageableEvents->count() > 1)
+            <form class="flex flex-wrap items-center gap-2">
+                <label class="text-sm text-zinc-600 dark:text-zinc-300">Event / อีเวนต์</label>
+                <select class="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="event_id" onchange="this.form.submit()">
+                    <option value="">All events / ทุกอีเวนต์</option>
+                    @foreach($manageableEvents as $event)
+                        <option value="{{ $event->id }}" @selected(request('event_id') == $event->id)>{{ $event->name }}</option>
+                    @endforeach
+                </select>
+            </form>
+        @elseif($manageableEvents->count() === 1)
+            <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ route('admin.events.overview', $manageableEvents->first()) }}"><x-icon name="calendar-days" />{{ $manageableEvents->first()->name }}</a>
+        @endif
     </div>
     <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         @foreach([['Events / อีเวนต์', $eventCount, 'calendar-days'], ['Pending / รอตรวจสอบ', $pendingOrders, 'clock'], ['Revenue THB / รายได้', number_format($revenueThb), 'wallet'], ['Checked in / เช็กอินแล้ว', $checkedIn, 'check']] as [$label, $value, $icon])
@@ -23,8 +41,8 @@
         <div class="divide-y divide-white/10">
             @foreach($recentOrders as $order)
                 <a class="flex items-center justify-between gap-4 p-4 hover:bg-zinc-50 dark:bg-white/[0.03]" href="{{ route('admin.orders.show', $order) }}">
-                    <div><div class="font-medium text-zinc-950 dark:text-white">{{ $order->order_number }}</div><div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $order->customer_name }} · {{ $order->tickets_count }} tickets / ตั๋ว</div></div>
-                    <span class="text-sm text-emerald-700 dark:text-emerald-200">{{ $order->status }}</span>
+                    <div><div class="font-medium text-zinc-950 dark:text-white">{{ $order->order_number }}</div><div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $order->customer_name }} · {{ $order->items->pluck('event.name')->filter()->unique()->join(', ') }} · {{ $order->tickets_count }} tickets / ตั๋ว</div></div>
+                    <x-status-badge :status="$order->status" />
                 </a>
             @endforeach
         </div>

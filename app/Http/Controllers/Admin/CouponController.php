@@ -11,16 +11,24 @@ use Illuminate\View\View;
 
 class CouponController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $coupons = Coupon::with(['event', 'ticketType'])->latest();
+        $events = $this->eventsForUser($request);
 
-        if (auth()->user()->role !== 'super_admin') {
-            $coupons->whereHas('event.assignedUsers', fn ($query) => $query->whereKey(auth()->id()));
+        if ($request->user()->role !== 'super_admin') {
+            $eventIds = $events->pluck('id');
+            $coupons->whereIn('event_id', $eventIds);
         }
 
+        $coupons
+            ->when($request->filled('event_id'), fn ($query) => $query->where('event_id', $request->integer('event_id')))
+            ->when($request->filled('type'), fn ($query) => $query->where('discount_type', $request->string('type')))
+            ->when($request->filled('status'), fn ($query) => $query->where('is_active', $request->string('status') === 'active'));
+
         return view('admin.coupons.index', [
-            'coupons' => $coupons->paginate(20),
+            'coupons' => $coupons->paginate(20)->withQueryString(),
+            'events' => $events,
         ]);
     }
 

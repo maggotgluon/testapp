@@ -13,6 +13,17 @@
 @endphp
 
 <x-layouts.app :title="$order->order_number">
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-2">
+        <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ route('admin.orders.index') }}"><x-icon name="undo" />Back to orders / กลับไปหน้าออเดอร์</a>
+        <div class="flex flex-wrap gap-2">
+            @if($previousOrder)
+                <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ route('admin.orders.show', $previousOrder) }}">Previous / ก่อนหน้า</a>
+            @endif
+            @if($nextOrder)
+                <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ route('admin.orders.show', $nextOrder) }}">Next / ถัดไป</a>
+            @endif
+        </div>
+    </div>
     <div class="grid gap-6 lg:grid-cols-[1fr_.8fr]">
         <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -20,7 +31,28 @@
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">Order / ออเดอร์</p>
                     <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">{{ $order->order_number }}</h1>
                 </div>
-                <span class="rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-200">{{ $order->status }}</span>
+                <x-status-badge :status="$order->status" />
+            </div>
+            <div class="mt-5 grid gap-3">
+                @foreach($order->items->groupBy('event_id') as $eventItems)
+                    @php $event = $eventItems->first()->event; @endphp
+                    @if($event)
+                        <a class="rounded-md border border-emerald-400/20 bg-emerald-400/10 p-4 hover:border-emerald-400/50" href="{{ route('admin.events.overview', $event) }}">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <div class="font-semibold text-zinc-950 dark:text-white">{{ $event->name }}</div>
+                                    <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $event->starts_at->format('M j, Y H:i') }} · {{ $event->venue }}</div>
+                                </div>
+                                <span class="text-sm font-semibold text-emerald-700 dark:text-emerald-200">Event overview / ภาพรวม</span>
+                            </div>
+                            <div class="mt-2 flex flex-wrap gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+                                @foreach($eventItems as $item)
+                                    <span class="rounded bg-white/80 px-2 py-1 dark:bg-zinc-950/60">{{ $item->ticketType?->name }} x {{ $item->quantity }}</span>
+                                @endforeach
+                            </div>
+                        </a>
+                    @endif
+                @endforeach
             </div>
             <dl class="mt-5 grid gap-2 text-sm text-zinc-700 dark:text-zinc-300">
                 <div><dt class="text-zinc-500">Customer / ลูกค้า</dt><dd>{{ $order->customer_name }} · {{ $order->customer_phone }}</dd></div>
@@ -130,8 +162,12 @@
                     <div class="rounded-md border border-zinc-200 p-4 dark:border-white/10" x-data="{ editHolder: false }">
                         <a class="block hover:text-emerald-700 dark:hover:text-emerald-200" href="{{ route('tickets.show', $ticket->uuid) }}">
                             <div class="font-medium text-zinc-950 dark:text-white">{{ $ticket->event->name }}</div>
-                            <div class="text-sm text-zinc-600 dark:text-zinc-400">{{ $ticket->ticketType->name }} · {{ $ticket->status }}</div>
+                            <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"><span>{{ $ticket->ticketType->name }}</span><x-status-badge :status="$ticket->status" type="ticket" /></div>
                         </a>
+                        <div class="mt-2 flex flex-wrap gap-2 text-sm">
+                            <a class="inline-flex items-center gap-1 font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-200" href="{{ route('tickets.show', $ticket->uuid) }}"><x-icon name="ticket" />Open ticket / เปิดตั๋ว</a>
+                            <a class="inline-flex items-center gap-1 font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-200" href="{{ route('admin.events.overview', $ticket->event) }}"><x-icon name="calendar-days" />Event overview / ภาพรวมอีเวนต์</a>
+                        </div>
                         <div class="mt-3 rounded-md bg-zinc-50 p-3 text-sm dark:bg-white/5">
                             <div class="flex flex-wrap items-center justify-between gap-2">
                                 <div>

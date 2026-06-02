@@ -3,6 +3,35 @@
         <h1 class="text-3xl font-semibold text-zinc-950 dark:text-white">Promotions / โปรโมชัน</h1>
         <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950" href="{{ route('admin.promotions.create') }}"><x-icon name="plus" />New promotion / เพิ่มโปรโมชัน</a>
     </div>
+    <form class="mt-5 grid gap-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-4">
+        <label class="text-sm text-zinc-700 dark:text-zinc-300">Event / อีเวนต์
+            <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="event_id">
+                <option value="">All events / ทุกอีเวนต์</option>
+                @foreach($events as $event)
+                    <option value="{{ $event->id }}" @selected(request('event_id') == $event->id)>{{ $event->name }}</option>
+                @endforeach
+            </select>
+        </label>
+        <label class="text-sm text-zinc-700 dark:text-zinc-300">Type / ประเภท
+            <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="type">
+                <option value="">All types / ทุกประเภท</option>
+                <option value="buy_x_get_y" @selected(request('type') === 'buy_x_get_y')>Buy X get Y / ซื้อ X แถม Y</option>
+                <option value="fixed" @selected(request('type') === 'fixed')>Fixed THB / ลดเป็นบาท</option>
+                <option value="percent" @selected(request('type') === 'percent')>Percent / เปอร์เซ็นต์</option>
+            </select>
+        </label>
+        <label class="text-sm text-zinc-700 dark:text-zinc-300">Status / สถานะ
+            <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="status">
+                <option value="">All statuses / ทุกสถานะ</option>
+                <option value="active" @selected(request('status') === 'active')>Active / ใช้งาน</option>
+                <option value="inactive" @selected(request('status') === 'inactive')>Inactive / ปิดอยู่</option>
+            </select>
+        </label>
+        <div class="flex items-end gap-2">
+            <button class="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950"><x-icon name="search" />Filter / กรอง</button>
+            <a class="inline-flex items-center justify-center rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-700 dark:border-white/10 dark:text-zinc-200" href="{{ route('admin.promotions.index') }}">Reset</a>
+        </div>
+    </form>
     <div class="mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04]">
         <div class="divide-y divide-white/10">
             @foreach($promotions as $promotion)
