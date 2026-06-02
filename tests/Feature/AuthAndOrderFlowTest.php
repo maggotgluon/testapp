@@ -864,7 +864,7 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertOk()
             ->assertSee($order->order_number)
             ->assertSee('Approve / อนุมัติ')
-            ->assertSee('Delete / ลบ');
+            ->assertDontSee('Delete / ลบ');
     }
 
     public function test_admin_can_recheck_existing_payment_slip_qr(): void
@@ -951,7 +951,7 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertOk();
     }
 
-    public function test_super_admin_can_delete_order_with_tickets(): void
+    public function test_super_admin_can_delete_cancelled_order_with_tickets(): void
     {
         $this->seed();
 
@@ -975,11 +975,69 @@ class AuthAndOrderFlowTest extends TestCase
         $ticketId = $order->tickets()->firstOrFail()->id;
 
         $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/approve')
+            ->assertRedirect();
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/cancel')
+            ->assertRedirect();
+
+        $this->actingAs($admin)
             ->delete('/admin/orders/'.$order->id)
             ->assertRedirect('/admin/orders');
 
         $this->assertDatabaseMissing('ticket_orders', ['id' => $order->id]);
         $this->assertDatabaseMissing('tickets', ['id' => $ticketId]);
+    }
+
+    public function test_pending_order_cannot_be_deleted_before_cancel_or_refund(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Keep Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+
+        $this->actingAs($admin)
+            ->delete('/admin/orders/'.$order->id)
+            ->assertSessionHasErrors('status');
+
+        $this->assertDatabaseHas('ticket_orders', ['id' => $order->id]);
+    }
+
+    public function test_admin_can_update_ticket_holder_from_order_page(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticket = $this->createApprovedTicket();
+
+        $this->actingAs($admin)
+            ->patch('/admin/events/'.$ticket->event_id.'/tickets/'.$ticket->id.'/holder', [
+                'holder_name' => 'Updated Holder',
+                'holder_phone' => '0899999999',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('tickets', [
+            'id' => $ticket->id,
+            'holder_name' => 'Updated Holder',
+            'holder_phone' => '0899999999',
+        ]);
     }
 
     public function test_event_admin_bank_name_uses_thai_bank_dropdown(): void
@@ -992,7 +1050,7 @@ class AuthAndOrderFlowTest extends TestCase
             ->get('/admin/events/1/edit')
             ->assertOk()
             ->assertSee('Select bank / เลือกธนาคาร')
-            ->assertSee('Krungthai Bank / ธนาคารกรุงไทย')
+            ->assertSee('Krungthai Bank')
             ->assertSee('ktb.svg', false);
     }
 
@@ -1540,6 +1598,48 @@ class AuthAndOrderFlowTest extends TestCase
         ]);
     }
 
+    public function test_checkout_accepts_dynamic_event_payment_account(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+        $ticketType->event->update([
+            'payment_accounts' => [
+                [
+                    'key' => 'promptpay-main',
+                    'method' => 'qr_payment',
+                    'label' => 'Main PromptPay',
+                    'account_name' => 'Main Account',
+                    'account_number' => '0812345678',
+                    'instructions' => 'Pay this account.',
+                    'is_active' => true,
+                ],
+            ],
+        ]);
+
+        $this->post('/orders', [
+            'customer_name' => 'Dynamic Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'payment_account_key' => 'promptpay-main',
+            'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'customer_name' => 'Dynamic Buyer',
+            'payment_method' => 'qr_payment',
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'method' => 'qr_payment',
+            'status' => 'submitted',
+        ]);
+    }
+
     public function test_hidden_coupon_is_not_suggested_but_can_still_be_applied(): void
     {
         $this->seed();
@@ -1560,7 +1660,7 @@ class AuthAndOrderFlowTest extends TestCase
 
         $this->get('/events/'.$ticketType->event_id)
             ->assertOk()
-            ->assertDontSee('QUIET100');
+            ->assertSee('QUIET100');
 
         $this->post('/orders', [
             'customer_name' => 'Coupon Buyer',

@@ -2,6 +2,8 @@
     <form method="POST" enctype="multipart/form-data" action="{{ $event->exists ? route('admin.events.update', $event) : route('admin.events.store') }}" class="grid gap-6 lg:grid-cols-[1fr_.8fr]" x-data="adminEventForm({
         description: @js(old('description', $event->description)),
         descriptionFormat: @js(old('description_format', $event->description_format ?: 'html')),
+        paymentAccounts: @js(old('payment_accounts', $event->paymentOptions())),
+        banks: @js(collect(config('thai_banks'))->map(fn ($bank) => $bank + ['logo_url' => asset($bank['logo'])])->values()),
         previewUrl: @js(route('admin.events.index')),
     })">
         @csrf
@@ -42,46 +44,48 @@
                 <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="is_published" value="1" @checked(old('is_published', $event->is_published ?? true))> Published / เผยแพร่</label>
                 <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="show_countdown" value="1" @checked(old('show_countdown', $event->show_countdown ?? false))> Show countdown / แสดงเวลานับถอยหลัง</label>
             </div>
-            @php
-                $banks = collect(config('thai_banks'))->map(fn ($bank) => $bank + ['logo_url' => asset($bank['logo'])])->values();
-                $selectedBank = old('bank_name', $event->bank_name);
-                $selectedBankExists = $selectedBank && $banks->contains('name', $selectedBank);
-            @endphp
-            <div class="mt-6 border-t border-zinc-200 dark:border-white/10 pt-6" x-data="{ bank: @js($selectedBank), banks: @js($banks) }">
+            <div class="mt-6 border-t border-zinc-200 dark:border-white/10 pt-6">
                 <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Payment accounts / บัญชีรับชำระเงิน</h2>
-                @php
-                    $enabledPaymentMethods = old('payment_methods', $event->enabledPaymentMethods());
-                @endphp
-                <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                    <label class="flex items-center gap-2 rounded-md border border-zinc-200 p-3 text-sm text-zinc-700 dark:border-white/10 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="payment_methods[]" value="qr_payment" @checked(in_array('qr_payment', $enabledPaymentMethods, true))> QR payment / QR</label>
-                    <label class="flex items-center gap-2 rounded-md border border-zinc-200 p-3 text-sm text-zinc-700 dark:border-white/10 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="payment_methods[]" value="bank_transfer" @checked(in_array('bank_transfer', $enabledPaymentMethods, true))> Bank transfer / โอนธนาคาร</label>
-                    <label class="flex items-center gap-2 rounded-md border border-zinc-200 p-3 text-sm text-zinc-700 dark:border-white/10 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="payment_methods[]" value="cash" @checked(in_array('cash', $enabledPaymentMethods, true))> Cash sale / เงินสด</label>
-                </div>
-                <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label class="text-sm text-zinc-700 dark:text-zinc-300">Bank name / ชื่อธนาคาร
-                        <select class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="bank_name" x-model="bank">
-                            <option value="">Select bank / เลือกธนาคาร</option>
-                            @if($selectedBank && ! $selectedBankExists)
-                                <option value="{{ $selectedBank }}">{{ $selectedBank }}</option>
-                            @endif
-                            @foreach($banks as $bank)
-                                <option value="{{ $bank['name'] }}">{{ $bank['name'] }} / {{ $bank['thai_name'] }}</option>
-                            @endforeach
-                        </select>
-                        <template x-if="banks.find((item) => item.name === bank)">
-                            <div class="mt-2 flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-2">
-                                <img class="h-8 w-8 rounded-md" :src="banks.find((item) => item.name === bank).logo_url" :alt="banks.find((item) => item.name === bank).name">
-                                <span class="text-sm font-medium text-zinc-950 dark:text-white" x-text="`${banks.find((item) => item.name === bank).name} / ${banks.find((item) => item.name === bank).thai_name}`"></span>
+                <input type="hidden" name="bank_name" :value="firstAccount('bank_transfer').bank_name || ''">
+                <input type="hidden" name="bank_account_name" :value="firstAccount('bank_transfer').account_name || ''">
+                <input type="hidden" name="bank_account_number" :value="firstAccount('bank_transfer').account_number || ''">
+                <input type="hidden" name="qr_payment_account_name" :value="firstAccount('qr_payment').account_name || ''">
+                <input type="hidden" name="qr_payment_account" :value="firstAccount('qr_payment').account_number || ''">
+                <input type="hidden" name="payment_instructions" :value="firstPaymentInstructions()">
+                <div class="mt-4 grid gap-4">
+                    <template x-for="(account, index) in paymentAccounts" :key="account.key || index">
+                        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-zinc-900">
+                            <input type="hidden" :name="`payment_accounts[${index}][key]`" x-model="account.key">
+                            <div class="flex items-start justify-between gap-3">
+                                <label class="text-sm text-zinc-700 dark:text-zinc-300">Method / วิธีชำระเงิน
+                                    <select class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`payment_accounts[${index}][method]`" x-model="account.method">
+                                        <option value="qr_payment">QR payment / QR</option>
+                                        <option value="bank_transfer">Bank transfer / โอนธนาคาร</option>
+                                        <option value="cash">Cash sale / เงินสด</option>
+                                    </select>
+                                </label>
+                                <button class="mt-6 inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:text-rose-200" type="button" @click="removePaymentAccount(index)"><x-icon name="trash-2" />Remove / ลบ</button>
                             </div>
-                        </template>
-                    </label>
-                    <label class="text-sm text-zinc-700 dark:text-zinc-300">Bank account name / ชื่อบัญชี<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="bank_account_name" value="{{ old('bank_account_name', $event->bank_account_name) }}"></label>
-                    <label class="text-sm text-zinc-700 dark:text-zinc-300">Bank account number / เลขบัญชี<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="bank_account_number" value="{{ old('bank_account_number', $event->bank_account_number) }}"></label>
-                    <label class="text-sm text-zinc-700 dark:text-zinc-300">QR payment account name / ชื่อบัญชี QR<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="qr_payment_account_name" value="{{ old('qr_payment_account_name', $event->qr_payment_account_name) }}"></label>
-                    <label class="text-sm text-zinc-700 dark:text-zinc-300">QR payment account / PromptPay / บัญชี QR หรือพร้อมเพย์<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="qr_payment_account" value="{{ old('qr_payment_account', $event->qr_payment_account) }}"></label>
-                    <label class="text-sm text-zinc-700 dark:text-zinc-300">QR payment image / รูป QR ชำระเงิน<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="file" name="qr_payment_image" accept="image/*"></label>
-                    <label class="text-sm text-zinc-700 dark:text-zinc-300 sm:col-span-2">Payment instructions / คำแนะนำการชำระเงิน<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_instructions" rows="3">{{ old('payment_instructions', $event->payment_instructions) }}</textarea></label>
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                <label class="text-sm text-zinc-700 dark:text-zinc-300">Display name / ชื่อที่แสดง<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`payment_accounts[${index}][label]`" x-model="account.label"></label>
+                                <label class="flex items-center gap-2 pt-7 text-sm text-zinc-700 dark:text-zinc-300"><input type="hidden" :name="`payment_accounts[${index}][is_active]`" value="0"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" :name="`payment_accounts[${index}][is_active]`" value="1" x-model="account.is_active"> Active / เปิดใช้งาน</label>
+                                <label class="text-sm text-zinc-700 dark:text-zinc-300" x-show="account.method === 'bank_transfer'">Bank name / ชื่อธนาคาร
+                                    <select class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`payment_accounts[${index}][bank_name]`" x-model="account.bank_name">
+                                        <option value="">Select bank / เลือกธนาคาร</option>
+                                        <template x-for="bank in banks" :key="bank.name">
+                                            <option :value="bank.name" x-text="`${bank.name} / ${bank.thai_name}`"></option>
+                                        </template>
+                                    </select>
+                                </label>
+                                <label class="text-sm text-zinc-700 dark:text-zinc-300">Account name / ชื่อบัญชี<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`payment_accounts[${index}][account_name]`" x-model="account.account_name"></label>
+                                <label class="text-sm text-zinc-700 dark:text-zinc-300" x-show="account.method !== 'cash'">Account / PromptPay / เลขบัญชีหรือพร้อมเพย์<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`payment_accounts[${index}][account_number]`" x-model="account.account_number"></label>
+                                <label class="text-sm text-zinc-700 dark:text-zinc-300 sm:col-span-2">Instructions / คำแนะนำ<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" :name="`payment_accounts[${index}][instructions]`" rows="2" x-model="account.instructions"></textarea></label>
+                            </div>
+                        </div>
+                    </template>
                 </div>
+                <button class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-zinc-200 px-4 py-3 font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" type="button" @click="addPaymentAccount()"><x-icon name="plus" />Add payment account / เพิ่มบัญชีรับชำระเงิน</button>
+                <label class="mt-4 block text-sm text-zinc-700 dark:text-zinc-300">QR payment image / รูป QR ชำระเงิน<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="file" name="qr_payment_image" accept="image/*"></label>
             </div>
         </section>
         @php

@@ -35,9 +35,9 @@
     >
         <div class="ticket-print-surface overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-950">
             <div class="ticket-export-card mx-auto flex min-h-[760px] max-w-[420px] flex-col bg-white text-zinc-950">
-                <div class="relative aspect-[4/5] bg-gradient-to-br from-emerald-500 via-sky-500 to-zinc-800">
+                <div class="relative h-[360px] overflow-hidden bg-gradient-to-br from-emerald-500 via-sky-500 to-zinc-800">
                     @if($ticketImageUrl)
-                        <img class="h-full w-full object-cover" src="{{ $ticketImageUrl }}" alt="{{ $ticket->event->name }}">
+                        <img class="h-full w-full object-cover object-center" src="{{ $ticketImageUrl }}" alt="{{ $ticket->event->name }}">
                     @endif
                     <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950/90 to-transparent p-5 pt-16 text-white">
                         <p class="text-sm font-semibold uppercase tracking-wide">{{ $ticket->ticketType->name }}</p>

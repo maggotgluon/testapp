@@ -32,6 +32,7 @@ class Event extends Model
         'qr_payment_image_path',
         'payment_instructions',
         'payment_methods',
+        'payment_accounts',
         'is_published',
         'show_countdown',
     ];
@@ -42,6 +43,7 @@ class Event extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'payment_methods' => 'array',
+            'payment_accounts' => 'array',
             'is_published' => 'boolean',
             'show_countdown' => 'boolean',
         ];
@@ -49,10 +51,87 @@ class Event extends Model
 
     public function enabledPaymentMethods(): array
     {
-        $methods = is_array($this->payment_methods) ? $this->payment_methods : ['qr_payment', 'bank_transfer'];
+        $accountMethods = collect($this->paymentOptions())
+            ->where('is_active', true)
+            ->pluck('method')
+            ->all();
+        $methods = $accountMethods ?: (is_array($this->payment_methods) ? $this->payment_methods : ['qr_payment', 'bank_transfer']);
         $enabled = array_values(array_intersect($methods, ['qr_payment', 'bank_transfer', 'cash']));
 
         return $enabled ?: ['qr_payment'];
+    }
+
+    public function paymentOptions(): array
+    {
+        $accounts = collect(is_array($this->payment_accounts) ? $this->payment_accounts : [])
+            ->filter(fn ($account) => is_array($account) && in_array($account['method'] ?? null, ['qr_payment', 'bank_transfer', 'cash'], true))
+            ->map(fn ($account, $index) => $this->normalizePaymentAccount($account, (string) $index))
+            ->values()
+            ->all();
+
+        if ($accounts !== []) {
+            return $accounts;
+        }
+
+        $legacyMethods = is_array($this->payment_methods) ? $this->payment_methods : ['qr_payment', 'bank_transfer'];
+
+        return collect([
+            [
+                'key' => 'qr-payment',
+                'method' => 'qr_payment',
+                'label' => $this->qr_payment_account_name ?: 'QR payment / ชำระด้วย QR',
+                'account_name' => $this->qr_payment_account_name,
+                'account_number' => $this->qr_payment_account,
+                'instructions' => $this->payment_instructions,
+                'is_active' => in_array('qr_payment', $legacyMethods, true),
+            ],
+            [
+                'key' => 'bank-transfer',
+                'method' => 'bank_transfer',
+                'label' => $this->bank_name ?: 'Bank transfer / โอนธนาคาร',
+                'bank_name' => $this->bank_name,
+                'account_name' => $this->bank_account_name,
+                'account_number' => $this->bank_account_number,
+                'instructions' => $this->payment_instructions,
+                'is_active' => in_array('bank_transfer', $legacyMethods, true),
+            ],
+            [
+                'key' => 'cash',
+                'method' => 'cash',
+                'label' => 'Cash sale / เงินสด',
+                'account_name' => null,
+                'account_number' => null,
+                'instructions' => $this->payment_instructions,
+                'is_active' => in_array('cash', $legacyMethods, true),
+            ],
+        ])->filter(fn ($account) => $account['is_active'])->values()->all();
+    }
+
+    public function paymentOption(?string $key, ?string $method = null): ?array
+    {
+        return collect($this->paymentOptions())
+            ->first(fn ($account) => ($key && ($account['key'] ?? null) === $key) || ($method && ($account['method'] ?? null) === $method));
+    }
+
+    private function normalizePaymentAccount(array $account, string $fallbackKey): array
+    {
+        $method = $account['method'] ?? 'qr_payment';
+        $key = $account['key'] ?? str($method.'-'.$fallbackKey)->slug()->toString();
+
+        return [
+            'key' => $key,
+            'method' => $method,
+            'label' => $account['label'] ?? match ($method) {
+                'bank_transfer' => 'Bank transfer / โอนธนาคาร',
+                'cash' => 'Cash sale / เงินสด',
+                default => 'QR payment / ชำระด้วย QR',
+            },
+            'bank_name' => $account['bank_name'] ?? null,
+            'account_name' => $account['account_name'] ?? null,
+            'account_number' => $account['account_number'] ?? null,
+            'instructions' => $account['instructions'] ?? null,
+            'is_active' => (bool) ($account['is_active'] ?? true),
+        ];
     }
 
     public function ticketTypes(): HasMany

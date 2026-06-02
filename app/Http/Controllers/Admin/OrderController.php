@@ -47,8 +47,8 @@ class OrderController extends Controller
         $order->loadMissing('items.event');
         $this->authorizeOrder($request, $order);
 
-        if ($order->status === 'approved') {
-            return back()->with('status', 'Order is already approved.');
+        if (! $this->canTransition($order, 'approved')) {
+            return back()->withErrors(['status' => 'Only pending orders can be approved. / อนุมัติได้เฉพาะออเดอร์ที่รอตรวจสอบ']);
         }
 
         $order->update([
@@ -73,16 +73,39 @@ class OrderController extends Controller
         $order->loadMissing('items.event');
         $this->authorizeOrder($request, $order);
 
+        if (! $this->canTransition($order, 'rejected')) {
+            return back()->withErrors(['status' => 'Only pending orders can be rejected. / ปฏิเสธได้เฉพาะออเดอร์ที่รอตรวจสอบ']);
+        }
+
         $order->update(['status' => 'rejected']);
         $order->tickets()->update(['status' => 'rejected']);
 
         return back()->with('status', 'Order rejected.');
     }
 
+    public function cancel(Request $request, TicketOrder $order): RedirectResponse
+    {
+        $order->loadMissing('items.event');
+        $this->authorizeOrder($request, $order);
+
+        if (! $this->canTransition($order, 'cancelled')) {
+            return back()->withErrors(['status' => 'Only approved orders can be cancelled. / ยกเลิกได้เฉพาะออเดอร์ที่อนุมัติแล้ว']);
+        }
+
+        $order->update(['status' => 'cancelled']);
+        $order->tickets()->update(['status' => 'cancelled']);
+
+        return back()->with('status', 'Order cancelled.');
+    }
+
     public function refund(Request $request, TicketOrder $order): RedirectResponse
     {
         $order->loadMissing('items.event');
         $this->authorizeOrder($request, $order);
+
+        if (! $this->canTransition($order, 'refunded')) {
+            return back()->withErrors(['status' => 'Only approved orders can be refunded. / คืนเงินได้เฉพาะออเดอร์ที่อนุมัติแล้ว']);
+        }
 
         $order->update(['status' => 'refunded']);
         $order->tickets()->update(['status' => 'refunded']);
@@ -121,9 +144,23 @@ class OrderController extends Controller
     {
         $order->loadMissing('items.event');
         $this->authorizeOrder($request, $order);
+
+        if (! in_array($order->status, ['cancelled', 'refunded'], true)) {
+            return back()->withErrors(['status' => 'Cancel or refund the order before deleting it. / กรุณายกเลิกหรือคืนเงินก่อนลบออเดอร์']);
+        }
+
         $order->delete();
 
         return redirect()->route('admin.orders.index')->with('status', 'Order deleted.');
+    }
+
+    private function canTransition(TicketOrder $order, string $nextStatus): bool
+    {
+        return match ($nextStatus) {
+            'approved', 'rejected' => $order->status === 'pending',
+            'cancelled', 'refunded' => $order->status === 'approved',
+            default => false,
+        };
     }
 
     private function authorizeOrder(Request $request, TicketOrder $order): void

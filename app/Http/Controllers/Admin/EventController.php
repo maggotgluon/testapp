@@ -194,7 +194,7 @@ class EventController extends Controller
         abort_unless($ticket->event_id === $event->id, 404);
 
         $data = $request->validate([
-            'status' => ['required', 'in:pending,approved,checked_in,checked_out,rejected,refunded,expired'],
+            'status' => ['required', 'in:pending,approved,checked_in,checked_out,rejected,refunded,cancelled,expired'],
         ]);
 
         $updates = ['status' => $data['status']];
@@ -208,7 +208,7 @@ class EventController extends Controller
             $updates['checked_out_at'] = $ticket->checked_out_at ?? now();
         }
 
-        if (in_array($data['status'], ['pending', 'approved', 'rejected', 'refunded', 'expired'], true)) {
+        if (in_array($data['status'], ['pending', 'approved', 'rejected', 'refunded', 'cancelled', 'expired'], true)) {
             $updates['checked_in_at'] = null;
             $updates['checked_out_at'] = null;
         }
@@ -224,6 +224,24 @@ class EventController extends Controller
         }
 
         return back()->with('status', 'Ticket status updated.');
+    }
+
+    public function updateTicketHolder(Request $request, Event $event, Ticket $ticket): RedirectResponse
+    {
+        abort_unless($request->user()->canManageEvent($event), 403);
+        abort_unless($ticket->event_id === $event->id, 404);
+
+        $data = $request->validate([
+            'holder_name' => ['required', 'string', 'max:255'],
+            'holder_phone' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $ticket->update([
+            'holder_name' => $data['holder_name'],
+            'holder_phone' => $data['holder_phone'] ?: $ticket->holder_phone,
+        ]);
+
+        return back()->with('status', 'Ticket holder updated. / อัปเดตชื่อผู้ถือบัตรแล้ว');
     }
 
     private function validated(Request $request, ?Event $event = null): array
@@ -252,6 +270,15 @@ class EventController extends Controller
             'payment_instructions' => ['nullable', 'string'],
             'payment_methods' => ['nullable', 'array'],
             'payment_methods.*' => ['required', 'in:qr_payment,bank_transfer,cash'],
+            'payment_accounts' => ['nullable', 'array'],
+            'payment_accounts.*.key' => ['nullable', 'string', 'max:80'],
+            'payment_accounts.*.method' => ['required_with:payment_accounts', 'in:qr_payment,bank_transfer,cash'],
+            'payment_accounts.*.label' => ['nullable', 'string', 'max:255'],
+            'payment_accounts.*.bank_name' => ['nullable', 'string', 'max:255'],
+            'payment_accounts.*.account_name' => ['nullable', 'string', 'max:255'],
+            'payment_accounts.*.account_number' => ['nullable', 'string', 'max:255'],
+            'payment_accounts.*.instructions' => ['nullable', 'string', 'max:1000'],
+            'payment_accounts.*.is_active' => ['nullable', 'boolean'],
             'is_published' => ['nullable', 'boolean'],
             'show_countdown' => ['nullable', 'boolean'],
         ]);
@@ -275,15 +302,46 @@ class EventController extends Controller
         $data['description_format'] = $data['description_format'] ?? 'html';
         $data['is_published'] = $request->boolean('is_published');
         $data['show_countdown'] = $request->boolean('show_countdown');
-        $paymentMethods = $request->has('payment_methods')
-            ? ($data['payment_methods'] ?? [])
-            : ($event?->enabledPaymentMethods() ?? ['qr_payment', 'bank_transfer']);
+        $data['payment_accounts'] = $this->paymentAccountsFromRequest($request);
+        $paymentMethods = $data['payment_accounts'] !== []
+            ? collect($data['payment_accounts'])->where('is_active', true)->pluck('method')->all()
+            : ($request->has('payment_methods')
+                ? ($data['payment_methods'] ?? [])
+                : ($event?->enabledPaymentMethods() ?? ['qr_payment', 'bank_transfer']));
         $data['payment_methods'] = array_values(array_intersect($paymentMethods, ['qr_payment', 'bank_transfer', 'cash'])) ?: ['qr_payment'];
         $data['description'] = $data['description_format'] === 'markdown'
             ? ($data['description'] ?? null)
             : $this->descriptions->safeHtml($data['description'] ?? null);
 
         return $data;
+    }
+
+    private function paymentAccountsFromRequest(Request $request): array
+    {
+        return collect($request->input('payment_accounts', []))
+            ->filter(fn ($account) => is_array($account) && in_array($account['method'] ?? null, ['qr_payment', 'bank_transfer', 'cash'], true))
+            ->map(function (array $account, int $index) {
+                $method = $account['method'];
+                $label = trim((string) ($account['label'] ?? ''));
+                $key = trim((string) ($account['key'] ?? ''));
+
+                return [
+                    'key' => $key !== '' ? $key : str($method.'-'.$index.'-'.$label)->slug()->limit(80, '')->toString(),
+                    'method' => $method,
+                    'label' => $label ?: match ($method) {
+                        'bank_transfer' => 'Bank transfer / โอนธนาคาร',
+                        'cash' => 'Cash sale / เงินสด',
+                        default => 'QR payment / ชำระด้วย QR',
+                    },
+                    'bank_name' => trim((string) ($account['bank_name'] ?? '')) ?: null,
+                    'account_name' => trim((string) ($account['account_name'] ?? '')) ?: null,
+                    'account_number' => trim((string) ($account['account_number'] ?? '')) ?: null,
+                    'instructions' => trim((string) ($account['instructions'] ?? '')) ?: null,
+                    'is_active' => (bool) ($account['is_active'] ?? false),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function destroy(Request $request, Event $event): RedirectResponse

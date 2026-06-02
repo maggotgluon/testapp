@@ -43,9 +43,11 @@ class QrCodeService
         return $ticket->uuid;
     }
 
-    public function paymentPayload(Event $event, int|float|null $amountThb): string
+    public function paymentPayload(Event $event, int|float|null $amountThb, ?array $account = null): string
     {
-        return $this->promptPayPayload((string) $event->qr_payment_account, $amountThb > 0 ? $amountThb : null);
+        $target = $account['account_number'] ?? $event->qr_payment_account;
+
+        return $this->promptPayPayload((string) $target, $amountThb > 0 ? $amountThb : null);
     }
 
     public function promptPayPayload(string $target, int|float|null $amountThb = null): string

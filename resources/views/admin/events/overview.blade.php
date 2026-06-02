@@ -53,7 +53,7 @@
             <div class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
                 <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Order status / สถานะออเดอร์</h2>
                 <div class="mt-4 grid gap-2 text-sm">
-                    @foreach(['pending', 'approved', 'rejected', 'refunded'] as $status)
+                    @foreach(['pending', 'approved', 'rejected', 'cancelled', 'refunded'] as $status)
                         <div class="flex justify-between rounded bg-zinc-50 dark:bg-zinc-900 px-3 py-2"><span class="text-zinc-700 dark:text-zinc-300">{{ str_replace('_', ' ', $status) }}</span><span class="font-semibold text-zinc-950 dark:text-white">{{ $orderStatusCounts[$status] ?? 0 }}</span></div>
                     @endforeach
                 </div>
@@ -61,7 +61,7 @@
             <div class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5">
                 <h2 class="text-xl font-semibold text-zinc-950 dark:text-white">Ticket/check-in status / สถานะตั๋วและเช็กอิน</h2>
                 <div class="mt-4 grid gap-2 text-sm">
-                    @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'refunded'] as $status)
+                    @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'cancelled', 'refunded'] as $status)
                         <div class="flex justify-between rounded bg-zinc-50 dark:bg-zinc-900 px-3 py-2"><span class="text-zinc-700 dark:text-zinc-300">{{ str_replace('_', ' ', $status) }}</span><span class="font-semibold text-zinc-950 dark:text-white">{{ $ticketStatusCounts[$status] ?? 0 }}</span></div>
                     @endforeach
                 </div>
@@ -139,7 +139,7 @@
             <form class="flex gap-2">
                 <select class="rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-950 dark:text-white" name="order_status">
                     <option value="">All orders / ทุกออเดอร์</option>
-                    @foreach(['pending', 'approved', 'rejected', 'refunded'] as $status)
+                    @foreach(['pending', 'approved', 'rejected', 'cancelled', 'refunded'] as $status)
                         <option value="{{ $status }}" @selected(request('order_status') === $status)>{{ str_replace('_', ' ', $status) }}</option>
                     @endforeach
                 </select>
@@ -158,13 +158,19 @@
                             @endforeach
                         </div>
                     </div>
-                    <div class="flex flex-wrap items-start gap-2">
-                        @if($order->status !== 'approved')
-                            <form method="POST" action="{{ route('admin.orders.approve', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="check" />Approve / อนุมัติ</button></form>
+                    <div class="flex flex-wrap items-start gap-2" x-data="{ editStatus: false }">
+                        @if($order->status === 'pending')
+                            <form method="POST" action="{{ route('admin.orders.approve', $order) }}" onsubmit="return confirm('Approve this order? / ยืนยันอนุมัติออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="check" />Approve / อนุมัติ</button></form>
+                            <form method="POST" action="{{ route('admin.orders.reject', $order) }}" onsubmit="return confirm('Reject this order? / ยืนยันปฏิเสธออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-rose-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="x" />Reject / ปฏิเสธ</button></form>
+                        @elseif($order->status === 'approved')
+                            <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" type="button" @click="editStatus = !editStatus"><x-icon name="pencil" /><span x-text="editStatus ? 'Hide / ซ่อน' : 'Edit status / แก้ไขสถานะ'"></span></button>
+                            <div class="flex flex-wrap gap-2" x-cloak x-show="editStatus" x-transition>
+                                <form method="POST" action="{{ route('admin.orders.cancel', $order) }}" onsubmit="return confirm('Cancel this approved order? / ยืนยันยกเลิกออเดอร์ที่อนุมัติแล้ว?')">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-700 dark:border-amber-400/40 dark:text-amber-100"><x-icon name="ban" />Cancel / ยกเลิก</button></form>
+                                <form method="POST" action="{{ route('admin.orders.refund', $order) }}" onsubmit="return confirm('Refund this approved order? / ยืนยันคืนเงินออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-800 dark:border-white/10 dark:text-zinc-100"><x-icon name="undo" />Refund / คืนเงิน</button></form>
+                            </div>
+                        @elseif(in_array($order->status, ['cancelled', 'refunded'], true))
+                            <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button></form>
                         @endif
-                        <form method="POST" action="{{ route('admin.orders.reject', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-rose-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="x" />Reject / ปฏิเสธ</button></form>
-                        <form method="POST" action="{{ route('admin.orders.refund', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100"><x-icon name="undo" />Refund / คืนเงิน</button></form>
-                        <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button></form>
                     </div>
                 </div>
             @empty
@@ -180,7 +186,7 @@
             <form class="flex gap-2">
                 <select class="rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-950 dark:text-white" name="ticket_status">
                     <option value="">All tickets / ทุกตั๋ว</option>
-                    @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'refunded'] as $status)
+                    @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'cancelled', 'refunded'] as $status)
                         <option value="{{ $status }}" @selected(request('ticket_status') === $status)>{{ str_replace('_', ' ', $status) }}</option>
                     @endforeach
                 </select>
@@ -200,17 +206,19 @@
                             @csrf
                             @method('PATCH')
                             <select class="rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-950 dark:text-white" name="status">
-                                @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'refunded'] as $status)
+                                @foreach(['pending', 'approved', 'checked_in', 'checked_out', 'expired', 'rejected', 'cancelled', 'refunded'] as $status)
                                     <option value="{{ $status }}" @selected($ticket->status === $status)>{{ str_replace('_', ' ', $status) }}</option>
                                 @endforeach
                             </select>
                             <button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="save" />Update / อัปเดต</button>
                         </form>
-                        <form method="POST" action="{{ route('admin.events.tickets.destroy', [$event, $ticket]) }}" onsubmit="return confirm('Delete this ticket? / ลบตั๋วนี้?')">
-                            @csrf
-                            @method('DELETE')
-                            <button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button>
-                        </form>
+                        @if(in_array($ticket->order->status, ['cancelled', 'refunded'], true))
+                            <form method="POST" action="{{ route('admin.events.tickets.destroy', [$event, $ticket]) }}" onsubmit="return confirm('Delete this ticket? / ลบตั๋วนี้?')">
+                                @csrf
+                                @method('DELETE')
+                                <button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button>
+                            </form>
+                        @endif
                     </div>
                 </div>
             @empty

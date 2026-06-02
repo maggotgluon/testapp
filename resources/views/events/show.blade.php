@@ -53,14 +53,16 @@
         ])->values();
         $visibleCheckoutCoupons = $event->coupons->filter->show_on_checkout;
         $visibleEventPromotions = $event->promotions->filter->show_on_event_page;
-        $checkoutCoupons = $visibleCheckoutCoupons->map(fn ($coupon) => [
+        $couponPayload = fn ($coupon) => [
             'code' => $coupon->code,
             'type' => $coupon->discount_type,
             'scope' => $coupon->discount_scope,
             'value' => $coupon->discount_value,
             'ticket_type_id' => $coupon->ticket_type_id,
             'show_on_checkout' => $coupon->show_on_checkout,
-        ])->values();
+        ];
+        $checkoutCoupons = $event->coupons->map($couponPayload)->values();
+        $visibleCouponCodes = $visibleCheckoutCoupons->pluck('code')->values();
         $checkoutPromotions = $visibleEventPromotions->map(fn ($promotion) => [
             'id' => $promotion->id,
             'name' => $promotion->name,
@@ -78,6 +80,14 @@
             'summary' => $promotion->displaySummary(),
         ])->values();
         $paymentMethods = $event->enabledPaymentMethods();
+        $paymentOptions = collect($event->paymentOptions())->where('is_active', true)->map(function ($account) {
+            $bank = collect(config('thai_banks'))->firstWhere('name', $account['bank_name'] ?? null);
+
+            return $account + [
+                'bank_logo' => $bank ? asset($bank['logo']) : null,
+                'bank_display_name' => $bank ? $bank['name'].' / '.$bank['thai_name'] : ($account['bank_name'] ?? null),
+            ];
+        })->values();
         $checkoutLegalDocs = app(\App\Services\LegalDocumentService::class)->modal(['terms', 'privacy', 'refund']);
     @endphp
     <div class="grid gap-8 lg:grid-cols-[.8fr_1.2fr]">
@@ -130,8 +140,10 @@
             eventId: {{ $event->id }},
             tickets: @js($checkoutTickets),
             coupons: @js($checkoutCoupons),
+            visibleCouponCodes: @js($visibleCouponCodes),
             promotions: @js($checkoutPromotions),
             paymentMethods: @js($paymentMethods),
+            paymentOptions: @js($paymentOptions),
             payment: @js([
                 'bank_name' => $event->bank_name,
                 'bank_account_name' => $event->bank_account_name,
@@ -222,7 +234,11 @@
                     <label class="text-sm text-zinc-700 dark:text-zinc-300">Email / อีเมล<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="customer_email" value="{{ auth()->user()->email ?? old('customer_email') }}"></label>
                     @if($event->coupons->isNotEmpty())
                         <label class="text-sm text-zinc-700 dark:text-zinc-300">Coupon / คูปอง
-                            <input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 uppercase text-zinc-950 dark:text-white" name="coupon_code" placeholder="EARLYBIRD" x-model="couponCode">
+                            <div class="mt-1 grid gap-2 sm:grid-cols-[1fr_auto]">
+                                <input class="w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 uppercase text-zinc-950 dark:text-white" name="coupon_code" placeholder="EARLYBIRD" x-model="couponCode" @input="couponApplied = false; couponMessage = ''">
+                                <button class="inline-flex items-center justify-center gap-2 rounded-md border border-emerald-300 px-3 py-2 font-semibold text-emerald-700 hover:bg-emerald-400/10 dark:border-emerald-400/40 dark:text-emerald-100" type="button" @click="applyTypedCoupon()"><x-icon name="tag" />Apply / ใช้</button>
+                            </div>
+                            <p class="mt-2 text-xs" x-show="couponMessage" x-text="couponMessage" :class="couponApplied ? 'text-emerald-700 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-200'"></p>
                         </label>
                     @endif
                 </div>
@@ -266,7 +282,7 @@
 
                 <div class="mt-5 rounded-md border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
                     <div class="flex items-center justify-between gap-3">
-                        <strong class="inline-flex items-center gap-2"><x-icon name="wallet" /><span x-text="paymentMethod === 'qr_payment' ? 'QR payment / ชำระด้วย QR' : 'Bank transfer / โอนผ่านธนาคาร'"></span></strong>
+                        <strong class="inline-flex items-center gap-2"><x-icon name="wallet" /><span x-text="selectedPayment().label || paymentMethodLabel(paymentMethod)"></span></strong>
                         <span class="rounded bg-emerald-300 px-2 py-1 font-semibold text-zinc-950">THB <span x-text="total().toLocaleString()"></span></span>
                     </div>
                     <dl class="mt-3 grid gap-1 text-sm">
@@ -281,13 +297,13 @@
                     <template x-if="paymentMethod === 'bank_transfer'">
                         <dl class="mt-3 grid gap-2">
                             <div><dt class="text-emerald-700 dark:text-emerald-200">Bank / ธนาคาร</dt><dd class="mt-1 flex items-center gap-2">
-                                <template x-if="payment.bank_logo">
-                                    <img class="h-9 w-9 rounded-md bg-white object-contain p-1" :src="payment.bank_logo" :alt="payment.bank_display_name || payment.bank_name">
+                                <template x-if="selectedPayment().bank_logo || payment.bank_logo">
+                                    <img class="h-9 w-9 rounded-md bg-white object-contain p-1" :src="selectedPayment().bank_logo || payment.bank_logo" :alt="selectedPayment().bank_display_name || selectedPayment().bank_name || payment.bank_display_name || payment.bank_name">
                                 </template>
-                                <span x-text="payment.bank_display_name || payment.bank_name || 'Set bank name in admin event settings / ตั้งค่าชื่อธนาคารในหน้าแอดมิน'"></span>
+                                <span x-text="selectedPayment().bank_display_name || selectedPayment().bank_name || payment.bank_display_name || payment.bank_name || 'Set bank name in admin event settings / ตั้งค่าชื่อธนาคารในหน้าแอดมิน'"></span>
                             </dd></div>
-                            <div><dt class="text-emerald-700 dark:text-emerald-200">Account name / ชื่อบัญชี</dt><dd x-text="payment.bank_account_name || '-'"></dd></div>
-                            <div><dt class="text-emerald-700 dark:text-emerald-200">Account number / เลขบัญชี</dt><dd class="font-mono" x-text="payment.bank_account_number || '-'"></dd></div>
+                            <div><dt class="text-emerald-700 dark:text-emerald-200">Account name / ชื่อบัญชี</dt><dd x-text="selectedPayment().account_name || payment.bank_account_name || '-'"></dd></div>
+                            <div><dt class="text-emerald-700 dark:text-emerald-200">Account number / เลขบัญชี</dt><dd class="font-mono" x-text="selectedPayment().account_number || payment.bank_account_number || '-'"></dd></div>
                         </dl>
                     </template>
                     <template x-if="paymentMethod === 'cash'">
@@ -302,8 +318,8 @@
                                 <img class="h-32 w-32 object-contain" :src="paymentQrUrl()" alt="QR payment code / QR สำหรับชำระเงิน">
                             </div>
                             <dl class="grid gap-2">
-                                <div><dt class="text-emerald-700 dark:text-emerald-200">QR account / บัญชี QR</dt><dd x-text="payment.qr_payment_account_name || '-'"></dd></div>
-                                <div><dt class="text-emerald-700 dark:text-emerald-200">PromptPay / account / พร้อมเพย์หรือบัญชี</dt><dd class="font-mono" x-text="payment.qr_payment_account || '-'"></dd></div>
+                                <div><dt class="text-emerald-700 dark:text-emerald-200">QR account / บัญชี QR</dt><dd x-text="selectedPayment().account_name || payment.qr_payment_account_name || '-'"></dd></div>
+                                <div><dt class="text-emerald-700 dark:text-emerald-200">PromptPay / account / พร้อมเพย์หรือบัญชี</dt><dd class="font-mono" x-text="selectedPayment().account_number || payment.qr_payment_account || '-'"></dd></div>
                                 <div><dt class="text-emerald-700 dark:text-emerald-200">Amount / จำนวนเงิน</dt><dd>THB <span x-text="total().toLocaleString()"></span></dd></div>
                                 <template x-if="payment.qr_payment_image">
                                     <div><dt class="text-emerald-700 dark:text-emerald-200">Reference QR image / รูป QR อ้างอิง</dt><dd><a class="inline-flex items-center gap-1.5 underline" :href="payment.qr_payment_image" target="_blank"><x-icon name="qr-code" class="h-3.5 w-3.5" />Open uploaded account QR / เปิดรูป QR ที่อัปโหลด</a></dd></div>
@@ -316,18 +332,25 @@
 
                 <div class="mt-4 grid gap-4 rounded-md transition sm:grid-cols-2" data-checkout-section="payment" :class="validationAttempted && invalidSection === 'payment' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Payment method / วิธีชำระเงิน <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
-                    <select class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_method" x-model="paymentMethod" required>
-                        <template x-for="method in paymentMethods" :key="method">
-                            <option :value="method" x-text="paymentMethodLabel(method)"></option>
+                    <input type="hidden" name="payment_method" :value="paymentMethod">
+                    <input type="hidden" name="payment_account_key" :value="paymentAccountKey">
+                    <select class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" x-model="paymentAccountKey" @change="syncPaymentMethod()" required>
+                        <template x-for="option in paymentOptions" :key="option.key">
+                            <option :value="option.key" x-text="option.label || paymentMethodLabel(option.method)"></option>
                         </template>
                     </select></label>
                     <div class="text-sm text-zinc-700 dark:text-zinc-300" x-show="slipRequired()" x-cloak>
                         Payment slip / สลิปชำระเงิน <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
                         <label class="mt-1 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-emerald-400/50 bg-white dark:bg-zinc-950 px-3 py-2 font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/10">
-                        <input class="sr-only" name="slip" type="file" accept="image/*" @change="slipName = $event.target.files[0]?.name || ''" :required="slipRequired()">
+                        <input class="sr-only" name="slip" type="file" accept="image/*" @change="setSlipPreview($event)" :required="slipRequired()">
                             <span class="inline-flex items-center gap-2"><x-icon name="upload" />Attach payment slip / แนบสลิป</span>
                         </label>
                         <p class="mt-1 truncate text-xs text-zinc-500" x-text="slipName || 'No file attached yet / ยังไม่ได้แนบไฟล์'"></p>
+                        <template x-if="slipPreviewUrl">
+                            <div class="mt-3 overflow-hidden rounded-md border border-zinc-200 bg-white dark:border-white/10 dark:bg-zinc-950">
+                                <img class="max-h-72 w-full object-contain" :src="slipPreviewUrl" alt="Payment slip preview / ตัวอย่างสลิป">
+                            </div>
+                        </template>
                     </div>
                     <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-600 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-300" x-show="!slipRequired()" x-cloak>
                         No slip is required for this order. / ออเดอร์นี้ไม่ต้องแนบสลิป

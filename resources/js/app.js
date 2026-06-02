@@ -258,9 +258,14 @@ Alpine.data('scanner', (config = {}) => ({
 
 Alpine.data('checkout', (config) => ({
     paymentMethods: config.paymentMethods?.length ? config.paymentMethods : ['qr_payment'],
-    paymentMethod: (config.paymentMethods?.length ? config.paymentMethods : ['qr_payment'])[0],
+    paymentOptions: config.paymentOptions?.length ? config.paymentOptions : (config.paymentMethods || ['qr_payment']).map((method) => ({ key: method, method, label: null })),
+    paymentAccountKey: (config.paymentOptions?.[0]?.key) || (config.paymentMethods?.[0]) || 'qr_payment',
+    paymentMethod: (config.paymentOptions?.[0]?.method) || (config.paymentMethods?.length ? config.paymentMethods : ['qr_payment'])[0],
     couponCode: '',
+    couponApplied: false,
+    couponMessage: '',
     slipName: '',
+    slipPreviewUrl: '',
     errorMessage: '',
     validationAttempted: false,
     invalidSection: '',
@@ -279,6 +284,22 @@ Alpine.data('checkout', (config) => ({
             bank_transfer: 'Direct bank transfer / โอนผ่านธนาคาร',
             cash: 'Cash sale / ชำระเงินสด',
         }[method] || method;
+    },
+    selectedPayment() {
+        return this.paymentOptions.find((option) => option.key === this.paymentAccountKey) || this.paymentOptions[0] || { method: this.paymentMethod };
+    },
+    syncPaymentMethod() {
+        this.paymentMethod = this.selectedPayment().method || this.paymentMethod;
+    },
+    setSlipPreview(event) {
+        const file = event.target.files?.[0] || null;
+        this.slipName = file?.name || '';
+
+        if (this.slipPreviewUrl) {
+            URL.revokeObjectURL(this.slipPreviewUrl);
+        }
+
+        this.slipPreviewUrl = file ? URL.createObjectURL(file) : '';
     },
     increment(ticketId) {
         this.quantities[ticketId] = Math.min(20, Number(this.quantities[ticketId] || 0) + 1);
@@ -346,6 +367,34 @@ Alpine.data('checkout', (config) => ({
     },
     applyCoupon(code) {
         this.couponCode = String(code || '').trim().toUpperCase();
+        this.applyTypedCoupon();
+    },
+    applyTypedCoupon() {
+        const code = String(this.couponCode || '').trim().toUpperCase();
+        this.couponCode = code;
+        const coupon = this.activeCoupon();
+
+        if (!code) {
+            this.couponApplied = false;
+            this.couponMessage = 'Please enter a coupon code. / กรุณากรอกรหัสคูปอง';
+            return;
+        }
+
+        if (!coupon) {
+            this.couponApplied = false;
+            this.couponMessage = 'Coupon not found or not available for this event. / ไม่พบคูปองหรือคูปองใช้กับอีเวนต์นี้ไม่ได้';
+            return;
+        }
+
+        const amount = this.discount();
+        if (amount <= 0) {
+            this.couponApplied = false;
+            this.couponMessage = 'Coupon is valid, but conditions are not met yet. / คูปองถูกต้อง แต่ยังไม่เข้าเงื่อนไข';
+            return;
+        }
+
+        this.couponApplied = true;
+        this.couponMessage = `Coupon applied: THB ${amount.toLocaleString()} discount. / ใช้คูปองแล้ว ลด THB ${amount.toLocaleString()}`;
     },
     eligibleSubtotal(coupon) {
         return config.tickets.reduce((sum, ticket) => {
@@ -497,7 +546,7 @@ Alpine.data('checkout', (config) => ({
         return Math.max(0, this.subtotal() - this.discount() - this.promotionDiscount());
     },
     paymentQrUrl() {
-        return `/payments/events/${config.eventId}/qr?amount=${this.total()}`;
+        return `/payments/events/${config.eventId}/qr?amount=${this.total()}&account=${encodeURIComponent(this.paymentAccountKey || '')}`;
     },
     slipRequired() {
         return this.total() > 0 && this.paymentMethod !== 'cash';
@@ -511,7 +560,7 @@ Alpine.data('checkout', (config) => ({
             return 'Cash sale does not require a slip. Admin approval will activate tickets. / ชำระเงินสดไม่ต้องแนบสลิป แอดมินจะอนุมัติเพื่อเปิดใช้งานตั๋ว';
         }
 
-        return this.payment.instructions || 'Upload your payment slip after transfer. Admin approval will activate tickets. / อัปโหลดสลิปหลังชำระเงิน แอดมินจะตรวจสอบและอนุมัติตั๋ว';
+        return this.selectedPayment().instructions || this.payment.instructions || 'Upload your payment slip after transfer. Admin approval will activate tickets. / อัปโหลดสลิปหลังชำระเงิน แอดมินจะตรวจสอบและอนุมัติตั๋ว';
     },
     canSubmitOrder() {
         return this.cartQuantity() > 0
@@ -656,7 +705,7 @@ Alpine.data('ticketExport', (config) => ({
         window.print();
     },
     async drawHero(ctx) {
-        const heroHeight = 860;
+        const heroHeight = 720;
         const gradient = ctx.createLinearGradient(0, 0, 1080, heroHeight);
         gradient.addColorStop(0, '#10b981');
         gradient.addColorStop(0.5, '#0ea5e9');
@@ -679,40 +728,40 @@ Alpine.data('ticketExport', (config) => ({
 
         ctx.fillStyle = '#ffffff';
         ctx.font = '700 36px sans-serif';
-        ctx.fillText(String(config.ticketType || '').toUpperCase(), 72, 665);
+        ctx.fillText(String(config.ticketType || '').toUpperCase(), 72, 525);
         ctx.font = '700 76px sans-serif';
-        this.wrapText(ctx, config.eventName, 72, 755, 900, 86, 2);
+        this.wrapText(ctx, config.eventName, 72, 615, 900, 86, 2);
     },
     drawText(ctx) {
         ctx.fillStyle = '#18181b';
         ctx.font = '700 48px sans-serif';
-        ctx.fillText(config.holderName || '-', 72, 960);
+        ctx.fillText(config.holderName || '-', 72, 835);
 
         ctx.fillStyle = '#71717a';
         ctx.font = '400 28px sans-serif';
-        ctx.fillText('Holder / ผู้ถือบัตร', 72, 912);
-        ctx.fillText('Date & time / วันเวลา', 72, 1040);
-        ctx.fillText('Venue / สถานที่', 72, 1162);
-        ctx.fillText('Order / ออเดอร์', 72, 1800);
+        ctx.fillText('Holder / ผู้ถือบัตร', 72, 787);
+        ctx.fillText('Date & time / วันเวลา', 72, 940);
+        ctx.fillText('Venue / สถานที่', 72, 1062);
+        ctx.fillText('Order / ออเดอร์', 72, 1810);
 
         ctx.fillStyle = '#18181b';
         ctx.font = '600 38px sans-serif';
-        ctx.fillText(`${config.startsAt || '-'} - ${String(config.endsAt || '').split(' ').pop() || ''}`, 72, 1090);
-        this.wrapText(ctx, config.venue || '-', 72, 1210, 900, 44, 2);
+        ctx.fillText(`${config.startsAt || '-'} - ${String(config.endsAt || '').split(' ').pop() || ''}`, 72, 990);
+        this.wrapText(ctx, config.venue || '-', 72, 1110, 900, 44, 2);
 
         ctx.fillStyle = '#52525b';
         ctx.font = '400 30px sans-serif';
-        this.wrapText(ctx, config.location || '', 72, 1310, 900, 38, 2);
+        this.wrapText(ctx, config.location || '', 72, 1205, 900, 38, 2);
 
         ctx.fillStyle = '#71717a';
         ctx.font = '400 26px monospace';
-        this.wrapText(ctx, `${config.orderNumber || '-'} · ${config.status || '-'}`, 72, 1842, 900, 34, 2);
+        this.wrapText(ctx, `${config.orderNumber || '-'} · ${config.status || '-'}`, 72, 1852, 900, 34, 2);
     },
     async drawQr(ctx) {
         const qr = await this.loadImage(config.qrUrl).catch(() => null);
-        const boxX = 240;
-        const boxY = 1328;
-        const boxSize = 600;
+        const boxX = 260;
+        const boxY = 1288;
+        const boxSize = 560;
 
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = '#e4e4e7';
@@ -720,12 +769,12 @@ Alpine.data('ticketExport', (config) => ({
         this.roundRect(ctx, boxX, boxY, boxSize, boxSize, 28, true, true);
 
         if (qr) {
-            ctx.drawImage(qr, boxX + 54, boxY + 42, 492, 492);
+            ctx.drawImage(qr, boxX + 50, boxY + 38, 460, 460);
         }
 
         ctx.fillStyle = '#18181b';
         ctx.font = '400 24px monospace';
-        this.wrapText(ctx, config.uuid || '', boxX + 54, boxY + 558, 492, 28, 2, 'center');
+        this.wrapText(ctx, config.uuid || '', boxX + 50, boxY + 520, 460, 28, 2, 'center');
     },
     drawInactiveNotice(ctx) {
         ctx.fillStyle = '#fffbeb';
@@ -925,7 +974,49 @@ Alpine.data('adminTicketTypes', (config) => {
 Alpine.data('adminEventForm', (config) => ({
     description: config.description || '',
     descriptionFormat: config.descriptionFormat || 'html',
+    paymentAccounts: (config.paymentAccounts?.length ? config.paymentAccounts : [
+        { key: 'qr-payment', method: 'qr_payment', label: 'QR payment / ชำระด้วย QR', bank_name: '', account_name: '', account_number: '', instructions: '', is_active: true },
+        { key: 'bank-transfer', method: 'bank_transfer', label: 'Bank transfer / โอนธนาคาร', bank_name: '', account_name: '', account_number: '', instructions: '', is_active: true },
+    ]).map((account, index) => ({
+        key: account.key || `payment-${index}-${Date.now()}`,
+        method: account.method || 'qr_payment',
+        label: account.label || '',
+        bank_name: account.bank_name || '',
+        account_name: account.account_name || '',
+        account_number: account.account_number || '',
+        instructions: account.instructions || '',
+        is_active: account.is_active !== false,
+    })),
+    banks: config.banks || [],
     previewOpen: false,
+    blankPaymentAccount() {
+        return {
+            key: `payment-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            method: 'qr_payment',
+            label: 'QR payment / ชำระด้วย QR',
+            bank_name: '',
+            account_name: '',
+            account_number: '',
+            instructions: '',
+            is_active: true,
+        };
+    },
+    addPaymentAccount() {
+        this.paymentAccounts.push(this.blankPaymentAccount());
+    },
+    removePaymentAccount(index) {
+        this.paymentAccounts.splice(index, 1);
+
+        if (this.paymentAccounts.length === 0) {
+            this.addPaymentAccount();
+        }
+    },
+    firstAccount(method) {
+        return this.paymentAccounts.find((account) => account.method === method && account.is_active) || {};
+    },
+    firstPaymentInstructions() {
+        return this.paymentAccounts.find((account) => account.instructions)?.instructions || '';
+    },
     escapeHtml(value) {
         const div = document.createElement('div');
         div.textContent = value || '';

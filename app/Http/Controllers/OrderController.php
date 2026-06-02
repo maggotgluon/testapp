@@ -31,6 +31,7 @@ class OrderController extends Controller
             'customer_phone' => ['required', 'string', 'max:40'],
             'customer_email' => ['nullable', 'email'],
             'payment_method' => ['required', 'in:bank_transfer,qr_payment,cash'],
+            'payment_account_key' => ['nullable', 'string', 'max:80'],
             'payment_note' => ['nullable', 'string', 'max:1000'],
             'terms_accepted' => ['required', 'accepted'],
             'coupon_code' => ['nullable', 'string', 'max:40'],
@@ -62,7 +63,7 @@ class OrderController extends Controller
             $eventIds = $ticketTypes->pluck('event_id')->unique();
             $events = $ticketTypes->pluck('event')->unique('id');
 
-            $paymentAllowed = $events->every(fn (Event $event) => in_array($data['payment_method'], $event->enabledPaymentMethods(), true));
+            $paymentAllowed = $events->every(fn (Event $event) => (bool) $event->paymentOption($data['payment_account_key'] ?? null, $data['payment_method']));
             if (! $paymentAllowed) {
                 throw ValidationException::withMessages([
                     'payment_method' => 'This payment method is not available for the selected ticket. / วิธีชำระเงินนี้ยังไม่เปิดใช้สำหรับตั๋วที่เลือก',
@@ -258,8 +259,9 @@ class OrderController extends Controller
     public function paymentQr(Event $event, Request $request, QrCodeService $qrCode): Response
     {
         $amount = max(0, (float) $request->input('amount', 0));
+        $account = $event->paymentOption($request->string('account')->toString(), 'qr_payment');
 
-        return response($qrCode->svg($qrCode->paymentPayload($event, $amount)), 200)
+        return response($qrCode->svg($qrCode->paymentPayload($event, $amount, $account)), 200)
             ->header('Content-Type', 'image/svg+xml');
     }
 

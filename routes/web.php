@@ -79,8 +79,10 @@ Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->na
     Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/approve', [AdminOrderController::class, 'approve'])->name('orders.approve');
     Route::post('/orders/{order}/reject', [AdminOrderController::class, 'reject'])->name('orders.reject');
+    Route::post('/orders/{order}/cancel', [AdminOrderController::class, 'cancel'])->name('orders.cancel');
     Route::post('/orders/{order}/refund', [AdminOrderController::class, 'refund'])->name('orders.refund');
     Route::post('/orders/{order}/check-slip-qr', [AdminOrderController::class, 'checkSlipQr'])->name('orders.check-slip-qr');
+    Route::patch('/events/{event}/tickets/{ticket}/holder', [AdminEventController::class, 'updateTicketHolder'])->name('events.tickets.holder');
     Route::delete('/orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');
 });
 

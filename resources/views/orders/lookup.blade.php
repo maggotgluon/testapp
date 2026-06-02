@@ -21,11 +21,19 @@
                             <div class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ str_replace('_', ' ', $order->status) }} · THB {{ number_format($order->total_thb) }}</div>
                         </div>
                         @if($isAdmin)
-                            <div class="flex flex-wrap gap-2">
-                                <form method="POST" action="{{ route('admin.orders.approve', $order) }}" onsubmit="return confirm('Approve this order? / ยืนยันอนุมัติออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="check" />Approve / อนุมัติ</button></form>
-                                <form method="POST" action="{{ route('admin.orders.reject', $order) }}" onsubmit="return confirm('Reject this order? / ยืนยันปฏิเสธออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-rose-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="x" />Reject / ปฏิเสธ</button></form>
-                                <form method="POST" action="{{ route('admin.orders.refund', $order) }}" onsubmit="return confirm('Refund this order? / ยืนยันคืนเงินออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 dark:border-white/10 dark:text-zinc-100"><x-icon name="undo" />Refund / คืนเงิน</button></form>
-                                <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button></form>
+                            <div class="flex flex-wrap gap-2" x-data="{ editStatus: false }">
+                                @if($order->status === 'pending')
+                                    <form method="POST" action="{{ route('admin.orders.approve', $order) }}" onsubmit="return confirm('Approve this order? / ยืนยันอนุมัติออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="check" />Approve / อนุมัติ</button></form>
+                                    <form method="POST" action="{{ route('admin.orders.reject', $order) }}" onsubmit="return confirm('Reject this order? / ยืนยันปฏิเสธออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-rose-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="x" />Reject / ปฏิเสธ</button></form>
+                                @elseif($order->status === 'approved')
+                                    <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 dark:border-white/10 dark:text-zinc-100" type="button" @click="editStatus = !editStatus"><x-icon name="pencil" /><span x-text="editStatus ? 'Hide / ซ่อน' : 'Edit status / แก้ไขสถานะ'"></span></button>
+                                    <div class="flex flex-wrap gap-2" x-cloak x-show="editStatus" x-transition>
+                                        <form method="POST" action="{{ route('admin.orders.cancel', $order) }}" onsubmit="return confirm('Cancel this approved order? / ยืนยันยกเลิกออเดอร์ที่อนุมัติแล้ว?')">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-700 dark:border-amber-400/40 dark:text-amber-100"><x-icon name="ban" />Cancel / ยกเลิก</button></form>
+                                        <form method="POST" action="{{ route('admin.orders.refund', $order) }}" onsubmit="return confirm('Refund this approved order? / ยืนยันคืนเงินออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 dark:border-white/10 dark:text-zinc-100"><x-icon name="undo" />Refund / คืนเงิน</button></form>
+                                    </div>
+                                @elseif(in_array($order->status, ['cancelled', 'refunded'], true))
+                                    <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button></form>
+                                @endif
                             </div>
                         @endif
                     </div>
