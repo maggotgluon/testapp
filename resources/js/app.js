@@ -753,44 +753,60 @@ Alpine.data('ticketExport', (config) => ({
         this.wrapText(ctx, config.eventName, 72, 670, 900, 66, 2);
     },
     async drawText(ctx) {
+        const bodyGradient = ctx.createLinearGradient(0, 720, 1080, 1920);
+        bodyGradient.addColorStop(0, '#0f766e');
+        bodyGradient.addColorStop(0.48, '#312e81');
+        bodyGradient.addColorStop(1, '#064e3b');
+        ctx.fillStyle = bodyGradient;
+        ctx.fillRect(0, 720, 1080, 1240);
+
         if (config.imageUrl) {
             const image = await this.loadImage(config.imageUrl).catch(() => null);
             if (image) {
                 ctx.save();
-                ctx.filter = 'blur(34px)';
-                ctx.globalAlpha = 0.34;
+                ctx.filter = 'blur(42px) saturate(1.25)';
+                ctx.globalAlpha = 0.58;
                 this.coverImage(ctx, image, -70, 650, 1220, 1420);
                 ctx.restore();
             }
         }
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-        this.roundRect(ctx, 0, 720, 1080, 1240, 0, true, false);
+        const readabilityGradient = ctx.createLinearGradient(0, 720, 0, 1920);
+        readabilityGradient.addColorStop(0, 'rgba(9, 9, 11, 0.52)');
+        readabilityGradient.addColorStop(0.35, 'rgba(9, 9, 11, 0.36)');
+        readabilityGradient.addColorStop(1, 'rgba(9, 9, 11, 0.64)');
+        ctx.fillStyle = readabilityGradient;
+        ctx.fillRect(0, 720, 1080, 1240);
 
-        ctx.fillStyle = '#18181b';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 3;
+        ctx.fillStyle = '#ffffff';
         ctx.font = '700 44px sans-serif';
         ctx.fillText(config.holderName || '-', 72, 840);
 
-        ctx.fillStyle = '#71717a';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
         ctx.font = '400 26px sans-serif';
         ctx.fillText('Holder / ผู้ถือบัตร', 72, 792);
         ctx.fillText('Date & time / วันเวลา', 72, 890);
         ctx.fillText('Venue / สถานที่', 72, 982);
         ctx.fillText('Order / ออเดอร์', 72, 1882);
 
-        ctx.fillStyle = '#18181b';
+        ctx.fillStyle = '#ffffff';
         ctx.font = '600 30px sans-serif';
         ctx.fillText(`${config.startsAt || '-'} - ${String(config.endsAt || '').split(' ').pop() || ''}`, 72, 930);
         this.wrapText(ctx, config.venue || '-', 72, 1025, 900, 44, 2);
 
-        ctx.fillStyle = '#52525b';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.84)';
         ctx.font = '400 30px sans-serif';
         this.wrapText(ctx, config.location || '', 72, 1065, 900, 38, 2);
 
-        ctx.fillStyle = '#71717a';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.74)';
         ctx.font = '400 26px monospace';
-        this.wrapText(ctx, `${config.orderNumber || '-'} · ${config.status || '-'}`, 272, 1882, 900, 34, 2);
-        
+        this.wrapText(ctx, `${config.orderNumber || '-'} `, 1000, 1882, 900, 34, 2, 'right');
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
     },
     async drawQr(ctx) {
         const qr = await this.loadImage(config.qrUrl).catch(() => null);
