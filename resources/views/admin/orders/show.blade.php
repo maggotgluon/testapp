@@ -139,13 +139,15 @@
                                     <div class="font-semibold text-zinc-950 dark:text-white">{{ $ticket->holder_name }}</div>
                                     <div class="text-zinc-600 dark:text-zinc-400">{{ $ticket->holder_phone ?: 'No phone / ไม่มีเบอร์โทร' }}</div>
                                 </div>
-                                <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" type="button" @click="editHolder = !editHolder"><x-icon name="pencil" /><span x-text="editHolder ? 'Cancel / ยกเลิก' : 'Edit / แก้ไข'"></span></button>
+                                <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" type="button" @click="editHolder = !editHolder"><x-icon name="pencil" />
+                                <!-- <span x-text="editHolder ? 'Cancel / ยกเลิก' : 'Edit / แก้ไข'"></span> -->
+                            </button>
                             </div>
                             <form class="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto]" method="POST" action="{{ route('admin.events.tickets.holder', [$ticket->event, $ticket]) }}" x-cloak x-show="editHolder" x-transition>
                                 @csrf
                                 @method('PATCH')
-                                <label class="text-sm text-zinc-700 dark:text-zinc-300">Holder name / ชื่อผู้ถือบัตร<input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="holder_name" value="{{ $ticket->holder_name }}" required></label>
-                                <label class="text-sm text-zinc-700 dark:text-zinc-300">Phone / เบอร์โทร<input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="holder_phone" value="{{ $ticket->holder_phone }}"></label>
+                                <label class="text-sm text-zinc-700 dark:text-zinc-300">Name<input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="holder_name" value="{{ $ticket->holder_name }}" required></label>
+                                <label class="text-sm text-zinc-700 dark:text-zinc-300">Phone<input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="holder_phone" value="{{ $ticket->holder_phone }}"></label>
                                 <button class="self-end inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="save" />Save / บันทึก</button>
                             </form>
                         </div>
