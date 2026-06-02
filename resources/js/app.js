@@ -681,7 +681,10 @@ Alpine.data('eventCountdown', (config) => ({
 }));
 
 Alpine.data('ticketExport', (config) => ({
-    async downloadPng() {
+    previewOpen: false,
+    previewUrl: '',
+    previewLoading: false,
+    async renderCanvas() {
         const canvas = document.createElement('canvas');
         canvas.width = 1080;
         canvas.height = 1920;
@@ -691,7 +694,7 @@ Alpine.data('ticketExport', (config) => ({
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         await this.drawHero(ctx);
-        this.drawText(ctx);
+        await this.drawText(ctx);
 
         if (config.active && config.qrUrl) {
             await this.drawQr(ctx);
@@ -699,6 +702,20 @@ Alpine.data('ticketExport', (config) => ({
             this.drawInactiveNotice(ctx);
         }
 
+        return canvas;
+    },
+    async previewPng() {
+        this.previewLoading = true;
+        const canvas = await this.renderCanvas();
+        this.previewUrl = canvas.toDataURL('image/png');
+        this.previewOpen = true;
+        this.previewLoading = false;
+    },
+    closePreview() {
+        this.previewOpen = false;
+    },
+    async downloadPng() {
+        const canvas = await this.renderCanvas();
         this.downloadCanvas(canvas);
     },
     printPdf() {
@@ -726,42 +743,60 @@ Alpine.data('ticketExport', (config) => ({
         ctx.fillStyle = shade;
         ctx.fillRect(0, 420, 1080, heroHeight - 420);
 
+        ctx.fillStyle = 'rgba(24, 24, 27, 0.78)';
+        this.roundRect(ctx, 48, 550, 984, 240, 28, true, false);
+
         ctx.fillStyle = '#ffffff';
-        ctx.font = '700 36px sans-serif';
-        ctx.fillText(String(config.ticketType || '').toUpperCase(), 72, 525);
-        ctx.font = '700 76px sans-serif';
-        this.wrapText(ctx, config.eventName, 72, 615, 900, 86, 2);
+        ctx.font = '700 32px sans-serif';
+        ctx.fillText(String(config.ticketType || '').toUpperCase(), 72, 605);
+        ctx.font = '700 58px sans-serif';
+        this.wrapText(ctx, config.eventName, 72, 670, 900, 66, 2);
     },
-    drawText(ctx) {
+    async drawText(ctx) {
+        if (config.imageUrl) {
+            const image = await this.loadImage(config.imageUrl).catch(() => null);
+            if (image) {
+                ctx.save();
+                ctx.filter = 'blur(34px)';
+                ctx.globalAlpha = 0.34;
+                this.coverImage(ctx, image, -70, 650, 1220, 1420);
+                ctx.restore();
+            }
+        }
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+        this.roundRect(ctx, 0, 720, 1080, 1240, 0, true, false);
+
         ctx.fillStyle = '#18181b';
-        ctx.font = '700 48px sans-serif';
-        ctx.fillText(config.holderName || '-', 72, 835);
+        ctx.font = '700 44px sans-serif';
+        ctx.fillText(config.holderName || '-', 72, 840);
 
         ctx.fillStyle = '#71717a';
-        ctx.font = '400 28px sans-serif';
-        ctx.fillText('Holder / ผู้ถือบัตร', 72, 787);
-        ctx.fillText('Date & time / วันเวลา', 72, 940);
-        ctx.fillText('Venue / สถานที่', 72, 1062);
-        ctx.fillText('Order / ออเดอร์', 72, 1810);
+        ctx.font = '400 26px sans-serif';
+        ctx.fillText('Holder / ผู้ถือบัตร', 72, 792);
+        ctx.fillText('Date & time / วันเวลา', 72, 890);
+        ctx.fillText('Venue / สถานที่', 72, 982);
+        ctx.fillText('Order / ออเดอร์', 72, 1882);
 
         ctx.fillStyle = '#18181b';
-        ctx.font = '600 38px sans-serif';
-        ctx.fillText(`${config.startsAt || '-'} - ${String(config.endsAt || '').split(' ').pop() || ''}`, 72, 990);
-        this.wrapText(ctx, config.venue || '-', 72, 1110, 900, 44, 2);
+        ctx.font = '600 30px sans-serif';
+        ctx.fillText(`${config.startsAt || '-'} - ${String(config.endsAt || '').split(' ').pop() || ''}`, 72, 930);
+        this.wrapText(ctx, config.venue || '-', 72, 1025, 900, 44, 2);
 
         ctx.fillStyle = '#52525b';
         ctx.font = '400 30px sans-serif';
-        this.wrapText(ctx, config.location || '', 72, 1205, 900, 38, 2);
+        this.wrapText(ctx, config.location || '', 72, 1065, 900, 38, 2);
 
         ctx.fillStyle = '#71717a';
         ctx.font = '400 26px monospace';
-        this.wrapText(ctx, `${config.orderNumber || '-'} · ${config.status || '-'}`, 72, 1852, 900, 34, 2);
+        this.wrapText(ctx, `${config.orderNumber || '-'} · ${config.status || '-'}`, 272, 1882, 900, 34, 2);
+        
     },
     async drawQr(ctx) {
         const qr = await this.loadImage(config.qrUrl).catch(() => null);
-        const boxX = 260;
-        const boxY = 1288;
-        const boxSize = 560;
+        const boxX = 190;
+        const boxY = 1128;
+        const boxSize = 680;
 
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = '#e4e4e7';
@@ -769,12 +804,12 @@ Alpine.data('ticketExport', (config) => ({
         this.roundRect(ctx, boxX, boxY, boxSize, boxSize, 28, true, true);
 
         if (qr) {
-            ctx.drawImage(qr, boxX + 50, boxY + 38, 460, 460);
+            ctx.drawImage(qr, boxX + 60, boxY + 48, 560, 560);
         }
 
         ctx.fillStyle = '#18181b';
         ctx.font = '400 24px monospace';
-        this.wrapText(ctx, config.uuid || '', boxX + 50, boxY + 520, 460, 28, 2, 'center');
+        this.wrapText(ctx, config.uuid || '', boxX + 60, boxY + 632, 560, 28, 2, 'center');
     },
     drawInactiveNotice(ctx) {
         ctx.fillStyle = '#fffbeb';
