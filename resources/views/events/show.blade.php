@@ -63,7 +63,7 @@
         ];
         $checkoutCoupons = $event->coupons->map($couponPayload)->values();
         $visibleCouponCodes = $visibleCheckoutCoupons->pluck('code')->values();
-        $checkoutPromotions = $visibleEventPromotions->map(fn ($promotion) => [
+        $checkoutPromotions = $event->promotions->map(fn ($promotion) => [
             'id' => $promotion->id,
             'name' => $promotion->name,
             'description' => $promotion->description,
@@ -75,6 +75,8 @@
             'get_quantity' => $promotion->get_quantity,
             'min_quantity' => $promotion->min_quantity,
             'max_discount_thb' => $promotion->max_discount_thb,
+            'usage_limit' => $promotion->usage_limit,
+            'used_count' => $promotion->used_count,
             'combines_with_coupons' => $promotion->combines_with_coupons,
             'show_on_event_page' => $promotion->show_on_event_page,
             'summary' => $promotion->displaySummary(),
@@ -227,7 +229,7 @@
             </div>
             <div class="mt-4 rounded-md border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-800 dark:text-rose-100" x-cloak x-show="errorMessage" x-text="errorMessage"></div>
 
-            <div x-cloak x-show="subtotal() > 0" x-transition>
+            <div x-cloak x-show="cartQuantity() > 0" x-transition>
                 <div class="mt-5 grid gap-4 rounded-md transition sm:grid-cols-2" data-checkout-section="customer" :class="validationAttempted && invalidSection === 'customer' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Name / ชื่อ <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_name" x-model="customerName" @input="syncDefaultHolderNames()" required></label>
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Phone / เบอร์โทร <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_phone" x-model="customerPhone" required></label>
@@ -265,15 +267,19 @@
                                         <span class="text-xs font-medium text-emerald-700 dark:text-emerald-200" x-text="promotion.summary"></span>
                                     </div>
                                     <p class="mt-1 text-xs text-emerald-800 dark:text-emerald-100" x-show="promotion.description" x-text="promotion.description"></p>
+                                    <p class="mt-1 text-xs text-emerald-700 dark:text-emerald-200" x-show="promotionConditionText(promotion)" x-text="promotionConditionText(promotion)"></p>
                                 </div>
                             </template>
                         </div>
                     </div>
                     <div class="mt-4 rounded-md border border-sky-300/40 bg-sky-100/70 p-4 text-sm text-sky-950 dark:border-sky-300/20 dark:bg-sky-400/10 dark:text-sky-100" x-cloak x-show="promotionHints().length > 0">
                         <div class="inline-flex items-center gap-2 font-medium"><x-icon name="sparkles" />Unlock more savings / ซื้อเพิ่มเพื่อรับส่วนลด</div>
-                        <div class="mt-2 grid gap-1">
+                        <div class="mt-2 grid gap-2">
                             <template x-for="hint in promotionHints()" :key="hint.id">
-                                <p x-text="hint.text"></p>
+                                <div>
+                                    <p x-text="hint.text"></p>
+                                    <p class="mt-1 text-xs text-sky-800 dark:text-sky-200" x-show="hint.condition" x-text="hint.condition"></p>
+                                </div>
                             </template>
                         </div>
                     </div>
@@ -282,19 +288,31 @@
 
                 <div class="mt-5 rounded-md border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
                     <div class="flex items-center justify-between gap-3">
-                        <strong class="inline-flex items-center gap-2"><x-icon name="wallet" /><span x-text="selectedPayment().label || paymentMethodLabel(paymentMethod)"></span></strong>
+                        <strong class="inline-flex items-center gap-2"><x-icon name="wallet" /><span x-text="total() === 0 ? 'Free checkout / รับตั๋วฟรี' : (selectedPayment().label || paymentMethodLabel(paymentMethod))"></span></strong>
                         <span class="rounded bg-emerald-300 px-2 py-1 font-semibold text-zinc-950">THB <span x-text="total().toLocaleString()"></span></span>
                     </div>
                     <dl class="mt-3 grid gap-1 text-sm">
                         <div class="flex justify-between gap-3"><dt class="text-emerald-700 dark:text-emerald-200">Subtotal / ยอดรวม</dt><dd>THB <span x-text="subtotal().toLocaleString()"></span></dd></div>
                         @if($event->coupons->isNotEmpty())
-                        <div class="flex justify-between gap-3"><dt class="text-emerald-700 dark:text-emerald-200">Coupon discount / ส่วนลดคูปอง</dt><dd>- THB <span x-text="discount().toLocaleString()"></span></dd></div>
+                        <div class="flex justify-between gap-3" x-show="discount() > 0" x-cloak>
+                            <dt class="text-emerald-700 dark:text-emerald-200">Coupon discount / ส่วนลดคูปอง <span class="font-mono text-xs" x-text="couponCode"></span></dt>
+                            <dd>- THB <span x-text="discount().toLocaleString()"></span></dd>
+                        </div>
                         @endif
                         @if($event->promotions->isNotEmpty())
-                        <div class="flex justify-between gap-3"><dt class="text-emerald-700 dark:text-emerald-200">Promotion discount / ส่วนลดโปรโมชัน</dt><dd>- THB <span x-text="promotionDiscount().toLocaleString()"></span></dd></div>
+                        <div class="flex justify-between gap-3" x-show="promotionDiscount() > 0" x-cloak>
+                            <dt class="text-emerald-700 dark:text-emerald-200">Promotion discount / ส่วนลดโปรโมชัน <span class="text-xs" x-text="activePromotionNames()"></span></dt>
+                            <dd>- THB <span x-text="promotionDiscount().toLocaleString()"></span></dd>
+                        </div>
                         @endif
                     </dl>
-                    <template x-if="paymentMethod === 'bank_transfer'">
+                    <template x-if="total() === 0">
+                        <div class="mt-3 rounded-md border border-emerald-400/30 bg-white/70 p-3 dark:bg-zinc-950/60">
+                            <div class="font-semibold">No payment required / ไม่ต้องชำระเงิน</div>
+                            <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-100">This order total is zero, so no payment method or slip is needed. Tickets will be generated automatically. / ยอดรวมเป็นศูนย์ ไม่ต้องเลือกวิธีชำระเงินหรือแนบสลิป ระบบจะสร้างตั๋วให้อัตโนมัติ</p>
+                        </div>
+                    </template>
+                    <template x-if="total() > 0 && paymentMethod === 'bank_transfer'">
                         <dl class="mt-3 grid gap-2">
                             <div><dt class="text-emerald-700 dark:text-emerald-200">Bank / ธนาคาร</dt><dd class="mt-1 flex items-center gap-2">
                                 <template x-if="selectedPayment().bank_logo || payment.bank_logo">
@@ -306,13 +324,13 @@
                             <div><dt class="text-emerald-700 dark:text-emerald-200">Account number / เลขบัญชี</dt><dd class="font-mono" x-text="selectedPayment().account_number || payment.bank_account_number || '-'"></dd></div>
                         </dl>
                     </template>
-                    <template x-if="paymentMethod === 'cash'">
+                    <template x-if="total() > 0 && paymentMethod === 'cash'">
                         <div class="mt-3 rounded-md border border-emerald-400/30 bg-white/70 p-3 dark:bg-zinc-950/60">
                             <div class="font-semibold">Cash sale / ชำระเงินสด</div>
                             <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-100">No slip is required. Admin approval is still required before tickets become active. / ไม่ต้องแนบสลิป แต่ยังต้องรอแอดมินอนุมัติก่อนตั๋วใช้งานได้</p>
                         </div>
                     </template>
-                    <template x-if="paymentMethod === 'qr_payment'">
+                    <template x-if="total() > 0 && paymentMethod === 'qr_payment'">
                         <div class="mt-3 grid gap-4 sm:grid-cols-[160px_1fr]">
                             <div class="grid place-items-center rounded-md bg-white p-3">
                                 <img class="h-32 w-32 object-contain" :src="paymentQrUrl()" alt="QR payment code / QR สำหรับชำระเงิน">
@@ -330,7 +348,7 @@
                     <p class="mt-3 text-emerald-800 dark:text-emerald-100" x-text="paymentInstructions()"></p>
                 </div>
 
-                <div class="mt-4 grid gap-4 rounded-md transition sm:grid-cols-2" data-checkout-section="payment" :class="validationAttempted && invalidSection === 'payment' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
+                <div class="mt-4 grid gap-4 rounded-md transition sm:grid-cols-2" data-checkout-section="payment" x-show="total() > 0" x-cloak :class="validationAttempted && invalidSection === 'payment' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Payment method / วิธีชำระเงิน <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200">required / จำเป็น</span>
                     <input type="hidden" name="payment_method" :value="paymentMethod">
                     <input type="hidden" name="payment_account_key" :value="paymentAccountKey">
@@ -356,7 +374,7 @@
                         No slip is required for this order. / ออเดอร์นี้ไม่ต้องแนบสลิป
                     </div>
                 </div>
-                <label class="mt-4 block text-sm text-zinc-700 dark:text-zinc-300">Payment note / หมายเหตุการชำระเงิน<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_note" rows="3"></textarea></label>
+                <label class="mt-4 block text-sm text-zinc-700 dark:text-zinc-300" x-show="total() > 0" x-cloak>Payment note / หมายเหตุการชำระเงิน<textarea class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="payment_note" rows="3"></textarea></label>
                 <div class="mt-5 rounded-md border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-900 p-4" x-data="{ holdersOpen: false }">
                     <button class="flex w-full items-center justify-between gap-3 text-left font-semibold text-zinc-950 dark:text-white" type="button" @click="holdersOpen = !holdersOpen" :aria-expanded="holdersOpen.toString()">
                         <span class="inline-flex items-center gap-2"><x-icon name="users" />Ticket holders / ชื่อผู้ถือบัตร</span>

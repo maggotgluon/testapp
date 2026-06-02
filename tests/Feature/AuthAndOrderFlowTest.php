@@ -1680,7 +1680,7 @@ class AuthAndOrderFlowTest extends TestCase
         ]);
     }
 
-    public function test_hidden_promotion_does_not_show_on_event_page(): void
+    public function test_hidden_promotion_is_not_suggested_but_can_still_be_applied(): void
     {
         $this->seed();
         $ticketType = TicketType::query()
@@ -1691,9 +1691,9 @@ class AuthAndOrderFlowTest extends TestCase
             'event_id' => $ticketType->event_id,
             'ticket_type_id' => $ticketType->id,
             'name' => 'Secret bulk discount',
-            'promotion_type' => 'quantity_discount',
+            'promotion_type' => 'fixed',
+            'discount_scope' => 'order',
             'min_quantity' => 2,
-            'discount_type' => 'fixed',
             'discount_value' => 100,
             'show_on_event_page' => false,
             'is_active' => true,
@@ -1701,7 +1701,24 @@ class AuthAndOrderFlowTest extends TestCase
 
         $this->get('/events/'.$ticketType->event_id)
             ->assertOk()
-            ->assertDontSee('Secret bulk discount');
+            ->assertSee('Secret bulk discount');
+
+        $this->post('/orders', [
+            'customer_name' => 'Promotion Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 2],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'subtotal_thb' => $ticketType->price_thb * 2,
+            'discount_thb' => 100,
+            'total_thb' => ($ticketType->price_thb * 2) - 100,
+        ]);
     }
 
     public function test_markdown_event_description_renders_safe_html(): void

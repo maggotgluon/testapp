@@ -101,6 +101,7 @@ class PromotionController extends Controller
         if ($data['promotion_type'] === 'buy_x_get_y') {
             $data['buy_quantity'] = $data['buy_quantity'] ?: 2;
             $data['get_quantity'] = $data['get_quantity'] ?: 1;
+            $data['min_quantity'] = null;
             $data['discount_value'] = null;
             $data['discount_scope'] = 'order';
         } else {

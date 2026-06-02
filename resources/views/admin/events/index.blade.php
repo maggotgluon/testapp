@@ -13,13 +13,13 @@
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="text-sm text-emerald-700 dark:text-emerald-200">{{ $event->ticketTypes->count() }} ticket types / ประเภทตั๋ว</span>
-                        <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950" href="{{ route('admin.events.overview', $event) }}"><x-icon name="eye" />Overview / ภาพรวม</a>
-                        <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100" href="{{ route('admin.events.edit', $event) }}"><x-icon name="edit" />Edit / แก้ไข</a>
+                        <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950" href="{{ route('admin.events.overview', $event) }}"><x-icon name="eye" /></a>
+                        <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100" href="{{ route('admin.events.edit', $event) }}"><x-icon name="edit" />Edit</a>
                         @if(auth()->user()->role === 'super_admin')
                             <form method="POST" action="{{ route('admin.events.destroy', $event) }}" onsubmit="return confirm('Delete this event and related records? / ลบอีเวนต์และข้อมูลที่เกี่ยวข้อง?')">
                                 @csrf
                                 @method('DELETE')
-                                <button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button>
+                                <button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete</button>
                             </form>
                         @endif
                     </div>

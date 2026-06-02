@@ -447,25 +447,65 @@ Alpine.data('checkout', (config) => ({
     activePromotions() {
         return this.promotions.filter((promotion) => this.discountForPromotion(promotion, this.discount()) > 0);
     },
+    activePromotionNames() {
+        return this.activePromotions().map((promotion) => promotion.name).filter(Boolean).join(', ');
+    },
     visibleActivePromotions() {
         return this.activePromotions().filter((promotion) => promotion.show_on_event_page !== false);
+    },
+    promotionThreshold(promotion) {
+        if (promotion.type === 'buy_x_get_y') {
+            return Math.max(1, Number(promotion.buy_quantity || 1)) + Math.max(1, Number(promotion.get_quantity || 1));
+        }
+
+        return Number(promotion.min_quantity || 1);
+    },
+    promotionConditionText(promotion) {
+        const conditions = [];
+        const threshold = this.promotionThreshold(promotion);
+
+        if (threshold > 1) {
+            conditions.push(`Requires ${threshold} ticket${threshold === 1 ? '' : 's'} / ต้องซื้ออย่างน้อย ${threshold} ใบ`);
+        }
+
+        if (promotion.max_discount_thb) {
+            conditions.push(`Maximum discount THB ${Number(promotion.max_discount_thb).toLocaleString()} / ส่วนลดสูงสุด THB ${Number(promotion.max_discount_thb).toLocaleString()}`);
+        }
+
+        if (promotion.usage_limit) {
+            const remaining = Math.max(0, Number(promotion.usage_limit) - Number(promotion.used_count || 0));
+            conditions.push(`${remaining.toLocaleString()} use${remaining === 1 ? '' : 's'} remaining / เหลือสิทธิ์ใช้งาน ${remaining.toLocaleString()} ครั้ง`);
+        }
+
+        if (promotion.combines_with_coupons === false) {
+            conditions.push('Cannot combine with coupons / ใช้ร่วมกับคูปองไม่ได้');
+        }
+
+        return conditions.join(' · ');
+    },
+    promotionUnlockText(promotion) {
+        if (promotion.type === 'buy_x_get_y') {
+            const getQuantity = Math.max(1, Number(promotion.get_quantity || 1));
+            return `Buy 1 more to get ${getQuantity} free with ${promotion.name}. / ซื้อเพิ่มอีก 1 ใบ เพื่อรับฟรี ${getQuantity} ใบจาก ${promotion.name}`;
+        }
+
+        return `Buy 1 more to unlock ${promotion.name}. / ซื้อเพิ่มอีก 1 ใบเพื่อใช้โปรโมชัน ${promotion.name}`;
     },
     promotionHints() {
         return this.promotions
             .filter((promotion) => promotion.show_on_event_page !== false && this.discountForPromotion(promotion, this.discount()) <= 0)
             .map((promotion) => {
                 const currentQuantity = this.eligibleQuantity(promotion);
-                const threshold = promotion.type === 'buy_x_get_y'
-                    ? Math.max(1, Number(promotion.buy_quantity || 1)) + Math.max(1, Number(promotion.get_quantity || 1))
-                    : Number(promotion.min_quantity || 1);
+                const threshold = this.promotionThreshold(promotion);
                 const needed = Math.max(0, threshold - currentQuantity);
-                if (needed < 1) {
+                if (needed !== 1) {
                     return null;
                 }
 
                 return {
                     id: promotion.id,
-                    text: `Add ${needed} more ticket${needed > 1 ? 's' : ''} to unlock ${promotion.name}. / เพิ่มอีก ${needed} ใบเพื่อใช้โปรโมชัน ${promotion.name}`,
+                    text: this.promotionUnlockText(promotion),
+                    condition: this.promotionConditionText(promotion),
                 };
             })
             .filter(Boolean);
