@@ -50,8 +50,10 @@ class SlipQrDecoderService
 
         $imageHash = hash_file('sha256', $absolutePath) ?: null;
 
+        $decodePath = $this->preparedImagePathForQrScan($absolutePath);
+
         try {
-            $payload = trim((string) (new QRCode())->readFromFile($absolutePath));
+            $payload = trim((string) (new QRCode())->readFromFile($decodePath));
         } catch (Throwable $exception) {
             return [
                 'slip_qr_status' => 'no_qr',
@@ -63,6 +65,10 @@ class SlipQrDecoderService
                 ],
                 'slip_reviewed_at' => now(),
             ];
+        } finally {
+            if ($decodePath !== $absolutePath && is_file($decodePath)) {
+                @unlink($decodePath);
+            }
         }
 
         if ($payload === '') {
@@ -106,6 +112,7 @@ class SlipQrDecoderService
         $result = $this->withDuplicateReview($result, $currentPayment);
 
         $flags = $result['slip_review_flags'] ?? [];
+        $method = $expected['method'] ?? null;
         $status = $result['slip_qr_status'] ?? null;
         $data = $result['slip_qr_data'] ?? [];
 
@@ -131,8 +138,6 @@ class SlipQrDecoderService
         if ($status === 'decoded' || $status === 'duplicate') {
             if ($expectedAmount !== null && $actualAmount !== null && abs((float) $actualAmount - (float) $expectedAmount) > 0.01) {
                 $flags['amount_mismatch'] = 'The decoded slip amount does not match this order.';
-            } elseif ($expectedAmount !== null && $actualAmount === null) {
-                $flags['missing_amount'] = 'The slip QR did not expose an amount.';
             }
 
             $expectedPromptPayId = $this->normalizePromptPayIdentifier((string) ($expected['expected_promptpay_id'] ?? ''));
@@ -144,14 +149,18 @@ class SlipQrDecoderService
                     $flags['receiver_mismatch'] = 'The decoded PromptPay receiver does not match the selected account.';
                 } elseif ($actualPromptPayId === '' && $queryReceiver !== '' && $queryReceiver !== $expectedPromptPayId) {
                     $flags['receiver_mismatch'] = 'The decoded receiver/account does not match the selected account.';
-                } elseif ($actualPromptPayId === '' && $queryReceiver === '') {
-                    $flags['missing_receiver'] = 'The slip QR did not expose a receiver account.';
                 }
             }
         }
 
+        if ($method === 'bank_transfer') {
+            foreach (['no_qr', 'missing_amount', 'missing_receiver'] as $quietFlag) {
+                unset($flags[$quietFlag]);
+            }
+        }
+
         $riskFlags = ['decode_error', 'missing_slip', 'duplicate', 'amount_mismatch', 'receiver_mismatch', 'invalid_crc'];
-        $manualFlags = ['no_qr', 'missing_amount', 'missing_receiver'];
+        $manualFlags = ['no_qr'];
         $reviewStatus = collect(array_keys($flags))->intersect($riskFlags)->isNotEmpty()
             ? 'risky'
             : (collect(array_keys($flags))->intersect($manualFlags)->isNotEmpty() ? 'needs_manual_review' : 'passed');
@@ -161,6 +170,65 @@ class SlipQrDecoderService
             'slip_review_flags' => $flags,
             'slip_reviewed_at' => now(),
         ]);
+    }
+
+    private function preparedImagePathForQrScan(string $absolutePath): string
+    {
+        $size = @getimagesize($absolutePath);
+
+        if (! is_array($size)) {
+            return $absolutePath;
+        }
+
+        [$width, $height, $type] = $size;
+        $maxDimension = 1400;
+
+        if ($width <= $maxDimension && $height <= $maxDimension) {
+            return $absolutePath;
+        }
+
+        if (! function_exists('imagecreatetruecolor')) {
+            return $absolutePath;
+        }
+
+        $loader = match ($type) {
+            IMAGETYPE_JPEG => function_exists('imagecreatefromjpeg') ? 'imagecreatefromjpeg' : null,
+            IMAGETYPE_PNG => function_exists('imagecreatefrompng') ? 'imagecreatefrompng' : null,
+            IMAGETYPE_WEBP => function_exists('imagecreatefromwebp') ? 'imagecreatefromwebp' : null,
+            default => null,
+        };
+
+        if (! $loader) {
+            return $absolutePath;
+        }
+
+        $source = @$loader($absolutePath);
+        if (! $source) {
+            return $absolutePath;
+        }
+
+        $scale = min($maxDimension / $width, $maxDimension / $height);
+        $targetWidth = max(1, (int) round($width * $scale));
+        $targetHeight = max(1, (int) round($height * $scale));
+        $target = imagecreatetruecolor($targetWidth, $targetHeight);
+
+        imagecopyresampled($target, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
+
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'slip-qr-');
+        if (! $temporaryPath) {
+            imagedestroy($source);
+            imagedestroy($target);
+
+            return $absolutePath;
+        }
+
+        $temporaryPng = $temporaryPath.'.png';
+        $written = imagepng($target, $temporaryPng);
+        @unlink($temporaryPath);
+        imagedestroy($source);
+        imagedestroy($target);
+
+        return $written ? $temporaryPng : $absolutePath;
     }
 
     public function parsePayloadForReview(string $payload): array
@@ -299,7 +367,6 @@ class SlipQrDecoderService
     private function findDuplicatePayment(array $result, ?Payment $currentPayment = null): array
     {
         $checks = [
-            'image' => ['slip_image_sha256', $result['slip_image_sha256'] ?? null],
             'payload' => ['slip_qr_payload_sha256', $result['slip_qr_payload_sha256'] ?? null],
             'reference' => ['slip_qr_reference_normalized', $result['slip_qr_reference_normalized'] ?? null],
         ];

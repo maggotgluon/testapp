@@ -18,6 +18,12 @@
     $canCancel = $order->status === 'approved';
     $canRefund = $order->status === 'approved';
     $canDelete = in_array($order->status, ['cancelled', 'refunded'], true);
+    $showSlipQrPanel = $payment
+        && ($payment->slip_qr_status || $payment->slip_review_status)
+        && ! ($order->payment_method === 'bank_transfer'
+            && $payment->slip_qr_status === 'no_qr'
+            && $reviewStatus === 'passed'
+            && empty($reviewFlags));
 @endphp
 
 <x-layouts.app :title="$order->order_number">
@@ -116,21 +122,23 @@
                 @endif
             </div>
             <div class="mt-3 flex flex-wrap gap-2">
-                @if($order->payment_slip_path)
+                @if($order->payment_method !== 'cash' && $order->payment_slip_path)
                     <form method="POST" action="{{ route('admin.orders.check-slip-qr', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-emerald-300 px-4 py-2 font-semibold text-emerald-800 dark:border-emerald-400/40 dark:text-emerald-100"><x-icon name="qr-code" />Check slip QR / ตรวจ QR สลิป</button></form>
                 @endif
-                <form class="flex flex-wrap items-center gap-2" method="POST" action="{{ route('admin.orders.payment-slip', $order) }}" enctype="multipart/form-data">
-                    @csrf
-                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100">
-                        <x-icon name="upload" />Reupload slip / อัปโหลดสลิปใหม่
-                        <input class="sr-only" type="file" name="slip" accept="image/*" required onchange="this.form.submit()">
-                    </label>
-                </form>
+                @if($order->payment_method !== 'cash')
+                    <form class="flex flex-wrap items-center gap-2" method="POST" action="{{ route('admin.orders.payment-slip', $order) }}" enctype="multipart/form-data">
+                        @csrf
+                        <label class="inline-flex cursor-pointer items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100">
+                            <x-icon name="upload" />Reupload slip / อัปโหลดสลิปใหม่
+                            <input class="sr-only" type="file" name="slip" accept="image/*" required onchange="this.form.submit()">
+                        </label>
+                    </form>
+                @endif
             </div>
             @if($order->payment_slip_path)
                 <img class="mt-6 max-h-96 rounded-lg border border-zinc-200 dark:border-white/10 object-contain" src="{{ asset('uploads/'.$order->payment_slip_path) }}" alt="Payment slip / สลิปชำระเงิน">
             @endif
-            @if($payment?->slip_qr_status || $payment?->slip_review_status)
+            @if($showSlipQrPanel)
                 <div class="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="scan-line" class="h-5 w-5 text-emerald-500" />Slip QR assist / ช่วยอ่าน QR จากสลิป</h2>
@@ -188,7 +196,7 @@
                                 @endif
                             </div>
                             <div><dt class="text-zinc-500 dark:text-zinc-400">Reference / เลขอ้างอิง</dt><dd>{{ $payment->slip_qr_reference ?: 'Not found / ไม่พบข้อมูล' }}</dd></div>
-                            <div><dt class="text-zinc-500 dark:text-zinc-400">Receiver / ผู้รับเงิน</dt><dd>{{ $payment->slip_qr_receiver ?: 'Not found / ไม่พบข้อมูล' }}</dd></div>
+                            <div><dt class="text-zinc-500 dark:text-zinc-400">{{ ($payment->slip_qr_data['format'] ?? null) === 'slip_verify' ? 'Sending bank / ธนาคารต้นทาง' : 'Receiver / ผู้รับเงิน' }}</dt><dd>{{ $payment->slip_qr_receiver ?: 'Not found / ไม่พบข้อมูล' }}</dd></div>
                             <div><dt class="text-zinc-500 dark:text-zinc-400">Paid at / เวลาชำระเงิน</dt><dd>{{ $payment->slip_qr_paid_at?->format('M j, Y H:i') ?: 'Not found / ไม่พบข้อมูล' }}</dd></div>
                         </dl>
                         <details class="mt-4 text-sm">

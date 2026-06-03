@@ -1945,6 +1945,54 @@ class AuthAndOrderFlowTest extends TestCase
         ]);
     }
 
+    public function test_bank_transfer_without_mini_qr_is_not_flagged_for_manual_review(): void
+    {
+        $result = app(SlipQrDecoderService::class)->reviewDecodedResult([
+            'slip_qr_status' => 'no_qr',
+            'slip_qr_data' => ['message' => 'No readable QR code was found in the slip image.'],
+            'slip_review_flags' => ['no_qr' => 'No readable QR code was found in the slip image.'],
+        ], ['method' => 'bank_transfer', 'expected_amount_thb' => 424], new Payment);
+
+        $this->assertSame('passed', $result['slip_review_status']);
+        $this->assertSame([], $result['slip_review_flags']);
+    }
+
+    public function test_cash_order_hides_and_rejects_slip_reupload(): void
+    {
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+        $ticketType->event->update(['payment_methods' => ['cash']]);
+
+        $this->post('/orders', [
+            'customer_name' => 'Cash Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'cash',
+            'terms_accepted' => '1',
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+
+        $this->actingAs($admin)
+            ->get('/admin/orders/'.$order->id)
+            ->assertOk()
+            ->assertDontSee('Reupload slip / อัปโหลดสลิปใหม่')
+            ->assertDontSee('/admin/orders/'.$order->id.'/payment-slip', false);
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/payment-slip', [
+                'slip' => UploadedFile::fake()->image('cash-slip.jpg', 640, 640),
+            ])
+            ->assertRedirect();
+
+        $this->assertNull($order->fresh()->payment_slip_path);
+    }
+
     public function test_admin_can_reupload_slip_and_recalculate_review(): void
     {
         $this->seed();
