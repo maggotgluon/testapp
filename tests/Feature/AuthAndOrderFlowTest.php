@@ -1040,6 +1040,58 @@ class AuthAndOrderFlowTest extends TestCase
         ]);
     }
 
+    public function test_customer_can_update_ticket_holder_after_order_is_approved(): void
+    {
+        $this->seed();
+
+        $customer = User::create([
+            'name' => 'Customer Holder',
+            'phone' => '0891112222',
+            'email' => 'holder@example.com',
+            'role' => 'customer',
+        ]);
+        $ticket = $this->createApprovedTicket();
+        $ticket->order->update(['user_id' => $customer->id]);
+        $ticket->update(['user_id' => $customer->id]);
+
+        $this->actingAs($customer)
+            ->patch('/orders/'.$ticket->ticket_order_id.'/tickets/'.$ticket->id.'/holder', [
+                'holder_name' => 'New Guest Name',
+            ])
+            ->assertRedirect('/orders/'.$ticket->ticket_order_id);
+
+        $this->assertDatabaseHas('tickets', [
+            'id' => $ticket->id,
+            'holder_name' => 'New Guest Name',
+        ]);
+    }
+
+    public function test_customer_cannot_update_ticket_holder_before_order_is_approved(): void
+    {
+        $this->seed();
+
+        $customer = User::create([
+            'name' => 'Pending Customer Holder',
+            'phone' => '0891113333',
+            'email' => 'pending-holder@example.com',
+            'role' => 'customer',
+        ]);
+        $ticket = $this->createApprovedTicket();
+        $ticket->order->update(['user_id' => $customer->id, 'status' => 'pending']);
+        $ticket->update(['user_id' => $customer->id, 'status' => 'pending']);
+
+        $this->actingAs($customer)
+            ->patch('/orders/'.$ticket->ticket_order_id.'/tickets/'.$ticket->id.'/holder', [
+                'holder_name' => 'Too Early Name',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('tickets', [
+            'id' => $ticket->id,
+            'holder_name' => 'Too Early Name',
+        ]);
+    }
+
     public function test_event_admin_bank_name_uses_thai_bank_dropdown(): void
     {
         $this->seed();

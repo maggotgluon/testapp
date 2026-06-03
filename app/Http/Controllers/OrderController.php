@@ -248,6 +248,30 @@ class OrderController extends Controller
         return view('tickets.show', compact('ticket'));
     }
 
+    public function updateTicketHolder(Request $request, TicketOrder $order, Ticket $ticket): RedirectResponse
+    {
+        abort_unless($ticket->ticket_order_id === $order->id, 404);
+        abort_unless(auth()->id() === $order->user_id || request('phone') === $order->customer_phone || auth()->user()?->isAdmin(), 403);
+        abort_unless($order->status === 'approved', 403, 'Ticket holder names can be edited after payment approval. / แก้ไขชื่อผู้ถือบัตรได้หลังอนุมัติการชำระเงิน');
+
+        $data = $request->validate([
+            'holder_name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $ticket->update([
+            'holder_name' => trim($data['holder_name']),
+        ]);
+
+        $parameters = ['order' => $order];
+        if (! auth()->check() && $request->filled('phone')) {
+            $parameters['phone'] = $request->input('phone');
+        }
+
+        return redirect()
+            ->route('orders.show', $parameters)
+            ->with('status', 'Ticket holder name updated. / อัปเดตชื่อผู้ถือบัตรแล้ว');
+    }
+
     public function ticketQr(string $uuid, QrCodeService $qrCode): Response
     {
         $ticket = Ticket::where('uuid', $uuid)->firstOrFail();

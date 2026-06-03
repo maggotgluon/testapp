@@ -51,6 +51,7 @@ Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
 Route::get('/payments/events/{event}/qr', [OrderController::class, 'paymentQr'])->name('payments.qr');
 Route::get('/orders/lookup', [EventController::class, 'lookup'])->name('orders.lookup');
 Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+Route::patch('/orders/{order}/tickets/{ticket}/holder', [OrderController::class, 'updateTicketHolder'])->name('orders.tickets.holder');
 Route::get('/tickets/{uuid}', [OrderController::class, 'ticket'])->name('tickets.show');
 Route::get('/tickets/{uuid}/qr', [OrderController::class, 'ticketQr'])->name('tickets.qr');
 
