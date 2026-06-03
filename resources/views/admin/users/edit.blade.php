@@ -2,7 +2,10 @@
     <form method="POST" action="{{ route('admin.users.update', $user) }}" class="mx-auto max-w-2xl rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
         @csrf
         @method('PUT')
-        <h1 class="inline-flex items-center gap-2 text-2xl font-semibold text-zinc-950 dark:text-white"><x-icon name="user" class="h-6 w-6 text-emerald-500" />Edit user / แก้ไขผู้ใช้</h1>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h1 class="inline-flex items-center gap-2 text-2xl font-semibold text-zinc-950 dark:text-white"><x-icon name="user" class="h-6 w-6 text-emerald-500" />Edit user / แก้ไขผู้ใช้</h1>
+            <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" href="{{ route('admin.users.profile', ['user' => $user, 'view' => 'tickets']) }}"><x-icon name="eye" /><x-t en="View profile" th="ดูโปรไฟล์" /></a>
+        </div>
         <div class="mt-5 grid gap-4 sm:grid-cols-2">
             <label class="text-sm text-zinc-700 dark:text-zinc-300">Name / ชื่อ<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="name" value="{{ old('name', $user->name) }}" required></label>
             <label class="text-sm text-zinc-700 dark:text-zinc-300">Username / ชื่อผู้ใช้<input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="username" value="{{ old('username', $user->username) }}"></label>

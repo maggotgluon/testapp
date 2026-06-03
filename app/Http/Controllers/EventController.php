@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Promotion;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
+use App\Models\User;
 use App\Services\EventDescriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,18 +77,25 @@ class EventController extends Controller
         return view('events.show', compact('event', 'eventDescriptionHtml'));
     }
 
-    public function profile(Request $request): View
+    public function profile(Request $request, ?User $user = null): View
     {
+        $profileUser = $user ?: $request->user();
+        abort_unless($profileUser, 403);
+
+        if ($user) {
+            abort_unless($request->user()?->role === 'super_admin', 403);
+        }
+
         $orders = TicketOrder::query()
             ->with(['items.event', 'items.ticketType', 'tickets.event', 'tickets.ticketType'])
-            ->where('user_id', $request->user()->id)
+            ->where('user_id', $profileUser->id)
             ->whereHas('items.event', fn ($query) => $query->where('ends_at', '>=', now()))
             ->latest()
             ->get();
 
         $tickets = Ticket::query()
             ->with(['event', 'ticketType', 'order'])
-            ->where('user_id', $request->user()->id)
+            ->where('user_id', $profileUser->id)
             ->whereHas('event', fn ($query) => $query->where('ends_at', '>=', now()))
             ->latest()
             ->get();
@@ -107,8 +115,9 @@ class EventController extends Controller
             ->values();
 
         $activeView = $request->query('view') === 'tickets' ? 'tickets' : 'orders';
+        $isViewingAsUser = (bool) $user;
 
-        return view('profile', compact('orders', 'tickets', 'orderEvents', 'ticketEvents', 'activeView'));
+        return view('profile', compact('orders', 'tickets', 'orderEvents', 'ticketEvents', 'activeView', 'profileUser', 'isViewingAsUser'));
     }
 
     public function updateProfile(Request $request): RedirectResponse

@@ -262,13 +262,7 @@ class OrderController extends Controller
             'holder_name' => trim($data['holder_name']),
         ]);
 
-        $parameters = ['order' => $order];
-        if (! auth()->check() && $request->filled('phone')) {
-            $parameters['phone'] = $request->input('phone');
-        }
-
-        return redirect()
-            ->route('orders.show', $parameters)
+        return back()
             ->with('status', 'Ticket holder name updated. / อัปเดตชื่อผู้ถือบัตรแล้ว');
     }
 

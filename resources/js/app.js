@@ -6,6 +6,7 @@ const uiLanguage = (() => {
     const storageKey = 'ticketflow.uiLanguage';
     const supported = ['en', 'th', 'both'];
     const thaiPattern = /[\u0E00-\u0E7F]/;
+    const localizedSelector = '[data-i18n-auto], [data-i18n-en], [data-i18n-th]';
     const skipSelector = [
         'script',
         'style',
@@ -16,7 +17,7 @@ const uiLanguage = (() => {
         'code',
         'pre',
         '[contenteditable="true"]',
-        '[data-i18n-auto]',
+        localizedSelector,
         '[data-i18n-skip]',
         '[data-i18n-skip] *',
     ].join(',');
@@ -89,15 +90,37 @@ const uiLanguage = (() => {
             return null;
         }
 
+        const en = String(parts.en || '').trim();
+        const th = String(parts.th || '').trim();
+        const fallback = en || th;
         const text = language === 'th'
-            ? parts.th
-            : (language === 'en' ? parts.en : `${parts.en} / ${parts.th}`);
+            ? (th || fallback)
+            : (language === 'en' ? (en || fallback) : [en, th].filter(Boolean).join(' / '));
 
         return `${parts.prefix}${text}${parts.suffix}`;
     };
 
+    const format = (value, language = current()) => {
+        if (!value) {
+            return '';
+        }
+
+        if (typeof value === 'string') {
+            const parts = split(value);
+
+            return parts ? localized(parts, language) : value;
+        }
+
+        return localized({
+            prefix: value.prefix || '',
+            suffix: value.suffix || '',
+            en: value.en,
+            th: value.th,
+        }, language) || '';
+    };
+
     const updateNode = (node, language = current()) => {
-        if (!node.dataset?.i18nEn || !node.dataset?.i18nTh) {
+        if (!node.dataset?.i18nEn && !node.dataset?.i18nTh) {
             return;
         }
 
@@ -152,7 +175,7 @@ const uiLanguage = (() => {
             return;
         }
 
-        if (root.nodeType === Node.ELEMENT_NODE && root.matches?.('[data-i18n-auto]')) {
+        if (root.nodeType === Node.ELEMENT_NODE && root.matches?.(localizedSelector)) {
             updateNode(root, language);
             return;
         }
@@ -192,7 +215,7 @@ const uiLanguage = (() => {
         }
 
         textNodes.forEach((textNode) => processTextNode(textNode, language));
-        root.querySelectorAll?.('[data-i18n-auto]').forEach((node) => updateNode(node, language));
+        root.querySelectorAll?.(localizedSelector).forEach((node) => updateNode(node, language));
         root.querySelectorAll?.('[placeholder], [title], [aria-label], [alt]').forEach((element) => {
             ['placeholder', 'title', 'aria-label', 'alt'].forEach((attribute) => {
                 if (element.hasAttribute(attribute)) {
@@ -250,7 +273,7 @@ const uiLanguage = (() => {
         observer.observe(document.body, { childList: true, subtree: true });
     };
 
-    return { init, set, current, apply };
+    return { init, set, current, apply, format };
 })();
 
 window.TicketFlowLanguage = uiLanguage;
@@ -265,6 +288,8 @@ Alpine.data('scanner', (config = {}) => ({
     ok: false,
     currentTicket: null,
     quickMode: false,
+    quickSettingsOpen: false,
+    scanFiltersOpen: false,
     selectedAction: 'check_in',
     selectedEventId: '',
     guideOpen: false,
@@ -312,17 +337,19 @@ Alpine.data('scanner', (config = {}) => ({
 
         const code = String(this.code || '').trim();
         if (!code) {
-            this.failFeedback('Please scan or enter a ticket UUID. / กรุณาสแกนหรือกรอก UUID ตั๋ว');
+            this.failFeedback(TicketFlowLanguage.format({ en: 'Please scan or enter a ticket UUID.', th: 'กรุณาสแกนหรือกรอก UUID ตั๋ว' }));
             return;
         }
 
         if (this.quickMode && !this.selectedEventId) {
-            this.failFeedback('Please select an event for quick mode. / กรุณาเลือกอีเวนต์สำหรับโหมดเร็ว');
+            this.failFeedback(TicketFlowLanguage.format({ en: 'Please select an event for quick mode.', th: 'กรุณาเลือกอีเวนต์สำหรับโหมดเร็ว' }));
             return;
         }
 
         this.scanning = true;
-        this.message = action ? 'Updating ticket... / กำลังอัปเดตตั๋ว...' : 'Looking up ticket... / กำลังค้นหาตั๋ว...';
+        this.message = action
+            ? TicketFlowLanguage.format({ en: 'Updating ticket...', th: 'กำลังอัปเดตตั๋ว...' })
+            : TicketFlowLanguage.format({ en: 'Looking up ticket...', th: 'กำลังค้นหาตั๋ว...' });
 
         try {
             const response = await fetch('/admin/scanner', {
@@ -360,14 +387,14 @@ Alpine.data('scanner', (config = {}) => ({
                 this.failFeedback(payload.message, payload);
             }
         } catch (error) {
-            this.failFeedback('Scanner request failed. Please try again. / สแกนไม่สำเร็จ กรุณาลองใหม่');
+            this.failFeedback(TicketFlowLanguage.format({ en: 'Scanner request failed. Please try again.', th: 'สแกนไม่สำเร็จ กรุณาลองใหม่' }));
         } finally {
             this.scanning = false;
         }
     },
     async startCamera() {
         if (!('BarcodeDetector' in window)) {
-            this.failFeedback('Camera barcode detection is not supported in this browser. / เบราว์เซอร์นี้ยังไม่รองรับการสแกนบาร์โค้ดด้วยกล้อง');
+            this.failFeedback(TicketFlowLanguage.format({ en: 'Camera barcode detection is not supported in this browser.', th: 'เบราว์เซอร์นี้ยังไม่รองรับการสแกนบาร์โค้ดด้วยกล้อง' }));
             return;
         }
 
@@ -516,7 +543,8 @@ Alpine.data('scanner', (config = {}) => ({
 
 Alpine.data('checkout', (config) => ({
     paymentMethods: config.paymentMethods?.length ? config.paymentMethods : ['qr_payment'],
-    paymentOptions: config.paymentOptions?.length ? config.paymentOptions : (config.paymentMethods || ['qr_payment']).map((method) => ({ key: method, method, label: null })),
+    paymentOptions: (config.paymentOptions?.length ? config.paymentOptions : (config.paymentMethods || ['qr_payment']).map((method) => ({ key: method, method, label: null })))
+        .map((option) => ({ ...option, label: TicketFlowLanguage.format(option.label) || option.label })),
     paymentAccountKey: (config.paymentOptions?.[0]?.key) || (config.paymentMethods?.[0]) || 'qr_payment',
     paymentMethod: (config.paymentOptions?.[0]?.method) || (config.paymentMethods?.length ? config.paymentMethods : ['qr_payment'])[0],
     couponCode: '',
@@ -538,9 +566,9 @@ Alpine.data('checkout', (config) => ({
     payment: config.payment,
     paymentMethodLabel(method) {
         return {
-            qr_payment: 'QR payment / ชำระด้วย QR',
-            bank_transfer: 'Direct bank transfer / โอนผ่านธนาคาร',
-            cash: 'Cash sale / ชำระเงินสด',
+            qr_payment: TicketFlowLanguage.format({ en: 'QR payment', th: 'ชำระด้วย QR' }),
+            bank_transfer: TicketFlowLanguage.format({ en: 'Direct bank transfer', th: 'โอนผ่านธนาคาร' }),
+            cash: TicketFlowLanguage.format({ en: 'Cash sale', th: 'ชำระเงินสด' }),
         }[method] || method;
     },
     selectedPayment() {
@@ -634,25 +662,28 @@ Alpine.data('checkout', (config) => ({
 
         if (!code) {
             this.couponApplied = false;
-            this.couponMessage = 'Please enter a coupon code. / กรุณากรอกรหัสคูปอง';
+            this.couponMessage = TicketFlowLanguage.format({ en: 'Please enter a coupon code.', th: 'กรุณากรอกรหัสคูปอง' });
             return;
         }
 
         if (!coupon) {
             this.couponApplied = false;
-            this.couponMessage = 'Coupon not found or not available for this event. / ไม่พบคูปองหรือคูปองใช้กับอีเวนต์นี้ไม่ได้';
+            this.couponMessage = TicketFlowLanguage.format({ en: 'Coupon not found or not available for this event.', th: 'ไม่พบคูปองหรือคูปองใช้กับอีเวนต์นี้ไม่ได้' });
             return;
         }
 
         const amount = this.discount();
         if (amount <= 0) {
             this.couponApplied = false;
-            this.couponMessage = 'Coupon is valid, but conditions are not met yet. / คูปองถูกต้อง แต่ยังไม่เข้าเงื่อนไข';
+            this.couponMessage = TicketFlowLanguage.format({ en: 'Coupon is valid, but conditions are not met yet.', th: 'คูปองถูกต้อง แต่ยังไม่เข้าเงื่อนไข' });
             return;
         }
 
         this.couponApplied = true;
-        this.couponMessage = `Coupon applied: THB ${amount.toLocaleString()} discount. / ใช้คูปองแล้ว ลด THB ${amount.toLocaleString()}`;
+        this.couponMessage = TicketFlowLanguage.format({
+            en: `Coupon applied: THB ${amount.toLocaleString()} discount.`,
+            th: `ใช้คูปองแล้ว ลด THB ${amount.toLocaleString()}`,
+        });
     },
     eligibleSubtotal(coupon) {
         return config.tickets.reduce((sum, ticket) => {
@@ -723,20 +754,29 @@ Alpine.data('checkout', (config) => ({
         const threshold = this.promotionThreshold(promotion);
 
         if (threshold > 1) {
-            conditions.push(`Requires ${threshold} ticket${threshold === 1 ? '' : 's'} / ต้องซื้ออย่างน้อย ${threshold} ใบ`);
+            conditions.push(TicketFlowLanguage.format({
+                en: `Requires ${threshold} ticket${threshold === 1 ? '' : 's'}`,
+                th: `ต้องซื้ออย่างน้อย ${threshold} ใบ`,
+            }));
         }
 
         if (promotion.max_discount_thb) {
-            conditions.push(`Maximum discount THB ${Number(promotion.max_discount_thb).toLocaleString()} / ส่วนลดสูงสุด THB ${Number(promotion.max_discount_thb).toLocaleString()}`);
+            conditions.push(TicketFlowLanguage.format({
+                en: `Maximum discount THB ${Number(promotion.max_discount_thb).toLocaleString()}`,
+                th: `ส่วนลดสูงสุด THB ${Number(promotion.max_discount_thb).toLocaleString()}`,
+            }));
         }
 
         if (promotion.usage_limit) {
             const remaining = Math.max(0, Number(promotion.usage_limit) - Number(promotion.used_count || 0));
-            conditions.push(`${remaining.toLocaleString()} use${remaining === 1 ? '' : 's'} remaining / เหลือสิทธิ์ใช้งาน ${remaining.toLocaleString()} ครั้ง`);
+            conditions.push(TicketFlowLanguage.format({
+                en: `${remaining.toLocaleString()} use${remaining === 1 ? '' : 's'} remaining`,
+                th: `เหลือสิทธิ์ใช้งาน ${remaining.toLocaleString()} ครั้ง`,
+            }));
         }
 
         if (promotion.combines_with_coupons === false) {
-            conditions.push('Cannot combine with coupons / ใช้ร่วมกับคูปองไม่ได้');
+            conditions.push(TicketFlowLanguage.format({ en: 'Cannot combine with coupons', th: 'ใช้ร่วมกับคูปองไม่ได้' }));
         }
 
         return conditions.join(' · ');
@@ -744,10 +784,16 @@ Alpine.data('checkout', (config) => ({
     promotionUnlockText(promotion) {
         if (promotion.type === 'buy_x_get_y') {
             const getQuantity = Math.max(1, Number(promotion.get_quantity || 1));
-            return `Buy 1 more to get ${getQuantity} free with ${promotion.name}. / ซื้อเพิ่มอีก 1 ใบ เพื่อรับฟรี ${getQuantity} ใบจาก ${promotion.name}`;
+            return TicketFlowLanguage.format({
+                en: `Buy 1 more to get ${getQuantity} free with ${promotion.name}.`,
+                th: `ซื้อเพิ่มอีก 1 ใบ เพื่อรับฟรี ${getQuantity} ใบจาก ${promotion.name}`,
+            });
         }
 
-        return `Buy 1 more to unlock ${promotion.name}. / ซื้อเพิ่มอีก 1 ใบเพื่อใช้โปรโมชัน ${promotion.name}`;
+        return TicketFlowLanguage.format({
+            en: `Buy 1 more to unlock ${promotion.name}.`,
+            th: `ซื้อเพิ่มอีก 1 ใบเพื่อใช้โปรโมชัน ${promotion.name}`,
+        });
     },
     promotionHints() {
         return this.promotions
@@ -851,14 +897,14 @@ Alpine.data('checkout', (config) => ({
     },
     paymentInstructions() {
         if (this.total() === 0) {
-            return 'This order is free. Tickets will be activated automatically. / ออเดอร์นี้ฟรี ตั๋วจะเปิดใช้งานอัตโนมัติ';
+            return TicketFlowLanguage.format({ en: 'This order is free. Tickets will be activated automatically.', th: 'ออเดอร์นี้ฟรี ตั๋วจะเปิดใช้งานอัตโนมัติ' });
         }
 
         if (this.paymentMethod === 'cash') {
-            return 'Cash sale does not require a slip. Admin approval will activate tickets. / ชำระเงินสดไม่ต้องแนบสลิป แอดมินจะอนุมัติเพื่อเปิดใช้งานตั๋ว';
+            return TicketFlowLanguage.format({ en: 'Cash sale does not require a slip. Admin approval will activate tickets.', th: 'ชำระเงินสดไม่ต้องแนบสลิป แอดมินจะอนุมัติเพื่อเปิดใช้งานตั๋ว' });
         }
 
-        return this.selectedPayment().instructions || this.payment.instructions || 'Upload your payment slip after transfer. Admin approval will activate tickets. / อัปโหลดสลิปหลังชำระเงิน แอดมินจะตรวจสอบและอนุมัติตั๋ว';
+        return this.selectedPayment().instructions || this.payment.instructions || TicketFlowLanguage.format({ en: 'Upload your payment slip after transfer. Admin approval will activate tickets.', th: 'อัปโหลดสลิปหลังชำระเงิน แอดมินจะตรวจสอบและอนุมัติตั๋ว' });
     },
     canSubmitOrder() {
         return this.cartQuantity() > 0
@@ -889,7 +935,7 @@ Alpine.data('checkout', (config) => ({
     highlightMissingSection() {
         this.validationAttempted = true;
         this.invalidSection = this.firstMissingSection();
-        this.errorMessage = 'Please complete the highlighted section before submitting. / กรุณากรอกส่วนที่ไฮไลต์ให้ครบก่อนส่งคำสั่งซื้อ';
+        this.errorMessage = TicketFlowLanguage.format({ en: 'Please complete the highlighted section before submitting.', th: 'กรุณากรอกส่วนที่ไฮไลต์ให้ครบก่อนส่งคำสั่งซื้อ' });
 
         this.$nextTick(() => {
             document.querySelector(`[data-checkout-section="${this.invalidSection}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -909,13 +955,13 @@ Alpine.data('checkout', (config) => ({
 
         if (this.cartQuantity() <= 0) {
             event.preventDefault();
-            this.errorMessage = 'Please select at least one ticket. / กรุณาเลือกตั๋วอย่างน้อย 1 ใบ';
+            this.errorMessage = TicketFlowLanguage.format({ en: 'Please select at least one ticket.', th: 'กรุณาเลือกตั๋วอย่างน้อย 1 ใบ' });
             return;
         }
 
         if (!event.target.reportValidity()) {
             event.preventDefault();
-            this.errorMessage = 'Please complete all required fields. / กรุณากรอกข้อมูลที่จำเป็นให้ครบ';
+            this.errorMessage = TicketFlowLanguage.format({ en: 'Please complete all required fields.', th: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบ' });
         }
     },
 }));
@@ -948,7 +994,7 @@ Alpine.data('floatingReserve', () => ({
 }));
 
 Alpine.data('eventCountdown', (config) => ({
-    label: 'Event starts in / เริ่มงานในอีก',
+    label: TicketFlowLanguage.format({ en: 'Event starts in', th: 'เริ่มงานในอีก' }),
     days: '00',
     hours: '00',
     minutes: '00',
@@ -963,7 +1009,7 @@ Alpine.data('eventCountdown', (config) => ({
         const diff = target - Date.now();
 
         if (diff <= 0) {
-            this.label = 'Event has started / อีเวนต์เริ่มแล้ว';
+            this.label = TicketFlowLanguage.format({ en: 'Event has started', th: 'อีเวนต์เริ่มแล้ว' });
             this.days = this.hours = this.minutes = this.seconds = '00';
             if (this.timer) {
                 window.clearInterval(this.timer);
@@ -1085,10 +1131,10 @@ Alpine.data('ticketExport', (config) => ({
 
         ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
         ctx.font = '400 26px sans-serif';
-        ctx.fillText('Holder / ผู้ถือบัตร', 72, 792);
-        ctx.fillText('Date & time / วันเวลา', 72, 890);
-        ctx.fillText('Venue / สถานที่', 72, 982);
-        ctx.fillText('Order / ออเดอร์', 72, 1882);
+        ctx.fillText(TicketFlowLanguage.format({ en: 'Holder', th: 'ผู้ถือบัตร' }), 72, 792);
+        ctx.fillText(TicketFlowLanguage.format({ en: 'Date & time', th: 'วันเวลา' }), 72, 890);
+        ctx.fillText(TicketFlowLanguage.format({ en: 'Venue', th: 'สถานที่' }), 72, 982);
+        ctx.fillText(TicketFlowLanguage.format({ en: 'Order', th: 'ออเดอร์' }), 72, 1882);
 
         ctx.fillStyle = '#ffffff';
         ctx.font = '600 30px sans-serif';
@@ -1134,7 +1180,7 @@ Alpine.data('ticketExport', (config) => ({
         ctx.font = '700 42px sans-serif';
         ctx.fillText('Ticket not active yet', 120, 1460);
         ctx.font = '400 30px sans-serif';
-        this.wrapText(ctx, 'QR code will show after payment is approved. / QR จะแสดงหลังอนุมัติการชำระเงิน', 120, 1518, 820, 38, 3);
+        this.wrapText(ctx, TicketFlowLanguage.format({ en: 'QR code will show after payment is approved.', th: 'QR จะแสดงหลังอนุมัติการชำระเงิน' }), 120, 1518, 820, 38, 3);
     },
     loadImage(src) {
         return new Promise((resolve, reject) => {
@@ -1202,13 +1248,13 @@ Alpine.data('ticketExport', (config) => ({
 Alpine.data('webPushSettings', () => ({
     supported: false,
     subscribed: false,
-    message: 'Checking notification support... / กำลังตรวจสอบการรองรับ...',
+    message: TicketFlowLanguage.format({ en: 'Checking notification support...', th: 'กำลังตรวจสอบการรองรับ...' }),
     registration: null,
     async init() {
         this.supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && Boolean(document.querySelector('meta[name="webpush-public-key"]')?.content);
 
         if (!this.supported) {
-            this.message = 'Web Push is not available on this device or VAPID keys are missing. / อุปกรณ์นี้ยังไม่รองรับ Web Push หรือยังไม่ได้ตั้งค่า VAPID';
+            this.message = TicketFlowLanguage.format({ en: 'Web Push is not available on this device or VAPID keys are missing.', th: 'อุปกรณ์นี้ยังไม่รองรับ Web Push หรือยังไม่ได้ตั้งค่า VAPID' });
             return;
         }
 
@@ -1216,8 +1262,8 @@ Alpine.data('webPushSettings', () => ({
         const subscription = await this.registration.pushManager.getSubscription();
         this.subscribed = Boolean(subscription);
         this.message = this.subscribed
-            ? 'Web Push is enabled on this device. / เปิด Web Push บนอุปกรณ์นี้แล้ว'
-            : 'Web Push is ready. / พร้อมเปิด Web Push';
+            ? TicketFlowLanguage.format({ en: 'Web Push is enabled on this device.', th: 'เปิด Web Push บนอุปกรณ์นี้แล้ว' })
+            : TicketFlowLanguage.format({ en: 'Web Push is ready.', th: 'พร้อมเปิด Web Push' });
     },
     async subscribe() {
         if (!this.supported) {
@@ -1227,7 +1273,7 @@ Alpine.data('webPushSettings', () => ({
         const permission = await Notification.requestPermission();
 
         if (permission !== 'granted') {
-            this.message = 'Notification permission was not granted. / ยังไม่ได้อนุญาตการแจ้งเตือน';
+            this.message = TicketFlowLanguage.format({ en: 'Notification permission was not granted.', th: 'ยังไม่ได้อนุญาตการแจ้งเตือน' });
             return;
         }
 
@@ -1247,7 +1293,7 @@ Alpine.data('webPushSettings', () => ({
         });
 
         this.subscribed = true;
-        this.message = 'Web Push is enabled on this device. / เปิด Web Push บนอุปกรณ์นี้แล้ว';
+        this.message = TicketFlowLanguage.format({ en: 'Web Push is enabled on this device.', th: 'เปิด Web Push บนอุปกรณ์นี้แล้ว' });
     },
     async unsubscribe() {
         const subscription = await this.registration?.pushManager.getSubscription();
@@ -1269,7 +1315,7 @@ Alpine.data('webPushSettings', () => ({
 
         await subscription.unsubscribe();
         this.subscribed = false;
-        this.message = 'Web Push is off on this device. / ปิด Web Push บนอุปกรณ์นี้แล้ว';
+        this.message = TicketFlowLanguage.format({ en: 'Web Push is off on this device.', th: 'ปิด Web Push บนอุปกรณ์นี้แล้ว' });
     },
 }));
 
@@ -1324,8 +1370,8 @@ Alpine.data('adminEventForm', (config) => ({
     description: config.description || '',
     descriptionFormat: config.descriptionFormat || 'html',
     paymentAccounts: (config.paymentAccounts?.length ? config.paymentAccounts : [
-        { key: 'qr-payment', method: 'qr_payment', label: 'QR payment / ชำระด้วย QR', bank_name: '', account_name: '', account_number: '', instructions: '', is_active: true },
-        { key: 'bank-transfer', method: 'bank_transfer', label: 'Bank transfer / โอนธนาคาร', bank_name: '', account_name: '', account_number: '', instructions: '', is_active: true },
+        { key: 'qr-payment', method: 'qr_payment', label: TicketFlowLanguage.format({ en: 'QR payment', th: 'ชำระด้วย QR' }), bank_name: '', account_name: '', account_number: '', instructions: '', is_active: true },
+        { key: 'bank-transfer', method: 'bank_transfer', label: TicketFlowLanguage.format({ en: 'Bank transfer', th: 'โอนธนาคาร' }), bank_name: '', account_name: '', account_number: '', instructions: '', is_active: true },
     ]).map((account, index) => ({
         key: account.key || `payment-${index}-${Date.now()}`,
         method: account.method || 'qr_payment',
@@ -1342,7 +1388,7 @@ Alpine.data('adminEventForm', (config) => ({
         return {
             key: `payment-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             method: 'qr_payment',
-            label: 'QR payment / ชำระด้วย QR',
+            label: TicketFlowLanguage.format({ en: 'QR payment', th: 'ชำระด้วย QR' }),
             bank_name: '',
             account_name: '',
             account_number: '',
@@ -1386,7 +1432,7 @@ Alpine.data('adminEventForm', (config) => ({
     },
     previewHtml() {
         if (this.descriptionFormat === 'html') {
-            return this.description || '<p class="text-zinc-500">No description yet / ยังไม่มีรายละเอียด</p>';
+            return this.description || `<p class="text-zinc-500">${TicketFlowLanguage.format({ en: 'No description yet', th: 'ยังไม่มีรายละเอียด' })}</p>`;
         }
 
         return this.escapeHtml(this.description)
@@ -1447,7 +1493,7 @@ Alpine.data('lineLiffLogin', (config) => ({
             }
         } catch (error) {
             if (!config.auto) {
-                this.message = 'LINE LIFF could not start. Please check the LIFF ID and endpoint URL. / ไม่สามารถเริ่ม LINE LIFF ได้ กรุณาตรวจสอบ LIFF ID และ Endpoint URL';
+                this.message = TicketFlowLanguage.format({ en: 'LINE LIFF could not start. Please check the LIFF ID and endpoint URL.', th: 'ไม่สามารถเริ่ม LINE LIFF ได้ กรุณาตรวจสอบ LIFF ID และ Endpoint URL' });
             }
         }
     },
@@ -1492,7 +1538,7 @@ Alpine.data('lineLiffLogin', (config) => ({
             const idToken = this.liff.getIDToken();
 
             if (!idToken) {
-                throw new Error('Missing LINE id token. / ไม่พบ LINE id token');
+                throw new Error(TicketFlowLanguage.format({ en: 'Missing LINE id token.', th: 'ไม่พบ LINE id token' }));
             }
 
             const profile = await this.liff.getProfile().catch(() => null);
@@ -1514,14 +1560,14 @@ Alpine.data('lineLiffLogin', (config) => ({
 
             if (!response.ok) {
                 const errors = payload.errors || {};
-                throw new Error(errors.line?.[0] || payload.message || 'LINE login failed. / เข้าสู่ระบบ LINE ไม่สำเร็จ');
+                throw new Error(errors.line?.[0] || payload.message || TicketFlowLanguage.format({ en: 'LINE login failed.', th: 'เข้าสู่ระบบ LINE ไม่สำเร็จ' }));
             }
 
             sessionStorage.removeItem('line_liff_login_pending');
             window.location.href = payload.redirect || config.profileUrl;
         } catch (error) {
             this.loading = false;
-            this.message = error.message || 'LINE login failed. Please try again. / เข้าสู่ระบบ LINE ไม่สำเร็จ กรุณาลองอีกครั้ง';
+            this.message = error.message || TicketFlowLanguage.format({ en: 'LINE login failed. Please try again.', th: 'เข้าสู่ระบบ LINE ไม่สำเร็จ กรุณาลองอีกครั้ง' });
         }
     },
 }));

@@ -686,6 +686,50 @@ class AuthAndOrderFlowTest extends TestCase
         ]);
     }
 
+    public function test_super_admin_can_view_user_profile_for_support(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $customer = User::factory()->create([
+            'name' => 'Support Customer',
+            'role' => 'customer',
+            'phone' => '0812223333',
+        ]);
+        $ticket = $this->createApprovedTicket();
+        $ticket->order->update(['user_id' => $customer->id]);
+        $ticket->update(['user_id' => $customer->id]);
+
+        $this->actingAs($admin)
+            ->get('/admin/users/'.$customer->id.'/profile?view=tickets')
+            ->assertOk()
+            ->assertSee('Super admin profile view')
+            ->assertSee('Support Customer')
+            ->assertSee($ticket->ticketType->name)
+            ->assertSee('Edit holder name');
+    }
+
+    public function test_coupon_and_promotion_indexes_share_marketing_page(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get('/admin/coupons')
+            ->assertOk()
+            ->assertSee('Coupons and promotions')
+            ->assertSee('New coupon')
+            ->assertSee('Promotions');
+
+        $this->actingAs($admin)
+            ->get('/admin/promotions')
+            ->assertOk()
+            ->assertSee('Coupons and promotions')
+            ->assertSee('New promotion')
+            ->assertSee('Coupons');
+    }
+
     public function test_event_admin_can_view_event_operations_overview(): void
     {
         $this->seed();
@@ -1058,7 +1102,7 @@ class AuthAndOrderFlowTest extends TestCase
             ->patch('/orders/'.$ticket->ticket_order_id.'/tickets/'.$ticket->id.'/holder', [
                 'holder_name' => 'New Guest Name',
             ])
-            ->assertRedirect('/orders/'.$ticket->ticket_order_id);
+            ->assertRedirect();
 
         $this->assertDatabaseHas('tickets', [
             'id' => $ticket->id,
@@ -1101,7 +1145,8 @@ class AuthAndOrderFlowTest extends TestCase
         $this->actingAs($admin)
             ->get('/admin/events/1/edit')
             ->assertOk()
-            ->assertSee('Select bank / เลือกธนาคาร')
+            ->assertSee('data-i18n-en="Select bank"', false)
+            ->assertSee('data-i18n-th="เลือกธนาคาร"', false)
             ->assertSee('Krungthai Bank')
             ->assertSee('ktb.svg', false);
     }

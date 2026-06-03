@@ -14,6 +14,7 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 dark:border-white/10 dark:text-zinc-100" type="button" @click="guideOpen = true"><x-icon name="sparkles" />Guide / คู่มือ</button>
+                    <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 dark:border-white/10 dark:text-zinc-100" type="button" @click="quickSettingsOpen = !quickSettingsOpen"><x-icon name="sliders-horizontal" /><span x-text="TicketFlowLanguage.format(quickSettingsOpen ? { en: 'Hide settings', th: 'ซ่อนตั้งค่า' } : { en: 'Show settings', th: 'แสดงตั้งค่า' })"></span></button>
                     <label class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 dark:border-white/10 dark:text-zinc-100">
                         <input class="rounded border-zinc-300" type="checkbox" x-model="quickMode">
                         Quick mode / โหมดเร็ว
@@ -23,7 +24,18 @@
 
             <div class="mt-5 grid gap-4 lg:grid-cols-[1fr_.75fr]">
                 <div class="grid gap-3">
-                    <div class="grid gap-3 sm:grid-cols-2" x-show="quickMode" x-cloak>
+                    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-950 dark:border-white/10">
+                        <video x-ref="video" class="hidden min-h-[360px] max-h-[72vh] w-full bg-black object-contain" autoplay muted playsinline></video>
+                        <div class="grid min-h-[260px] place-items-center p-6 text-center text-zinc-300" x-show="$refs.video?.classList?.contains('hidden')">
+                            <div>
+                                <x-icon name="camera" class="mx-auto h-10 w-10 text-emerald-300" />
+                                <p class="mt-3 text-sm"><x-t en="Camera preview will appear here." th="ตัวอย่างกล้องจะแสดงตรงนี้" /></p>
+                                <button @click="startCamera()" class="mt-4 inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950" type="button"><x-icon name="camera" /><x-t en="Start camera" th="เปิดกล้อง" /></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-zinc-900 sm:grid-cols-2" x-show="quickSettingsOpen" x-cloak x-transition>
                         <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Event / อีเวนต์
                             <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-3 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" x-model="selectedEventId">
                                 <option value="">Select event / เลือกอีเวนต์</option>
@@ -51,8 +63,6 @@
                         <button @click="submit('check_out')" class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 font-semibold text-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-zinc-100" type="button" x-show="!quickMode" :disabled="!canCheckOut()"><x-icon name="log-out" />Check out / เช็กเอาต์</button>
                         <button @click="startCamera()" class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-zinc-800 dark:border-white/10 dark:text-zinc-100" type="button"><x-icon name="camera" />Camera / กล้อง</button>
                     </div>
-
-                    <video x-ref="video" class="hidden min-h-[360px] max-h-[72vh] w-full rounded-lg bg-black object-contain" autoplay muted playsinline></video>
 
                     <template x-if="message">
                         <div class="rounded-md border p-4 text-sm" :class="ok ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-800 dark:text-emerald-100' : 'border-rose-400/30 bg-rose-400/10 text-rose-800 dark:text-rose-100'" x-text="message"></div>
@@ -128,7 +138,10 @@
                     <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="clock" class="h-5 w-5 text-emerald-500" />Latest {{ $perPage }} scans / รายการสแกนล่าสุด {{ $perPage }} รายการ</h2>
                     <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Click a scan row to open the ticket details. / คลิกแถวรายการสแกนเพื่อเปิดรายละเอียดตั๋ว</p>
                 </div>
-                <form class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="flex items-start justify-end">
+                    <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 dark:border-white/10 dark:text-zinc-100" type="button" @click="scanFiltersOpen = !scanFiltersOpen"><x-icon name="filter" /><span x-text="TicketFlowLanguage.format(scanFiltersOpen ? { en: 'Hide filters', th: 'ซ่อนตัวกรอง' } : { en: 'Show filters', th: 'แสดงตัวกรอง' })"></span></button>
+                </div>
+                <form class="grid gap-2 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-4" x-show="scanFiltersOpen" x-cloak x-transition>
                     <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">Event / อีเวนต์
                         <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="event_id" onchange="this.form.submit()">
                             <option value="">All events / ทุกอีเวนต์</option>

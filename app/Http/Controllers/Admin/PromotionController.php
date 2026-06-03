@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Coupon;
 use App\Models\Event;
 use App\Models\Promotion;
 use Illuminate\Http\RedirectResponse;
@@ -13,21 +14,14 @@ class PromotionController extends Controller
 {
     public function index(Request $request): View
     {
-        $promotions = Promotion::with(['event', 'ticketType'])->latest();
         $events = $this->eventsForUser($request);
+        $coupons = $this->filteredCoupons($request, $events);
+        $promotions = $this->filteredPromotions($request, $events);
 
-        if ($request->user()->role !== 'super_admin') {
-            $eventIds = $events->pluck('id');
-            $promotions->whereIn('event_id', $eventIds);
-        }
-
-        $promotions
-            ->when($request->filled('event_id'), fn ($query) => $query->where('event_id', $request->integer('event_id')))
-            ->when($request->filled('type'), fn ($query) => $query->where('promotion_type', $request->string('type')))
-            ->when($request->filled('status'), fn ($query) => $query->where('is_active', $request->string('status') === 'active'));
-
-        return view('admin.promotions.index', [
-            'promotions' => $promotions->paginate(20)->withQueryString(),
+        return view('admin.marketing.index', [
+            'activeTab' => 'promotions',
+            'coupons' => $coupons->paginate(20, ['*'], 'coupons_page')->withQueryString(),
+            'promotions' => $promotions->paginate(20, ['*'], 'promotions_page')->withQueryString(),
             'events' => $events,
         ]);
     }
@@ -130,6 +124,33 @@ class PromotionController extends Controller
         }
 
         return $events->get();
+    }
+
+    private function filteredCoupons(Request $request, $events)
+    {
+        $coupons = Coupon::with(['event', 'ticketType'])->latest();
+
+        if ($request->user()->role !== 'super_admin') {
+            $coupons->whereIn('event_id', $events->pluck('id'));
+        }
+
+        return $coupons
+            ->when($request->filled('event_id'), fn ($query) => $query->where('event_id', $request->integer('event_id')))
+            ->when($request->filled('status'), fn ($query) => $query->where('is_active', $request->string('status') === 'active'));
+    }
+
+    private function filteredPromotions(Request $request, $events)
+    {
+        $promotions = Promotion::with(['event', 'ticketType'])->latest();
+
+        if ($request->user()->role !== 'super_admin') {
+            $promotions->whereIn('event_id', $events->pluck('id'));
+        }
+
+        return $promotions
+            ->when($request->filled('event_id'), fn ($query) => $query->where('event_id', $request->integer('event_id')))
+            ->when($request->filled('type'), fn ($query) => $query->where('promotion_type', $request->string('type')))
+            ->when($request->filled('status'), fn ($query) => $query->where('is_active', $request->string('status') === 'active'));
     }
 
     private function canManagePromotion(Promotion $promotion): bool

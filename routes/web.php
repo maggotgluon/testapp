@@ -89,5 +89,6 @@ Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->na
 });
 
 Route::middleware(['auth', 'role:super_admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/users/{user}/profile', [EventController::class, 'profile'])->name('users.profile');
     Route::resource('users', AdminUserController::class)->only(['index', 'edit', 'update', 'destroy']);
 });
