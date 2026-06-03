@@ -66,11 +66,37 @@ class OrderController extends Controller
 
     public function approve(Request $request, TicketOrder $order, CustomerNotificationService $notifications, CrmSyncService $crm): RedirectResponse
     {
-        $order->loadMissing('items.event');
+        $order->loadMissing(['items.event', 'payments']);
         $this->authorizeOrder($request, $order);
 
         if (! $this->canTransition($order, 'approved')) {
             return back()->withErrors(['status' => 'Only pending orders can be approved. / อนุมัติได้เฉพาะออเดอร์ที่รอตรวจสอบ']);
+        }
+
+        $payment = $order->payments()->latest()->first();
+        if ($payment && $payment->slip_review_status === 'risky') {
+            return back()->withErrors([
+                'status' => 'This payment slip is flagged as risky. Please reupload or recheck the slip before approving. / สลิปนี้มีความเสี่ยง กรุณาอัปโหลดใหม่หรือตรวจใหม่ก่อนอนุมัติ',
+            ]);
+        }
+
+        if ($payment && $payment->slip_review_status === 'needs_manual_review') {
+            $manualReview = $request->boolean('manual_payment_review_confirmed') || trim((string) $request->input('manual_payment_review_note')) !== '';
+
+            if (! $manualReview) {
+                return back()->withErrors([
+                    'status' => 'This slip needs manual review. Confirm manual review or add a review note before approving. / สลิปนี้ต้องตรวจเอง กรุณายืนยันหรือเพิ่มหมายเหตุก่อนอนุมัติ',
+                ]);
+            }
+
+            if ($request->filled('manual_payment_review_note')) {
+                $payment->update([
+                    'note' => trim(implode("\n\n", array_filter([
+                        $payment->note,
+                        'Manual payment review: '.$request->string('manual_payment_review_note')->toString(),
+                    ]))),
+                ]);
+            }
         }
 
         $order->update([
@@ -148,18 +174,51 @@ class OrderController extends Controller
             ?? $order->payments()->create([
                 'method' => $order->payment_method,
                 'amount_thb' => $order->total_thb,
+                'expected_amount_thb' => $order->total_thb,
                 'status' => 'submitted',
                 'slip_path' => $order->payment_slip_path,
             ]);
 
-        $decoded = array_merge([
+        $review = array_merge([
             'slip_path' => $order->payment_slip_path,
-        ], $slipQrDecoder->decode($order->payment_slip_path));
+        ], $slipQrDecoder->review($order->payment_slip_path, $payment->fresh()->toArray(), $payment));
 
-        $payment->update($decoded);
-        $payment->update($slipQrDecoder->withDuplicateReview($decoded, $payment));
+        $payment->update($review);
 
         return back()->with('status', 'Payment slip QR checked. / ตรวจ QR จากสลิปแล้ว');
+    }
+
+    public function updatePaymentSlip(Request $request, TicketOrder $order, SlipQrDecoderService $slipQrDecoder): RedirectResponse
+    {
+        $order->loadMissing(['items.event', 'payments']);
+        $this->authorizeOrder($request, $order);
+
+        $data = $request->validate([
+            'slip' => ['required', 'image', 'max:4096'],
+        ]);
+
+        $slipPath = $data['slip']->store('payment-slips', 'uploads');
+        $order->update(['payment_slip_path' => $slipPath]);
+
+        $payment = $order->payments()->latest()->first()
+            ?? $order->payments()->create([
+                'method' => $order->payment_method,
+                'amount_thb' => $order->total_thb,
+                'expected_amount_thb' => $order->total_thb,
+                'status' => 'submitted',
+            ]);
+
+        if (! $payment->expected_amount_thb) {
+            $payment->expected_amount_thb = $order->total_thb;
+        }
+
+        $payment->slip_path = $slipPath;
+        $payment->save();
+        $payment->update(array_merge([
+            'slip_path' => $slipPath,
+        ], $slipQrDecoder->review($slipPath, $payment->fresh()->toArray(), $payment)));
+
+        return back()->with('status', 'Payment slip uploaded and checked. / อัปโหลดสลิปและตรวจแล้ว');
     }
 
     public function destroy(Request $request, TicketOrder $order): RedirectResponse

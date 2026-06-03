@@ -904,7 +904,7 @@ Alpine.data('checkout', (config) => ({
             return TicketFlowLanguage.format({ en: 'Cash sale does not require a slip. Admin approval will activate tickets.', th: 'ชำระเงินสดไม่ต้องแนบสลิป แอดมินจะอนุมัติเพื่อเปิดใช้งานตั๋ว' });
         }
 
-        return this.selectedPayment().instructions || this.payment.instructions || TicketFlowLanguage.format({ en: 'Upload your payment slip after transfer. Admin approval will activate tickets.', th: 'อัปโหลดสลิปหลังชำระเงิน แอดมินจะตรวจสอบและอนุมัติตั๋ว' });
+        return this.selectedPayment().instructions || this.payment.instructions || TicketFlowLanguage.format({ en: 'Scan/pay first, then upload the completed bank payment slip image. Admin approval will activate tickets.', th: 'สแกนและชำระเงินก่อน แล้วอัปโหลดรูปสลิปจากธนาคาร แอดมินจะตรวจสอบและอนุมัติตั๋ว' });
     },
     canSubmitOrder() {
         return this.cartQuantity() > 0

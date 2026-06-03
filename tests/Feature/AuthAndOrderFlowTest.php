@@ -1019,7 +1019,9 @@ class AuthAndOrderFlowTest extends TestCase
         $ticketId = $order->tickets()->firstOrFail()->id;
 
         $this->actingAs($admin)
-            ->post('/admin/orders/'.$order->id.'/approve')
+            ->post('/admin/orders/'.$order->id.'/approve', [
+                'manual_payment_review_confirmed' => '1',
+            ])
             ->assertRedirect();
 
         $this->actingAs($admin)
@@ -1280,7 +1282,9 @@ class AuthAndOrderFlowTest extends TestCase
         $order = TicketOrder::firstOrFail();
 
         $this->actingAs($admin)
-            ->post('/admin/orders/'.$order->id.'/approve')
+            ->post('/admin/orders/'.$order->id.'/approve', [
+                'manual_payment_review_confirmed' => '1',
+            ])
             ->assertRedirect();
 
         Http::assertSent(fn ($request) => $request->url() === 'https://api.line.me/v2/bot/message/push'
@@ -1833,6 +1837,171 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertSee('<li>Shirt</li>', false)
             ->assertSee('href="https://example.com"', false)
             ->assertDontSee('<script>', false);
+    }
+
+    public function test_checkout_stores_promptpay_account_snapshot_and_review_context(): void
+    {
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+        $ticketType->event->update([
+            'payment_accounts' => [
+                [
+                    'key' => 'promptpay-main',
+                    'method' => 'qr_payment',
+                    'label' => 'Main PromptPay',
+                    'account_name' => 'Event Organizer',
+                    'account_number' => '081-234-5678',
+                    'is_active' => true,
+                ],
+            ],
+        ]);
+
+        $this->post('/orders', [
+            'customer_name' => 'Snapshot Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'payment_account_key' => 'promptpay-main',
+            'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $payment = Payment::firstOrFail();
+
+        $this->assertSame('promptpay-main', $payment->payment_account_key);
+        $this->assertSame('Main PromptPay', $payment->payment_account_label);
+        $this->assertSame('Event Organizer', $payment->payment_account_name);
+        $this->assertSame('081-234-5678', $payment->payment_account_number);
+        $this->assertSame('0066812345678', $payment->expected_promptpay_id);
+        $this->assertSame('needs_manual_review', $payment->slip_review_status);
+        $this->assertArrayHasKey('no_qr', $payment->slip_review_flags);
+        $this->assertNotNull($payment->slip_image_sha256);
+    }
+
+    public function test_review_marks_normalized_reference_duplicate_as_risky(): void
+    {
+        $this->seed();
+        $existingOrder = TicketOrder::query()->create([
+            'order_number' => 'DUP-REF-ORDER',
+            'customer_name' => 'First Buyer',
+            'customer_phone' => '0811111111',
+            'status' => 'pending',
+            'subtotal_thb' => 100,
+            'discount_thb' => 0,
+            'total_thb' => 100,
+            'payment_method' => 'qr_payment',
+        ]);
+        Payment::query()->create([
+            'ticket_order_id' => $existingOrder->id,
+            'method' => 'qr_payment',
+            'amount_thb' => 100,
+            'status' => 'submitted',
+            'slip_qr_status' => 'decoded',
+            'slip_qr_reference' => 'ABC123',
+            'slip_qr_reference_normalized' => 'ABC123',
+        ]);
+
+        $result = app(SlipQrDecoderService::class)->reviewDecodedResult([
+            'slip_qr_status' => 'decoded',
+            'slip_qr_payload' => 'https://bank.example/slip?amount=100&ref=ABC-123',
+            'slip_qr_reference' => 'ABC-123',
+            'slip_qr_amount_thb' => 100.00,
+            'slip_qr_data' => ['format' => 'url', 'query' => ['amount' => '100', 'ref' => 'ABC-123']],
+        ], ['expected_amount_thb' => 100], new Payment);
+
+        $this->assertSame('duplicate', $result['slip_qr_status']);
+        $this->assertSame('risky', $result['slip_review_status']);
+        $this->assertSame('reference', $result['slip_qr_data']['duplicate']['matched_by']);
+        $this->assertArrayHasKey('duplicate', $result['slip_review_flags']);
+    }
+
+    public function test_risky_payment_review_blocks_admin_approval(): void
+    {
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticket = $this->createApprovedTicket();
+        $ticket->order->update(['status' => 'pending']);
+        $ticket->update(['status' => 'pending']);
+        Payment::query()->create([
+            'ticket_order_id' => $ticket->order->id,
+            'method' => 'qr_payment',
+            'amount_thb' => $ticket->order->total_thb,
+            'status' => 'submitted',
+            'slip_review_status' => 'risky',
+            'slip_review_flags' => ['duplicate' => 'This slip appears to match an existing payment.'],
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$ticket->order->id.'/approve')
+            ->assertSessionHasErrors('status');
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'id' => $ticket->order->id,
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_admin_can_reupload_slip_and_recalculate_review(): void
+    {
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+        $ticketType->event->update([
+            'payment_accounts' => [
+                [
+                    'key' => 'promptpay-main',
+                    'method' => 'qr_payment',
+                    'label' => 'Main PromptPay',
+                    'account_name' => 'Event Organizer',
+                    'account_number' => '081-234-5678',
+                    'is_active' => true,
+                ],
+            ],
+        ]);
+
+        $this->post('/orders', [
+            'customer_name' => 'Reupload Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'qr_payment',
+            'payment_account_key' => 'promptpay-main',
+            'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::with('payments')->firstOrFail();
+        $amount = $order->total_thb;
+        $this->instance(SlipQrDecoderService::class, new class($amount) extends SlipQrDecoderService {
+            public function __construct(private int $amount) {}
+
+            public function decode(?string $slipPath): array
+            {
+                return array_merge($this->parsePayloadForReview(app(QrCodeService::class)->promptPayPayload('0812345678', $this->amount)), [
+                    'slip_image_sha256' => 'reuploaded-image-hash',
+                ]);
+            }
+        });
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/payment-slip', [
+                'slip' => UploadedFile::fake()->image('new-slip.jpg', 640, 640),
+            ])
+            ->assertRedirect();
+
+        $payment = $order->payments()->latest()->firstOrFail()->fresh();
+
+        $this->assertSame('passed', $payment->slip_review_status);
+        $this->assertSame('reuploaded-image-hash', $payment->slip_image_sha256);
+        $this->assertNotSame('payment-slip.jpg', basename((string) $payment->slip_path));
+        $this->assertSame($payment->slip_path, $order->fresh()->payment_slip_path);
     }
 
     private function createApprovedTicket(): Ticket

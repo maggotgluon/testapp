@@ -24,7 +24,7 @@ use Illuminate\View\View;
 
 class OrderController extends Controller
 {
-    public function store(Request $request, CrmSyncService $crm, SlipQrDecoderService $slipQrDecoder, CustomerNotificationService $notifications): RedirectResponse
+    public function store(Request $request, CrmSyncService $crm, SlipQrDecoderService $slipQrDecoder, CustomerNotificationService $notifications, QrCodeService $qrCode): RedirectResponse
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
@@ -50,9 +50,8 @@ class OrderController extends Controller
         }
 
         $slipPath = $request->file('slip')?->store('payment-slips', 'uploads');
-        $slipQrData = $slipQrDecoder->decode($slipPath);
 
-        $order = DB::transaction(function () use ($data, $selected, $slipPath, $slipQrData, $request, $crm, $slipQrDecoder) {
+        $order = DB::transaction(function () use ($data, $selected, $slipPath, $request, $crm, $slipQrDecoder, $qrCode) {
             $user = $this->syncCustomerProfile($request->user(), $data, $crm);
             $ticketTypes = TicketType::query()
                 ->with('event')
@@ -63,6 +62,7 @@ class OrderController extends Controller
             $eventIds = $ticketTypes->pluck('event_id')->unique();
             $events = $ticketTypes->pluck('event')->unique('id');
 
+            $selectedPaymentAccount = $events->first()?->paymentOption($data['payment_account_key'] ?? null, $data['payment_method']);
             $paymentAllowed = $events->every(fn (Event $event) => (bool) $event->paymentOption($data['payment_account_key'] ?? null, $data['payment_method']));
             if (! $paymentAllowed) {
                 throw ValidationException::withMessages([
@@ -168,16 +168,28 @@ class OrderController extends Controller
                 }
             }
 
-            $payment = Payment::create(array_merge([
+            $expectedPromptPayId = $data['payment_method'] === 'qr_payment' && ! empty($selectedPaymentAccount['account_number'])
+                ? $qrCode->promptPayIdentifier((string) $selectedPaymentAccount['account_number'])
+                : null;
+
+            $payment = Payment::create([
                 'ticket_order_id' => $order->id,
                 'method' => $data['payment_method'],
+                'payment_account_key' => $selectedPaymentAccount['key'] ?? ($data['payment_account_key'] ?? null),
+                'payment_account_label' => $selectedPaymentAccount['label'] ?? null,
+                'payment_account_name' => $selectedPaymentAccount['account_name'] ?? null,
+                'payment_account_number' => $selectedPaymentAccount['account_number'] ?? null,
                 'amount_thb' => $order->total_thb,
+                'expected_amount_thb' => $order->total_thb,
+                'expected_promptpay_id' => $expectedPromptPayId,
                 'status' => $autoApprove ? 'waived' : ($data['payment_method'] === 'cash' ? 'cash_pending' : 'submitted'),
                 'slip_path' => $slipPath,
                 'note' => $data['payment_note'] ?? null,
-            ], $slipQrData));
+            ]);
 
-            $payment->update($slipQrDecoder->withDuplicateReview($slipQrData, $payment));
+            if (! $autoApprove && $data['payment_method'] !== 'cash') {
+                $payment->update($slipQrDecoder->review($slipPath, $payment->fresh()->toArray(), $payment));
+            }
 
             return $order;
         });

@@ -77,6 +77,11 @@ class QrCodeService
         return $this->serialize($data);
     }
 
+    public function promptPayIdentifier(string $target): string
+    {
+        return $this->formatTarget($target);
+    }
+
     private function field(string $id, string $value): string
     {
         return $id.str_pad((string) strlen($value), 2, '0', STR_PAD_LEFT).$value;

@@ -5,6 +5,14 @@
         : null;
     $emvco = $payment?->slip_qr_data['emv']['emvco'] ?? null;
     $duplicate = $payment?->slip_qr_data['duplicate'] ?? null;
+    $reviewFlags = $payment?->slip_review_flags ?? [];
+    $reviewStatus = $payment?->slip_review_status;
+    $reviewBadgeClass = match ($reviewStatus) {
+        'passed' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100',
+        'risky' => 'bg-rose-100 text-rose-800 dark:bg-rose-400/15 dark:text-rose-100',
+        'needs_manual_review' => 'bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-100',
+        default => 'bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200',
+    };
     $canApprove = $order->status === 'pending';
     $canReject = $order->status === 'pending';
     $canCancel = $order->status === 'approved';
@@ -59,6 +67,10 @@
                 <div><dt class="text-zinc-500">Email / อีเมล</dt><dd>{{ $order->customer_email ?: 'No email / ไม่มีอีเมล' }}</dd></div>
                 <div><dt class="text-zinc-500">Account / บัญชี</dt><dd>{{ $order->user?->name ?: 'Guest checkout / ซื้อโดยไม่ล็อกอิน' }} @if($order->user?->provider) · {{ strtoupper($order->user->provider) }} @endif</dd></div>
                 <div><dt class="text-zinc-500">Payment / การชำระเงิน</dt><dd>{{ str_replace('_', ' ', $order->payment_method) }} · THB {{ number_format($order->total_thb) }}</dd></div>
+                @if($payment)
+                    <div><dt class="text-zinc-500">Expected account / บัญชีที่ควรได้รับเงิน</dt><dd>{{ $payment->payment_account_label ?: $payment->payment_account_name ?: 'Not stored / ไม่ได้บันทึก' }} @if($payment->payment_account_number) · <span class="font-mono">{{ $payment->payment_account_number }}</span>@endif</dd></div>
+                    <div><dt class="text-zinc-500">Expected amount / ยอดที่ควรได้รับ</dt><dd>THB {{ number_format((float) ($payment->expected_amount_thb ?? $order->total_thb), 2) }}</dd></div>
+                @endif
                 <div><dt class="text-zinc-500">Note / หมายเหตุ</dt><dd>{{ $order->payment_note ?: 'No note / ไม่มีหมายเหตุ' }}</dd></div>
             </dl>
             @if($order->user?->avatar)
@@ -67,7 +79,17 @@
             <div class="mt-6" x-data="{ editStatus: false }">
                 <div class="flex flex-wrap gap-2">
                     @if($canApprove)
-                        <form method="POST" action="{{ route('admin.orders.approve', $order) }}" onsubmit="return confirm('Approve this order? / ยืนยันอนุมัติออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950"><x-icon name="check" />Approve / อนุมัติ</button></form>
+                        <form class="grid gap-2" method="POST" action="{{ route('admin.orders.approve', $order) }}" onsubmit="return confirm('Approve this order? / ยืนยันอนุมัติออเดอร์นี้?')">
+                            @csrf
+                            @if($reviewStatus === 'needs_manual_review')
+                                <label class="flex max-w-lg items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
+                                    <input class="mt-0.5" type="checkbox" name="manual_payment_review_confirmed" value="1">
+                                    <span>I manually checked the slip image, amount, receiver, and duplicate risk. / ตรวจสลิป ยอด ผู้รับ และความเสี่ยงสลิปซ้ำด้วยตัวเองแล้ว</span>
+                                </label>
+                                <input class="max-w-lg rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-zinc-950 dark:border-amber-400/30 dark:bg-zinc-950 dark:text-white" name="manual_payment_review_note" placeholder="Manual review note / หมายเหตุการตรวจเอง">
+                            @endif
+                            <button class="inline-flex w-fit items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950 {{ $reviewStatus === 'risky' ? 'opacity-60' : '' }}"><x-icon name="check" />Approve / อนุมัติ</button>
+                        </form>
                     @endif
                     @if($canReject)
                         <form method="POST" action="{{ route('admin.orders.reject', $order) }}" onsubmit="return confirm('Reject this order? / ยืนยันปฏิเสธออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md bg-rose-400 px-4 py-2 font-semibold text-zinc-950"><x-icon name="x" />Reject / ปฏิเสธ</button></form>
@@ -97,16 +119,40 @@
                 @if($order->payment_slip_path)
                     <form method="POST" action="{{ route('admin.orders.check-slip-qr', $order) }}">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-emerald-300 px-4 py-2 font-semibold text-emerald-800 dark:border-emerald-400/40 dark:text-emerald-100"><x-icon name="qr-code" />Check slip QR / ตรวจ QR สลิป</button></form>
                 @endif
+                <form class="flex flex-wrap items-center gap-2" method="POST" action="{{ route('admin.orders.payment-slip', $order) }}" enctype="multipart/form-data">
+                    @csrf
+                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100">
+                        <x-icon name="upload" />Reupload slip / อัปโหลดสลิปใหม่
+                        <input class="sr-only" type="file" name="slip" accept="image/*" required onchange="this.form.submit()">
+                    </label>
+                </form>
             </div>
             @if($order->payment_slip_path)
                 <img class="mt-6 max-h-96 rounded-lg border border-zinc-200 dark:border-white/10 object-contain" src="{{ asset('uploads/'.$order->payment_slip_path) }}" alt="Payment slip / สลิปชำระเงิน">
             @endif
-            @if($payment?->slip_qr_status)
+            @if($payment?->slip_qr_status || $payment?->slip_review_status)
                 <div class="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-zinc-950 dark:text-white"><x-icon name="scan-line" class="h-5 w-5 text-emerald-500" />Slip QR assist / ช่วยอ่าน QR จากสลิป</h2>
-                        <span class="rounded px-2 py-1 text-xs font-semibold {{ $payment->slip_qr_status === 'decoded' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100' : ($payment->slip_qr_status === 'duplicate' ? 'bg-rose-100 text-rose-800 dark:bg-rose-400/15 dark:text-rose-100' : 'bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-100') }}">{{ str_replace('_', ' ', $payment->slip_qr_status) }}</span>
+                        <div class="flex flex-wrap gap-2">
+                            @if($reviewStatus)
+                                <span class="rounded px-2 py-1 text-xs font-semibold {{ $reviewBadgeClass }}">{{ str_replace('_', ' ', $reviewStatus) }}</span>
+                            @endif
+                            @if($payment->slip_qr_status)
+                                <span class="rounded bg-white px-2 py-1 text-xs font-semibold text-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">{{ str_replace('_', ' ', $payment->slip_qr_status) }}</span>
+                            @endif
+                        </div>
                     </div>
+                    @if($reviewFlags)
+                        <div class="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
+                            <div class="font-semibold">Review flags / สิ่งที่ต้องตรวจ</div>
+                            <ul class="mt-2 grid gap-1">
+                                @foreach($reviewFlags as $flag => $message)
+                                    <li><span class="font-mono text-xs">{{ str_replace('_', ' ', $flag) }}</span>: {{ $message }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
                     @if(in_array($payment->slip_qr_status, ['decoded', 'duplicate'], true))
                         @if($duplicate)
                             <div class="mt-4 rounded-md border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-100">

@@ -40,26 +40,127 @@ class SlipQrDecoderService
             return [
                 'slip_qr_status' => 'decode_error',
                 'slip_qr_data' => ['message' => 'Payment slip file was not found.'],
+                'slip_review_status' => 'risky',
+                'slip_review_flags' => [
+                    'decode_error' => 'Payment slip file was not found.',
+                ],
+                'slip_reviewed_at' => now(),
             ];
         }
+
+        $imageHash = hash_file('sha256', $absolutePath) ?: null;
 
         try {
             $payload = trim((string) (new QRCode())->readFromFile($absolutePath));
         } catch (Throwable $exception) {
             return [
                 'slip_qr_status' => 'no_qr',
+                'slip_image_sha256' => $imageHash,
                 'slip_qr_data' => ['message' => 'No readable QR code was found in the slip image.'],
+                'slip_review_status' => 'needs_manual_review',
+                'slip_review_flags' => [
+                    'no_qr' => 'No readable QR code was found in the slip image.',
+                ],
+                'slip_reviewed_at' => now(),
             ];
         }
 
         if ($payload === '') {
             return [
                 'slip_qr_status' => 'no_qr',
+                'slip_image_sha256' => $imageHash,
                 'slip_qr_data' => ['message' => 'The QR code was empty.'],
+                'slip_review_status' => 'needs_manual_review',
+                'slip_review_flags' => [
+                    'no_qr' => 'The QR code was empty.',
+                ],
+                'slip_reviewed_at' => now(),
             ];
         }
 
-        return $this->parsePayloadForReview($payload);
+        return array_merge($this->parsePayloadForReview($payload), [
+            'slip_image_sha256' => $imageHash,
+        ]);
+    }
+
+    public function review(?string $slipPath, array $expected = [], ?Payment $currentPayment = null): array
+    {
+        if (! $slipPath) {
+            return [
+                'slip_qr_status' => 'decode_error',
+                'slip_qr_data' => ['message' => 'Payment slip is required but missing.'],
+                'slip_review_status' => 'risky',
+                'slip_review_flags' => [
+                    'missing_slip' => 'Payment slip is required but missing.',
+                ],
+                'slip_reviewed_at' => now(),
+            ];
+        }
+
+        return $this->reviewDecodedResult($this->decode($slipPath), $expected, $currentPayment);
+    }
+
+    public function reviewDecodedResult(array $result, array $expected = [], ?Payment $currentPayment = null): array
+    {
+        $result = $this->withDerivedFingerprints($result);
+        $result = $this->withDuplicateReview($result, $currentPayment);
+
+        $flags = $result['slip_review_flags'] ?? [];
+        $status = $result['slip_qr_status'] ?? null;
+        $data = $result['slip_qr_data'] ?? [];
+
+        if ($status === 'decode_error') {
+            $flags['decode_error'] ??= $data['message'] ?? 'The slip could not be decoded.';
+        }
+
+        if ($status === 'no_qr') {
+            $flags['no_qr'] ??= $data['message'] ?? 'No readable QR code was found in the slip image.';
+        }
+
+        if ($status === 'duplicate') {
+            $flags['duplicate'] = 'This slip appears to match an existing payment.';
+        }
+
+        $crc = $data['emv']['emvco']['crc_checksum'] ?? null;
+        if (is_array($crc) && ($crc['valid'] ?? null) === false) {
+            $flags['invalid_crc'] = 'The decoded QR checksum is invalid.';
+        }
+
+        $expectedAmount = $expected['expected_amount_thb'] ?? $expected['amount_thb'] ?? null;
+        $actualAmount = $result['slip_qr_amount_thb'] ?? null;
+        if ($status === 'decoded' || $status === 'duplicate') {
+            if ($expectedAmount !== null && $actualAmount !== null && abs((float) $actualAmount - (float) $expectedAmount) > 0.01) {
+                $flags['amount_mismatch'] = 'The decoded slip amount does not match this order.';
+            } elseif ($expectedAmount !== null && $actualAmount === null) {
+                $flags['missing_amount'] = 'The slip QR did not expose an amount.';
+            }
+
+            $expectedPromptPayId = $this->normalizePromptPayIdentifier((string) ($expected['expected_promptpay_id'] ?? ''));
+            if ($expectedPromptPayId !== '') {
+                $actualPromptPayId = $this->normalizePromptPayIdentifier((string) data_get($data, 'emv.emvco.merchant_account_information.promptpay_id', ''));
+                $queryReceiver = $this->normalizePromptPayIdentifier((string) data_get($data, 'query.receiver', data_get($data, 'query.account', '')));
+
+                if ($actualPromptPayId !== '' && $actualPromptPayId !== $expectedPromptPayId) {
+                    $flags['receiver_mismatch'] = 'The decoded PromptPay receiver does not match the selected account.';
+                } elseif ($actualPromptPayId === '' && $queryReceiver !== '' && $queryReceiver !== $expectedPromptPayId) {
+                    $flags['receiver_mismatch'] = 'The decoded receiver/account does not match the selected account.';
+                } elseif ($actualPromptPayId === '' && $queryReceiver === '') {
+                    $flags['missing_receiver'] = 'The slip QR did not expose a receiver account.';
+                }
+            }
+        }
+
+        $riskFlags = ['decode_error', 'missing_slip', 'duplicate', 'amount_mismatch', 'receiver_mismatch', 'invalid_crc'];
+        $manualFlags = ['no_qr', 'missing_amount', 'missing_receiver'];
+        $reviewStatus = collect(array_keys($flags))->intersect($riskFlags)->isNotEmpty()
+            ? 'risky'
+            : (collect(array_keys($flags))->intersect($manualFlags)->isNotEmpty() ? 'needs_manual_review' : 'passed');
+
+        return array_merge($result, [
+            'slip_review_status' => $reviewStatus,
+            'slip_review_flags' => $flags,
+            'slip_reviewed_at' => now(),
+        ]);
     }
 
     public function parsePayloadForReview(string $payload): array
@@ -108,6 +209,7 @@ class SlipQrDecoderService
         return [
             'slip_qr_status' => 'decoded',
             'slip_qr_payload' => $payload,
+            'slip_qr_payload_sha256' => hash('sha256', $payload),
             'slip_qr_data' => $data,
             'slip_qr_amount_thb' => $amount,
             'slip_qr_paid_at' => $paidAt,
@@ -124,6 +226,19 @@ class SlipQrDecoderService
                 $emv['62.07'] ?? null,
                 $emv['emvco']['merchant_account_information']['promptpay_id'] ?? null,
             ]),
+            'slip_qr_reference_normalized' => $this->normalizeReference($this->firstFilled([
+                $slipVerify['transaction_reference'] ?? null,
+                $query['ref'] ?? null,
+                $query['reference'] ?? null,
+                $query['transactionId'] ?? null,
+                $query['transaction_id'] ?? null,
+                $query['transRef'] ?? null,
+                $query['trans_ref'] ?? null,
+                $query['billPaymentRef1'] ?? null,
+                $emv['62.05'] ?? null,
+                $emv['62.07'] ?? null,
+                $emv['emvco']['merchant_account_information']['promptpay_id'] ?? null,
+            ])),
             'slip_qr_receiver' => $this->firstFilled([
                 $slipVerify['sending_bank_name'] ?? null,
                 $query['receiver'] ?? null,
@@ -146,11 +261,70 @@ class SlipQrDecoderService
             return $result;
         }
 
+        $result = $this->withDerivedFingerprints($result);
+        [$duplicate, $matchedBy] = $this->findDuplicatePayment($result, $currentPayment);
+
+        if (! $duplicate) {
+            return $result;
+        }
+
+        $data = $result['slip_qr_data'] ?? [];
+        $data['duplicate'] = [
+            'payment_id' => $duplicate->id,
+            'ticket_order_id' => $duplicate->ticket_order_id,
+            'order_number' => $duplicate->order?->order_number,
+            'customer_name' => $duplicate->order?->customer_name,
+            'matched_by' => $matchedBy,
+        ];
+
+        return array_merge($result, [
+            'slip_qr_status' => 'duplicate',
+            'slip_qr_data' => $data,
+        ]);
+    }
+
+    private function withDerivedFingerprints(array $result): array
+    {
+        if (! empty($result['slip_qr_payload']) && empty($result['slip_qr_payload_sha256'])) {
+            $result['slip_qr_payload_sha256'] = hash('sha256', $result['slip_qr_payload']);
+        }
+
+        if (! empty($result['slip_qr_reference']) && empty($result['slip_qr_reference_normalized'])) {
+            $result['slip_qr_reference_normalized'] = $this->normalizeReference($result['slip_qr_reference']);
+        }
+
+        return $result;
+    }
+
+    private function findDuplicatePayment(array $result, ?Payment $currentPayment = null): array
+    {
+        $checks = [
+            'image' => ['slip_image_sha256', $result['slip_image_sha256'] ?? null],
+            'payload' => ['slip_qr_payload_sha256', $result['slip_qr_payload_sha256'] ?? null],
+            'reference' => ['slip_qr_reference_normalized', $result['slip_qr_reference_normalized'] ?? null],
+        ];
+
+        foreach ($checks as $matchedBy => [$column, $value]) {
+            if (! $value) {
+                continue;
+            }
+
+            $duplicate = Payment::query()
+                ->with('order:id,order_number,customer_name,customer_phone')
+                ->when($currentPayment?->exists, fn ($query) => $query->whereKeyNot($currentPayment->getKey()))
+                ->where($column, $value)
+                ->first();
+
+            if ($duplicate) {
+                return [$duplicate, $matchedBy];
+            }
+        }
+
         $payload = $result['slip_qr_payload'] ?? null;
         $reference = $result['slip_qr_reference'] ?? null;
 
         if (! $payload && ! $reference) {
-            return $result;
+            return [null, null];
         }
 
         $duplicate = Payment::query()
@@ -168,23 +342,7 @@ class SlipQrDecoderService
             ->whereNotNull('slip_qr_status')
             ->first();
 
-        if (! $duplicate) {
-            return $result;
-        }
-
-        $data = $result['slip_qr_data'] ?? [];
-        $data['duplicate'] = [
-            'payment_id' => $duplicate->id,
-            'ticket_order_id' => $duplicate->ticket_order_id,
-            'order_number' => $duplicate->order?->order_number,
-            'customer_name' => $duplicate->order?->customer_name,
-            'matched_by' => $payload && $duplicate->slip_qr_payload === $payload ? 'payload' : 'reference',
-        ];
-
-        return array_merge($result, [
-            'slip_qr_status' => 'duplicate',
-            'slip_qr_data' => $data,
-        ]);
+        return [$duplicate, $payload && $duplicate?->slip_qr_payload === $payload ? 'payload' : 'reference'];
     }
 
     private function parseSlipVerifyPayload(string $payload): array
@@ -399,6 +557,20 @@ class SlipQrDecoderService
         }
 
         return null;
+    }
+
+    private function normalizeReference(?string $reference): ?string
+    {
+        if (! is_scalar($reference) || trim((string) $reference) === '') {
+            return null;
+        }
+
+        return strtoupper(preg_replace('/[^A-Z0-9]/i', '', (string) $reference) ?? '');
+    }
+
+    private function normalizePromptPayIdentifier(string $value): string
+    {
+        return preg_replace('/[^0-9]/', '', $value) ?? '';
     }
 
     private function crc16Xmodem(string $payload): int

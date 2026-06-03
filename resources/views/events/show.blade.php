@@ -342,6 +342,7 @@
                                 <template x-if="payment.qr_payment_image">
                                     <div><dt class="text-emerald-700 dark:text-emerald-200"><x-t en="Reference QR image" th="รูป QR อ้างอิง" /></dt><dd><a class="inline-flex items-center gap-1.5 underline" :href="payment.qr_payment_image" target="_blank"><x-icon name="qr-code" class="h-3.5 w-3.5" /><x-t en="Open uploaded account QR" th="เปิดรูป QR ที่อัปโหลด" /></a></dd></div>
                                 </template>
+                                <div class="sm:col-span-2 text-sm text-emerald-800 dark:text-emerald-100"><x-t en="Scan this PromptPay QR to pay, then upload the bank payment slip image below." th="สแกน QR พร้อมเพย์นี้เพื่อชำระเงิน แล้วอัปโหลดรูปสลิปจากธนาคารด้านล่าง" /></div>
                             </dl>
                         </div>
                     </template>
@@ -358,10 +359,10 @@
                         </template>
                     </select></label>
                     <div class="text-sm text-zinc-700 dark:text-zinc-300" x-show="slipRequired()" x-cloak>
-                        <x-t en="Payment slip" th="สลิปชำระเงิน" /> <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200"><x-t en="required" th="จำเป็น" /></span>
+                        <x-t en="Bank payment slip image" th="รูปสลิปจากธนาคาร" /> <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200"><x-t en="required" th="จำเป็น" /></span>
                         <label class="mt-1 flex cursor-pointer items-center justify-center rounded-md border border-dashed border-emerald-400/50 bg-white dark:bg-zinc-950 px-3 py-2 font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-400/10">
                         <input class="sr-only" name="slip" type="file" accept="image/*" @change="setSlipPreview($event)" :required="slipRequired()">
-                            <span class="inline-flex items-center gap-2"><x-icon name="upload" /><x-t en="Attach payment slip" th="แนบสลิป" /></span>
+                            <span class="inline-flex items-center gap-2"><x-icon name="upload" /><x-t en="Attach bank slip" th="แนบสลิปธนาคาร" /></span>
                         </label>
                         <p class="mt-1 truncate text-xs text-zinc-500" x-text="slipName || TicketFlowLanguage.format({ en: 'No file attached yet', th: 'ยังไม่ได้แนบไฟล์' })"></p>
                         <template x-if="slipPreviewUrl">
