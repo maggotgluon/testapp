@@ -171,7 +171,7 @@
                                 <form method="POST" action="{{ route('admin.orders.cancel', $order) }}" onsubmit="return confirm(TicketFlowLanguage.format({ en: 'Cancel this approved order?', th: 'ยืนยันยกเลิกออเดอร์ที่อนุมัติแล้ว?' }))">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-700 dark:border-amber-400/40 dark:text-amber-100"><x-icon name="ban" /><x-t en="Cancel" th="ยกเลิก" /></button></form>
                                 <form method="POST" action="{{ route('admin.orders.refund', $order) }}" onsubmit="return confirm(TicketFlowLanguage.format({ en: 'Refund this approved order?', th: 'ยืนยันคืนเงินออเดอร์นี้?' }))">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-800 dark:border-white/10 dark:text-zinc-100"><x-icon name="undo" /><x-t en="Refund" th="คืนเงิน" /></button></form>
                             </div>
-                        @elseif(in_array($order->status, ['cancelled', 'refunded'], true))
+                        @elseif(in_array($order->status, ['rejected', 'cancelled', 'refunded'], true))
                             <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm(TicketFlowLanguage.format({ en: 'Delete this order and its tickets?', th: 'ลบออเดอร์และตั๋วทั้งหมด?' }))">@csrf @method('DELETE')<button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" /><x-t en="Delete" th="ลบ" /></button></form>
                         @endif
                     </div>
@@ -221,7 +221,7 @@
                             </select>
                             <button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="save" /><x-t en="Update" th="อัปเดต" /></button>
                         </form>
-                        @if(in_array($ticket->order->status, ['cancelled', 'refunded'], true))
+                        @if(in_array($ticket->order->status, ['rejected', 'cancelled', 'refunded'], true))
                             <form method="POST" action="{{ route('admin.events.tickets.destroy', [$event, $ticket]) }}" onsubmit="return confirm(TicketFlowLanguage.format({ en: 'Delete this ticket?', th: 'ลบตั๋วนี้?' }))">
                                 @csrf
                                 @method('DELETE')

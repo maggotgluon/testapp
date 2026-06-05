@@ -17,7 +17,7 @@
     $canReject = $order->status === 'pending';
     $canCancel = $order->status === 'approved';
     $canRefund = $order->status === 'approved';
-    $canDelete = in_array($order->status, ['cancelled', 'refunded'], true);
+    $canDelete = in_array($order->status, ['rejected', 'cancelled', 'refunded'], true);
     $showSlipQrPanel = $payment
         && ($payment->slip_qr_status || $payment->slip_review_status)
         && ! ($order->payment_method === 'bank_transfer'
@@ -259,7 +259,7 @@
                                 <button class="self-end inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-3 py-2 text-sm font-semibold text-zinc-950"><x-icon name="save" />Save / บันทึก</button>
                             </form>
                         </div>
-                        @if(in_array($order->status, ['cancelled', 'refunded'], true))
+                        @if(in_array($order->status, ['rejected', 'cancelled', 'refunded'], true))
                             <form class="click-area-content mt-3" method="POST" action="{{ route('admin.events.tickets.destroy', [$ticket->event, $ticket]) }}" onsubmit="return confirm('Delete this ticket? / ลบตั๋วนี้?')">
                                 @csrf
                                 @method('DELETE')

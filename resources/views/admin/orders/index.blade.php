@@ -61,7 +61,7 @@
                     </div>
                     <div class="click-area-content flex flex-wrap items-center gap-2">
                         <x-status-badge :status="$order->status" />
-                        @if(in_array($order->status, ['cancelled', 'refunded'], true))
+                        @if(in_array($order->status, ['rejected', 'cancelled', 'refunded'], true))
                             <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">
                                 @csrf
                                 @method('DELETE')

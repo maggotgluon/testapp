@@ -234,8 +234,8 @@ class OrderController extends Controller
         $order->loadMissing('items.event');
         $this->authorizeOrder($request, $order);
 
-        if (! in_array($order->status, ['cancelled', 'refunded'], true)) {
-            return back()->withErrors(['status' => 'Cancel or refund the order before deleting it. / กรุณายกเลิกหรือคืนเงินก่อนลบออเดอร์']);
+        if (! in_array($order->status, ['rejected', 'cancelled', 'refunded'], true)) {
+            return back()->withErrors(['status' => 'Reject, cancel, or refund the order before deleting it. / กรุณาปฏิเสธ ยกเลิก หรือคืนเงินก่อนลบออเดอร์']);
         }
 
         $slips->deleteActiveSlipForOrder($order);

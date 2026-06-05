@@ -1039,7 +1039,42 @@ class AuthAndOrderFlowTest extends TestCase
         $this->assertDatabaseMissing('tickets', ['id' => $ticketId]);
     }
 
-    public function test_pending_order_cannot_be_deleted_before_cancel_or_refund(): void
+    public function test_super_admin_can_delete_rejected_order_with_tickets(): void
+    {
+        $this->seed();
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Rejected Delete Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::firstOrFail();
+        $ticketId = $order->tickets()->firstOrFail()->id;
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/reject')
+            ->assertRedirect();
+
+        $this->actingAs($admin)
+            ->delete('/admin/orders/'.$order->id)
+            ->assertRedirect('/admin/orders');
+
+        $this->assertDatabaseMissing('ticket_orders', ['id' => $order->id]);
+        $this->assertDatabaseMissing('tickets', ['id' => $ticketId]);
+    }
+
+    public function test_pending_order_cannot_be_deleted_before_reject_cancel_or_refund(): void
     {
         $this->seed();
 

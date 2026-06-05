@@ -31,7 +31,7 @@
                                         <form method="POST" action="{{ route('admin.orders.cancel', $order) }}" onsubmit="return confirm('Cancel this approved order? / ยืนยันยกเลิกออเดอร์ที่อนุมัติแล้ว?')">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-700 dark:border-amber-400/40 dark:text-amber-100"><x-icon name="ban" />Cancel / ยกเลิก</button></form>
                                         <form method="POST" action="{{ route('admin.orders.refund', $order) }}" onsubmit="return confirm('Refund this approved order? / ยืนยันคืนเงินออเดอร์นี้?')">@csrf<button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 dark:border-white/10 dark:text-zinc-100"><x-icon name="undo" />Refund / คืนเงิน</button></form>
                                     </div>
-                                @elseif(in_array($order->status, ['cancelled', 'refunded'], true))
+                                @elseif(in_array($order->status, ['rejected', 'cancelled', 'refunded'], true))
                                     <form method="POST" action="{{ route('admin.orders.destroy', $order) }}" onsubmit="return confirm('Delete this order and its tickets? / ลบออเดอร์และตั๋วทั้งหมด?')">@csrf @method('DELETE')<button class="inline-flex items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-400/40 dark:text-rose-200"><x-icon name="trash-2" />Delete / ลบ</button></form>
                                 @endif
                             </div>
