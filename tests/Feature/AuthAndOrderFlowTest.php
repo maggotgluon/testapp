@@ -992,7 +992,10 @@ class AuthAndOrderFlowTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/admin/orders/'.$existingOrder->id)
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('Slip QR assist / ช่วยอ่าน QR จากสลิป')
+            ->assertSee('x-data="{ slipQrOpen: false }"', false)
+            ->assertSee('Show details / ดูรายละเอียด');
     }
 
     public function test_super_admin_can_delete_cancelled_order_with_tickets(): void
@@ -2050,6 +2053,158 @@ class AuthAndOrderFlowTest extends TestCase
         $this->assertSame('reuploaded-image-hash', $payment->slip_image_sha256);
         $this->assertNotSame('payment-slip.jpg', basename((string) $payment->slip_path));
         $this->assertSame($payment->slip_path, $order->fresh()->payment_slip_path);
+    }
+
+    public function test_checkout_compresses_payment_slip_before_storage(): void
+    {
+        Storage::fake('uploads');
+        $this->seed();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Compressed Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'slip' => UploadedFile::fake()->image('large-slip.png', 2400, 1800),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $payment = Payment::firstOrFail();
+
+        Storage::disk('uploads')->assertExists($payment->slip_path);
+        $this->assertStringEndsWith('.jpg', $payment->slip_path);
+
+        [$width, $height] = getimagesize(Storage::disk('uploads')->path($payment->slip_path));
+        $this->assertLessThanOrEqual(1600, max($width, $height));
+    }
+
+    public function test_rejecting_order_deletes_active_payment_slip_but_keeps_review_data(): void
+    {
+        Storage::fake('uploads');
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Reject Slip Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::with('payments')->firstOrFail();
+        $path = $order->payment_slip_path;
+        $payment = $order->payments->first();
+        $payment->update([
+            'slip_qr_payload' => 'duplicate-proof-payload',
+            'slip_qr_payload_sha256' => hash('sha256', 'duplicate-proof-payload'),
+            'slip_qr_reference' => 'REF123',
+            'slip_qr_reference_normalized' => 'REF123',
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/reject')
+            ->assertRedirect();
+
+        Storage::disk('uploads')->assertMissing($path);
+        $payment = $payment->fresh();
+        $this->assertNull($order->fresh()->payment_slip_path);
+        $this->assertNull($payment->slip_path);
+        $this->assertNotNull($payment->slip_deleted_at);
+        $this->assertSame('duplicate-proof-payload', $payment->slip_qr_payload);
+        $this->assertSame('REF123', $payment->slip_qr_reference_normalized);
+    }
+
+    public function test_canceling_order_deletes_active_payment_slip(): void
+    {
+        Storage::fake('uploads');
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Cancel Slip Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::with('payments')->firstOrFail();
+        $path = $order->payment_slip_path;
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/approve', [
+                'manual_payment_review_confirmed' => '1',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$order->id.'/cancel')
+            ->assertRedirect();
+
+        Storage::disk('uploads')->assertMissing($path);
+        $this->assertNull($order->fresh()->payment_slip_path);
+        $this->assertNull($order->payments()->firstOrFail()->slip_path);
+    }
+
+    public function test_ended_event_archive_moves_approved_slips_to_private_storage(): void
+    {
+        Storage::fake('uploads');
+        Storage::fake('local');
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticketType = TicketType::query()
+            ->get()
+            ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
+
+        $this->post('/orders', [
+            'customer_name' => 'Archive Slip Buyer',
+            'customer_phone' => '0812345678',
+            'payment_method' => 'bank_transfer',
+            'terms_accepted' => '1',
+            'slip' => $this->paymentSlip(),
+            'items' => [
+                ['ticket_type_id' => $ticketType->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = TicketOrder::with('payments')->firstOrFail();
+        $path = $order->payment_slip_path;
+        $order->update(['status' => 'approved']);
+        $order->tickets()->update(['status' => 'approved']);
+        $ticketType->event->update([
+            'starts_at' => now()->subDays(2),
+            'ends_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/admin/events/'.$ticketType->event_id.'/archive-payment-slips')
+            ->assertRedirect()
+            ->assertSessionHas('status');
+
+        $payment = $order->payments()->firstOrFail()->fresh();
+        Storage::disk('uploads')->assertMissing($path);
+        Storage::disk('local')->assertExists($payment->slip_archived_path);
+        $this->assertNull($order->fresh()->payment_slip_path);
+        $this->assertNull($payment->slip_path);
+        $this->assertNotNull($payment->slip_archived_at);
     }
 
     private function createApprovedTicket(): Ticket

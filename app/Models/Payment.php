@@ -19,6 +19,9 @@ class Payment extends Model
         'expected_promptpay_id',
         'status',
         'slip_path',
+        'slip_archived_path',
+        'slip_archived_at',
+        'slip_deleted_at',
         'slip_image_sha256',
         'note',
         'slip_qr_status',
@@ -40,6 +43,8 @@ class Payment extends Model
         'slip_qr_data' => 'array',
         'slip_qr_amount_thb' => 'decimal:2',
         'slip_qr_paid_at' => 'datetime',
+        'slip_archived_at' => 'datetime',
+        'slip_deleted_at' => 'datetime',
         'slip_review_flags' => 'array',
         'slip_reviewed_at' => 'datetime',
     ];

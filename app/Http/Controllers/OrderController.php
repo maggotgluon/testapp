@@ -12,6 +12,7 @@ use App\Models\TicketType;
 use App\Models\User;
 use App\Services\CustomerNotificationService;
 use App\Services\CrmSyncService;
+use App\Services\PaymentSlipStorageService;
 use App\Services\QrCodeService;
 use App\Services\SlipQrDecoderService;
 use Illuminate\Http\RedirectResponse;
@@ -24,7 +25,7 @@ use Illuminate\View\View;
 
 class OrderController extends Controller
 {
-    public function store(Request $request, CrmSyncService $crm, SlipQrDecoderService $slipQrDecoder, CustomerNotificationService $notifications, QrCodeService $qrCode): RedirectResponse
+    public function store(Request $request, CrmSyncService $crm, SlipQrDecoderService $slipQrDecoder, CustomerNotificationService $notifications, QrCodeService $qrCode, PaymentSlipStorageService $slips): RedirectResponse
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
@@ -49,7 +50,7 @@ class OrderController extends Controller
             return back()->withErrors(['items' => 'Please select at least one ticket. / กรุณาเลือกตั๋วอย่างน้อย 1 ใบ'])->withInput();
         }
 
-        $slipPath = $request->file('slip')?->store('payment-slips', 'uploads');
+        $slipPath = $request->file('slip') ? $slips->store($request->file('slip')) : null;
 
         $order = DB::transaction(function () use ($data, $selected, $slipPath, $request, $crm, $slipQrDecoder, $qrCode) {
             $user = $this->syncCustomerProfile($request->user(), $data, $crm);

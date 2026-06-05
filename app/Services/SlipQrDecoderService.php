@@ -181,7 +181,7 @@ class SlipQrDecoderService
         }
 
         [$width, $height, $type] = $size;
-        $maxDimension = 1400;
+        $maxDimension = 900;
 
         if ($width <= $maxDimension && $height <= $maxDimension) {
             return $absolutePath;

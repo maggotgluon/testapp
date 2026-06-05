@@ -8,6 +8,7 @@ use App\Models\TicketType;
 use App\Models\TicketOrder;
 use App\Services\CrmSyncService;
 use App\Services\CustomerNotificationService;
+use App\Services\PaymentSlipStorageService;
 use App\Services\SlipQrDecoderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -116,7 +117,7 @@ class OrderController extends Controller
         return back()->with('status', 'Order approved and tickets activated.');
     }
 
-    public function reject(Request $request, TicketOrder $order): RedirectResponse
+    public function reject(Request $request, TicketOrder $order, PaymentSlipStorageService $slips): RedirectResponse
     {
         $order->loadMissing('items.event');
         $this->authorizeOrder($request, $order);
@@ -127,11 +128,12 @@ class OrderController extends Controller
 
         $order->update(['status' => 'rejected']);
         $order->tickets()->update(['status' => 'rejected']);
+        $slips->deleteActiveSlipForOrder($order);
 
         return back()->with('status', 'Order rejected.');
     }
 
-    public function cancel(Request $request, TicketOrder $order): RedirectResponse
+    public function cancel(Request $request, TicketOrder $order, PaymentSlipStorageService $slips): RedirectResponse
     {
         $order->loadMissing('items.event');
         $this->authorizeOrder($request, $order);
@@ -142,6 +144,7 @@ class OrderController extends Controller
 
         $order->update(['status' => 'cancelled']);
         $order->tickets()->update(['status' => 'cancelled']);
+        $slips->deleteActiveSlipForOrder($order);
 
         return back()->with('status', 'Order cancelled.');
     }
@@ -192,7 +195,7 @@ class OrderController extends Controller
         return back()->with('status', 'Payment slip QR checked. / ตรวจ QR จากสลิปแล้ว');
     }
 
-    public function updatePaymentSlip(Request $request, TicketOrder $order, SlipQrDecoderService $slipQrDecoder): RedirectResponse
+    public function updatePaymentSlip(Request $request, TicketOrder $order, SlipQrDecoderService $slipQrDecoder, PaymentSlipStorageService $slips): RedirectResponse
     {
         $order->loadMissing(['items.event', 'payments']);
         $this->authorizeOrder($request, $order);
@@ -205,9 +208,6 @@ class OrderController extends Controller
             'slip' => ['required', 'image', 'max:4096'],
         ]);
 
-        $slipPath = $data['slip']->store('payment-slips', 'uploads');
-        $order->update(['payment_slip_path' => $slipPath]);
-
         $payment = $order->payments()->latest()->first()
             ?? $order->payments()->create([
                 'method' => $order->payment_method,
@@ -216,12 +216,12 @@ class OrderController extends Controller
                 'status' => 'submitted',
             ]);
 
+        $slipPath = $slips->replaceForPayment($order, $payment, $data['slip']);
+
         if (! $payment->expected_amount_thb) {
             $payment->expected_amount_thb = $order->total_thb;
         }
 
-        $payment->slip_path = $slipPath;
-        $payment->save();
         $payment->update(array_merge([
             'slip_path' => $slipPath,
         ], $slipQrDecoder->review($slipPath, $payment->fresh()->toArray(), $payment)));
@@ -229,7 +229,7 @@ class OrderController extends Controller
         return back()->with('status', 'Payment slip uploaded and checked. / อัปโหลดสลิปและตรวจแล้ว');
     }
 
-    public function destroy(Request $request, TicketOrder $order): RedirectResponse
+    public function destroy(Request $request, TicketOrder $order, PaymentSlipStorageService $slips): RedirectResponse
     {
         $order->loadMissing('items.event');
         $this->authorizeOrder($request, $order);
@@ -238,6 +238,7 @@ class OrderController extends Controller
             return back()->withErrors(['status' => 'Cancel or refund the order before deleting it. / กรุณายกเลิกหรือคืนเงินก่อนลบออเดอร์']);
         }
 
+        $slips->deleteActiveSlipForOrder($order);
         $order->delete();
 
         return redirect()->route('admin.orders.index')->with('status', 'Order deleted.');

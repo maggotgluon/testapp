@@ -10,6 +10,7 @@ use App\Models\TicketOrder;
 use App\Models\User;
 use App\Services\CustomerNotificationService;
 use App\Services\EventDescriptionService;
+use App\Services\PaymentSlipStorageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -178,6 +179,19 @@ class EventController extends Controller
         return back()->with('status', 'Message sent. LINE: '.$counts['line'].' Web Push: '.$counts['web_push'].' / ส่งข้อความแล้ว LINE: '.$counts['line'].' Web Push: '.$counts['web_push']);
     }
 
+    public function archivePaymentSlips(Request $request, Event $event, PaymentSlipStorageService $slips): RedirectResponse
+    {
+        abort_unless($request->user()->canManageEvent($event), 403);
+
+        if ($event->ends_at->isFuture()) {
+            return back()->withErrors(['archive' => 'Payment slips can be archived after the event ends. / เก็บสลิปเข้าคลังได้หลังอีเวนต์จบแล้ว']);
+        }
+
+        $stats = $slips->archiveApprovedSlipsForEndedEvent($event);
+
+        return back()->with('status', 'Payment slips archived: '.$stats['archived'].' archived, '.$stats['already_archived'].' already archived, '.$stats['missing'].' missing. / เก็บสลิปแล้ว: '.$stats['archived'].' ไฟล์, เคยเก็บแล้ว '.$stats['already_archived'].' ไฟล์, ไม่พบ '.$stats['missing'].' ไฟล์');
+    }
+
     public function update(Request $request, Event $event): RedirectResponse
     {
         abort_unless($request->user()->canManageEvent($event), 403);
@@ -344,12 +358,18 @@ class EventController extends Controller
             ->all();
     }
 
-    public function destroy(Request $request, Event $event): RedirectResponse
+    public function destroy(Request $request, Event $event, PaymentSlipStorageService $slips): RedirectResponse
     {
         abort_unless($request->user()->role === 'super_admin', 403);
 
         DB::transaction(function () use ($event) {
-            TicketOrder::whereHas('items', fn ($query) => $query->where('event_id', $event->id))->delete();
+            TicketOrder::whereHas('items', fn ($query) => $query->where('event_id', $event->id))
+                ->with('payments')
+                ->get()
+                ->each(function (TicketOrder $order) use ($slips) {
+                    $slips->deleteActiveSlipForOrder($order);
+                    $order->delete();
+                });
             $event->delete();
         });
 

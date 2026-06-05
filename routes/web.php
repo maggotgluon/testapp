@@ -72,6 +72,7 @@ Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->na
     Route::get('/events/{event}/overview', [AdminEventController::class, 'overview'])->name('events.overview');
     Route::post('/events/{event}/email-attendees', [AdminEventController::class, 'emailAttendees'])->name('events.email-attendees');
     Route::post('/events/{event}/message-attendees', [AdminEventController::class, 'messageAttendees'])->name('events.message-attendees');
+    Route::post('/events/{event}/archive-payment-slips', [AdminEventController::class, 'archivePaymentSlips'])->name('events.archive-payment-slips');
     Route::patch('/events/{event}/tickets/{ticket}/status', [AdminEventController::class, 'updateTicketStatus'])->name('events.tickets.status');
     Route::delete('/events/{event}/tickets/{ticket}', [AdminEventController::class, 'destroyTicket'])->name('events.tickets.destroy');
     Route::resource('events', AdminEventController::class)->except(['show']);

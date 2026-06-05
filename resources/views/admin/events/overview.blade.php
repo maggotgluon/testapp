@@ -11,7 +11,15 @@
             <h1 class="mt-2 text-3xl font-semibold text-zinc-950 dark:text-white">{{ $event->name }}</h1>
             <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $event->starts_at->format('M j, Y H:i') }} · {{ $event->venue }}</p>
         </div>
-        <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100" href="{{ route('admin.events.edit', $event) }}"><x-icon name="edit" /><x-t en="Edit event" th="แก้ไขอีเวนต์" /></a>
+        <div class="flex flex-wrap gap-2">
+            @if($event->ends_at->isPast())
+                <form method="POST" action="{{ route('admin.events.archive-payment-slips', $event) }}" onsubmit="return confirm(TicketFlowLanguage.format({ en: 'Archive approved payment slips for this ended event?', th: 'เก็บสลิปของออเดอร์ที่อนุมัติแล้วสำหรับอีเวนต์ที่จบแล้วนี้?' }))">
+                    @csrf
+                    <button class="inline-flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-100 dark:hover:bg-amber-400/10"><x-icon name="archive" /><x-t en="Archive slips" th="เก็บสลิป" /></button>
+                </form>
+            @endif
+            <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 dark:border-white/10 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100" href="{{ route('admin.events.edit', $event) }}"><x-icon name="edit" /><x-t en="Edit event" th="แก้ไขอีเวนต์" /></a>
+        </div>
     </div>
 
     <div class="mt-6 flex flex-wrap gap-2 rounded-lg border border-zinc-200 bg-white p-2 dark:border-white/10 dark:bg-white/[0.04]">
