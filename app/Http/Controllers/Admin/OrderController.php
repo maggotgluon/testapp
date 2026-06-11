@@ -76,9 +76,18 @@ class OrderController extends Controller
 
         $payment = $order->payments()->latest()->first();
         if ($payment && $payment->slip_review_status === 'risky') {
-            return back()->withErrors([
-                'status' => 'This payment slip is flagged as risky. Please reupload or recheck the slip before approving. / สลิปนี้มีความเสี่ยง กรุณาอัปโหลดใหม่หรือตรวจใหม่ก่อนอนุมัติ',
-            ]);
+            $reviewFlags = collect($payment->slip_review_flags ?? [])->except(['invalid_crc']);
+
+            if (! $reviewFlags->has('duplicate')) {
+                $payment->update([
+                    'slip_review_status' => $reviewFlags->isEmpty() ? 'passed' : 'needs_manual_review',
+                    'slip_review_flags' => $reviewFlags->all(),
+                ]);
+            } else {
+                return back()->withErrors([
+                    'status' => 'This payment slip is flagged as risky. Please reupload or recheck the slip before approving. / สลิปนี้มีความเสี่ยง กรุณาอัปโหลดใหม่หรือตรวจใหม่ก่อนอนุมัติ',
+                ]);
+            }
         }
 
         if ($payment && $payment->slip_review_status === 'needs_manual_review') {

@@ -591,6 +591,36 @@ class AuthAndOrderFlowTest extends TestCase
         $this->assertTrue($emvco['crc_checksum']['valid']);
     }
 
+    public function test_invalid_promptpay_crc_is_not_a_review_flag(): void
+    {
+        $payload = app(QrCodeService::class)->promptPayPayload('081-234-5678', 100.50);
+        $payloadWithInvalidCrc = substr($payload, 0, -1).(str_ends_with($payload, '0') ? '1' : '0');
+
+        $result = app(SlipQrDecoderService::class)->reviewDecodedResult(
+            app(SlipQrDecoderService::class)->parsePayloadForReview($payloadWithInvalidCrc),
+            ['method' => 'qr_payment', 'expected_amount_thb' => 100.50, 'expected_promptpay_id' => '0066812345678'],
+            new Payment
+        );
+
+        $this->assertFalse($result['slip_qr_data']['emv']['emvco']['crc_checksum']['valid']);
+        $this->assertSame('passed', $result['slip_review_status']);
+        $this->assertSame([], $result['slip_review_flags']);
+    }
+
+    public function test_amount_mismatch_needs_manual_review_not_risky(): void
+    {
+        $result = app(SlipQrDecoderService::class)->reviewDecodedResult([
+            'slip_qr_status' => 'decoded',
+            'slip_qr_payload' => 'https://bank.example/slip?amount=90&ref=AMOUNT-MISMATCH',
+            'slip_qr_reference' => 'AMOUNT-MISMATCH',
+            'slip_qr_amount_thb' => 90.00,
+            'slip_qr_data' => ['format' => 'url', 'query' => ['amount' => '90', 'ref' => 'AMOUNT-MISMATCH']],
+        ], ['method' => 'qr_payment', 'expected_amount_thb' => 100], new Payment);
+
+        $this->assertSame('needs_manual_review', $result['slip_review_status']);
+        $this->assertArrayHasKey('amount_mismatch', $result['slip_review_flags']);
+    }
+
     public function test_promptpay_static_payload_has_no_amount(): void
     {
         $payload = app(QrCodeService::class)->promptPayPayload('081-234-5678');
@@ -1980,6 +2010,74 @@ class AuthAndOrderFlowTest extends TestCase
         $this->assertDatabaseHas('ticket_orders', [
             'id' => $ticket->order->id,
             'status' => 'pending',
+        ]);
+    }
+
+    public function test_invalid_crc_only_payment_review_does_not_block_admin_approval(): void
+    {
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticket = $this->createApprovedTicket();
+        $ticket->order->update(['status' => 'pending']);
+        $ticket->update(['status' => 'pending']);
+        $payment = Payment::query()->create([
+            'ticket_order_id' => $ticket->order->id,
+            'method' => 'qr_payment',
+            'amount_thb' => $ticket->order->total_thb,
+            'status' => 'submitted',
+            'slip_review_status' => 'risky',
+            'slip_review_flags' => ['invalid_crc' => 'The decoded QR checksum is invalid.'],
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$ticket->order->id.'/approve')
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'id' => $ticket->order->id,
+            'status' => 'approved',
+        ]);
+        $this->assertSame('passed', $payment->fresh()->slip_review_status);
+        $this->assertSame([], $payment->fresh()->slip_review_flags);
+    }
+
+    public function test_legacy_risky_without_duplicate_requires_manual_review_before_approval(): void
+    {
+        $this->seed();
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $ticket = $this->createApprovedTicket();
+        $ticket->order->update(['status' => 'pending']);
+        $ticket->update(['status' => 'pending']);
+        $payment = Payment::query()->create([
+            'ticket_order_id' => $ticket->order->id,
+            'method' => 'qr_payment',
+            'amount_thb' => $ticket->order->total_thb,
+            'status' => 'submitted',
+            'slip_review_status' => 'risky',
+            'slip_review_flags' => ['amount_mismatch' => 'The decoded slip amount does not match this order.'],
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$ticket->order->id.'/approve')
+            ->assertSessionHasErrors('status');
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'id' => $ticket->order->id,
+            'status' => 'pending',
+        ]);
+        $this->assertSame('needs_manual_review', $payment->fresh()->slip_review_status);
+
+        $this->actingAs($admin)
+            ->post('/admin/orders/'.$ticket->order->id.'/approve', [
+                'manual_payment_review_confirmed' => '1',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('ticket_orders', [
+            'id' => $ticket->order->id,
+            'status' => 'approved',
         ]);
     }
 

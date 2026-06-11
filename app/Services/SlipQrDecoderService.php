@@ -40,7 +40,7 @@ class SlipQrDecoderService
             return [
                 'slip_qr_status' => 'decode_error',
                 'slip_qr_data' => ['message' => 'Payment slip file was not found.'],
-                'slip_review_status' => 'risky',
+                'slip_review_status' => 'needs_manual_review',
                 'slip_review_flags' => [
                     'decode_error' => 'Payment slip file was not found.',
                 ],
@@ -95,7 +95,7 @@ class SlipQrDecoderService
             return [
                 'slip_qr_status' => 'decode_error',
                 'slip_qr_data' => ['message' => 'Payment slip is required but missing.'],
-                'slip_review_status' => 'risky',
+                'slip_review_status' => 'needs_manual_review',
                 'slip_review_flags' => [
                     'missing_slip' => 'Payment slip is required but missing.',
                 ],
@@ -128,10 +128,7 @@ class SlipQrDecoderService
             $flags['duplicate'] = 'This slip appears to match an existing payment.';
         }
 
-        $crc = $data['emv']['emvco']['crc_checksum'] ?? null;
-        if (is_array($crc) && ($crc['valid'] ?? null) === false) {
-            $flags['invalid_crc'] = 'The decoded QR checksum is invalid.';
-        }
+        unset($flags['invalid_crc']);
 
         $expectedAmount = $expected['expected_amount_thb'] ?? $expected['amount_thb'] ?? null;
         $actualAmount = $result['slip_qr_amount_thb'] ?? null;
@@ -159,8 +156,8 @@ class SlipQrDecoderService
             }
         }
 
-        $riskFlags = ['decode_error', 'missing_slip', 'duplicate', 'amount_mismatch', 'receiver_mismatch', 'invalid_crc'];
-        $manualFlags = ['no_qr'];
+        $riskFlags = ['duplicate'];
+        $manualFlags = ['decode_error', 'missing_slip', 'amount_mismatch', 'receiver_mismatch', 'no_qr'];
         $reviewStatus = collect(array_keys($flags))->intersect($riskFlags)->isNotEmpty()
             ? 'risky'
             : (collect(array_keys($flags))->intersect($manualFlags)->isNotEmpty() ? 'needs_manual_review' : 'passed');

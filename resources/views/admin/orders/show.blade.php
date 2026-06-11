@@ -5,8 +5,11 @@
         : null;
     $emvco = $payment?->slip_qr_data['emv']['emvco'] ?? null;
     $duplicate = $payment?->slip_qr_data['duplicate'] ?? null;
-    $reviewFlags = $payment?->slip_review_flags ?? [];
+    $reviewFlags = collect($payment?->slip_review_flags ?? [])->except(['invalid_crc'])->all();
     $reviewStatus = $payment?->slip_review_status;
+    if ($reviewStatus === 'risky' && ! array_key_exists('duplicate', $reviewFlags)) {
+        $reviewStatus = empty($reviewFlags) ? 'passed' : 'needs_manual_review';
+    }
     $reviewBadgeClass = match ($reviewStatus) {
         'passed' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100',
         'risky' => 'bg-rose-100 text-rose-800 dark:bg-rose-400/15 dark:text-rose-100',
