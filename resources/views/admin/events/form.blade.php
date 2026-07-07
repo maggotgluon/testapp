@@ -101,6 +101,20 @@
                 <button class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-zinc-200 px-4 py-3 font-semibold text-zinc-800 hover:border-emerald-300 dark:border-white/10 dark:text-zinc-100" type="button" @click="addPaymentAccount()"><x-icon name="plus" /><x-t en="Add payment account" th="เพิ่มบัญชีรับชำระเงิน" /></button>
                 <label class="mt-4 block text-sm text-zinc-700 dark:text-zinc-300"><x-t en="QR payment image" th="รูป QR ชำระเงิน" /><input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="file" name="qr_payment_image" accept="image/*"></label>
             </div>
+            <div class="mt-6 border-t border-zinc-200 dark:border-white/10 pt-6">
+                <h2 class="text-xl font-semibold text-zinc-950 dark:text-white"><x-t en="Beam Checkout" th="ชำระด้วย Beam" /></h2>
+                <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400"><x-t en="Accept payments via Beam Checkout (PromptPay QR, credit card, mobile banking)." th="รับชำระเงินผ่าน Beam Checkout (QR พร้อมเพย์, บัตรเครดิต, โมบายแบงก์กิ้ง)" /></p>
+                <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300"><input class="rounded border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950" type="checkbox" name="beam_enabled" value="1" @checked(old('beam_enabled', $event->beam_enabled ?? false))> <x-t en="Enable Beam Checkout" th="เปิดใช้งาน Beam Checkout" /></label>
+                    <label class="text-sm text-zinc-700 dark:text-zinc-300"><x-t en="Fee behavior" th="การจัดการค่าธรรมเนียม" />
+                        <select class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="beam_fee_behavior">
+                            <option value="merchant_absorb" @selected(old('beam_fee_behavior', $event->beam_fee_behavior ?? 'merchant_absorb') === 'merchant_absorb') data-i18n-en="Merchant absorbs fee" data-i18n-th="ผู้จัดรับค่าธรรมเนียม">Merchant absorbs fee</option>
+                            <option value="customer_pay" @selected(old('beam_fee_behavior', $event->beam_fee_behavior ?? 'merchant_absorb') === 'customer_pay') data-i18n-en="Customer pays fee" data-i18n-th="ผู้ซื้อจ่ายค่าธรรมเนียม">Customer pays fee</option>
+                        </select>
+                    </label>
+                    <label class="text-sm text-zinc-700 dark:text-zinc-300"><x-t en="Fee percent (override)" th="เปอร์เซ็นต์ค่าธรรมเนียม" /> <span class="text-xs text-zinc-500"><x-t en="leave empty for default" th="เว้นว่างไว้ใช้ค่าเริ่มต้น" /></span><input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" type="number" step="0.01" min="0" max="100" name="beam_fee_percent" value="{{ old('beam_fee_percent', $event->beam_fee_percent) }}" placeholder="{{ config('services.beam.default_fee_percent', 3.0) }}"></label>
+                </div>
+            </div>
         </section>
         @php
             $ticketRows = collect(old('tickets', $ticketTypes->map(fn ($ticket) => [

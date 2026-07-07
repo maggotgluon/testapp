@@ -63,4 +63,12 @@ return [
         'webhook_token' => env('CRM_WEBHOOK_TOKEN'),
     ],
 
+    'beam' => [
+        'merchant_id' => env('BEAM_MERCHANT_ID'),
+        'api_key' => env('BEAM_API_KEY'),
+        'webhook_key' => env('BEAM_WEBHOOK_KEY'),
+        'environment' => env('BEAM_ENVIRONMENT', 'playground'),
+        'default_fee_percent' => env('BEAM_DEFAULT_FEE_PERCENT', 3.0),
+    ],
+
 ];

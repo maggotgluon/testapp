@@ -33,6 +33,9 @@ class Event extends Model
         'payment_instructions',
         'payment_methods',
         'payment_accounts',
+        'beam_enabled',
+        'beam_fee_behavior',
+        'beam_fee_percent',
         'is_published',
         'show_countdown',
     ];
@@ -46,6 +49,8 @@ class Event extends Model
             'payment_accounts' => 'array',
             'is_published' => 'boolean',
             'show_countdown' => 'boolean',
+            'beam_enabled' => 'boolean',
+            'beam_fee_percent' => 'decimal:2',
         ];
     }
 
@@ -57,6 +62,10 @@ class Event extends Model
             ->all();
         $methods = $accountMethods ?: (is_array($this->payment_methods) ? $this->payment_methods : ['qr_payment', 'bank_transfer']);
         $enabled = array_values(array_intersect($methods, ['qr_payment', 'bank_transfer', 'cash']));
+
+        if ($this->beam_enabled) {
+            $enabled[] = 'beam';
+        }
 
         return $enabled ?: ['qr_payment'];
     }
@@ -152,6 +161,17 @@ class Event extends Model
     public function assignedUsers(): BelongsToMany
     {
         return $this->belongsToMany(User::class)->withTimestamps();
+    }
+
+    public function beamFeePercent(): ?float
+    {
+        $fee = $this->beam_fee_percent;
+
+        if ($fee === null || $fee === '' || (float) $fee <= 0) {
+            $fee = config('services.beam.default_fee_percent', 3.0);
+        }
+
+        return (float) $fee > 0 ? (float) $fee : null;
     }
 
     public function scopeVisible($query)

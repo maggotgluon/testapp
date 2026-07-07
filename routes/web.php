@@ -6,15 +6,18 @@ use App\Http\Controllers\Admin\EventController as AdminEventController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\PromotionController;
 use App\Http\Controllers\Admin\ScannerController;
+use App\Http\Controllers\Admin\SurveyController as AdminSurveyController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CrmController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\LegalDocumentController;
+use App\Http\Controllers\BeamWebhookController;
 use App\Http\Controllers\LineWebhookController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\SeoController;
+use App\Http\Controllers\SurveyController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
@@ -30,6 +33,8 @@ Route::get('/legal/refund-policy', [LegalDocumentController::class, 'show'])->de
 Route::get('/legal/event-admission-policy', [LegalDocumentController::class, 'show'])->defaults('document', 'event-admission')->name('legal.event-admission');
 Route::get('/legal/cookie-policy', [LegalDocumentController::class, 'show'])->defaults('document', 'cookies')->name('legal.cookies');
 Route::get('/events/{event}', [EventController::class, 'show'])->name('events.show');
+Route::get('/surveys/{survey}', [SurveyController::class, 'show'])->name('surveys.show');
+Route::post('/surveys/{survey}', [SurveyController::class, 'store'])->name('surveys.store');
 
 Route::get('/login', [AuthController::class, 'show'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.store');
@@ -37,6 +42,7 @@ Route::get('/admin/login', [AuthController::class, 'adminShow'])->name('admin.lo
 Route::post('/admin/login', [AuthController::class, 'adminLogin'])->name('admin.login.store');
 Route::post('/auth/line/liff', [AuthController::class, 'lineLiff'])->name('auth.line.liff');
 Route::post('/line/webhook', LineWebhookController::class)->name('line.webhook');
+Route::post('/beam/webhook', BeamWebhookController::class)->name('beam.webhook');
 Route::get('/auth/{provider}', [AuthController::class, 'social'])->name('auth.social');
 Route::get('/auth/{provider}/callback', [AuthController::class, 'socialCallback'])->name('auth.social.callback');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -78,6 +84,10 @@ Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->na
     Route::resource('events', AdminEventController::class)->except(['show']);
     Route::resource('coupons', CouponController::class)->except(['show']);
     Route::resource('promotions', PromotionController::class)->except(['show']);
+    Route::resource('surveys', AdminSurveyController::class)->except(['show']);
+    Route::get('/surveys/{survey}/responses', [AdminSurveyController::class, 'responses'])->name('surveys.responses');
+    Route::get('/surveys/{survey}/responses/export/csv', [AdminSurveyController::class, 'exportCsv'])->name('surveys.responses.export.csv');
+    Route::get('/surveys/{survey}/responses/export/pdf', [AdminSurveyController::class, 'exportPdf'])->name('surveys.responses.export.pdf');
     Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/approve', [AdminOrderController::class, 'approve'])->name('orders.approve');

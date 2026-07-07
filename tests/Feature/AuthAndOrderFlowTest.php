@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Promotion;
+use App\Models\Survey;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
@@ -209,6 +210,70 @@ class AuthAndOrderFlowTest extends TestCase
             ->assertSee('Login with LINE')
             ->assertSee('/auth/line?redirect=%2Fevents%2F1', false)
             ->assertDontSee('LINE LIFF');
+    }
+
+    public function test_event_survey_gate_is_required_only_once_per_session(): void
+    {
+        $this->seed();
+        $event = Event::query()->visible()->firstOrFail();
+        $survey = Survey::create([
+            'event_id' => $event->id,
+            'title' => 'Before event survey',
+            'placement' => 'before_event_view',
+            'questions' => [
+                ['key' => 'goal', 'label' => 'Goal', 'type' => 'text', 'required' => true, 'options' => []],
+            ],
+            'is_active' => true,
+        ]);
+
+        $this->get(route('events.show', $event))
+            ->assertRedirect(route('surveys.show', $survey));
+
+        $this->post(route('surveys.store', $survey), [
+            'action' => 'complete',
+            'answers' => ['goal' => 'Dance more'],
+        ])->assertRedirect(route('events.show', $event, false));
+
+        $this->get(route('events.show', $event))
+            ->assertOk()
+            ->assertSee($event->name);
+    }
+
+    public function test_guest_survey_draft_is_attached_when_user_logs_in(): void
+    {
+        $survey = Survey::create([
+            'title' => 'Profile survey',
+            'placement' => 'on_login',
+            'questions' => [
+                ['key' => 'nickname', 'label' => 'Nickname', 'type' => 'text', 'required' => false, 'options' => []],
+            ],
+            'is_active' => true,
+        ]);
+
+        $this->post(route('surveys.store', $survey), [
+            'action' => 'draft',
+            'answers' => ['nickname' => 'Sunny'],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('survey_responses', [
+            'survey_id' => $survey->id,
+            'user_id' => null,
+            'status' => 'draft',
+        ]);
+
+        $this->post('/login', [
+            'name' => 'Survey Buyer',
+            'phone' => '0811111111',
+            'provider' => 'guest',
+        ])->assertRedirect(route('surveys.show', $survey));
+
+        $user = User::where('phone', '0811111111')->firstOrFail();
+
+        $this->assertDatabaseHas('survey_responses', [
+            'survey_id' => $survey->id,
+            'user_id' => $user->id,
+            'status' => 'draft',
+        ]);
     }
 
     public function test_order_number_is_human_readable(): void
@@ -1740,6 +1805,7 @@ class AuthAndOrderFlowTest extends TestCase
     public function test_free_ticket_auto_approves_without_payment_slip(): void
     {
         $this->seed();
+        Survey::truncate(); // prevent survey gate from intercepting checkout
         $ticketType = TicketType::query()
             ->get()
             ->first(fn (TicketType $ticketType) => $ticketType->isOnSale());
@@ -1755,7 +1821,7 @@ class AuthAndOrderFlowTest extends TestCase
             ],
         ])->assertRedirect();
 
-        $order = TicketOrder::with('tickets')->firstOrFail();
+        $order = TicketOrder::with('tickets')->where('customer_phone', '0812345678')->latest()->firstOrFail();
 
         $this->assertSame('approved', $order->status);
         $this->assertSame(0, $order->total_thb);

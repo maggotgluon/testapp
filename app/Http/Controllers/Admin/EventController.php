@@ -293,6 +293,9 @@ class EventController extends Controller
             'payment_accounts.*.account_number' => ['nullable', 'string', 'max:255'],
             'payment_accounts.*.instructions' => ['nullable', 'string', 'max:1000'],
             'payment_accounts.*.is_active' => ['nullable', 'boolean'],
+            'beam_enabled' => ['nullable', 'boolean'],
+            'beam_fee_behavior' => ['nullable', 'in:merchant_absorb,customer_pay'],
+            'beam_fee_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'is_published' => ['nullable', 'boolean'],
             'show_countdown' => ['nullable', 'boolean'],
         ]);
@@ -316,6 +319,8 @@ class EventController extends Controller
         $data['description_format'] = $data['description_format'] ?? 'html';
         $data['is_published'] = $request->boolean('is_published');
         $data['show_countdown'] = $request->boolean('show_countdown');
+        $data['beam_enabled'] = $request->boolean('beam_enabled');
+        $data['beam_fee_behavior'] = $data['beam_fee_behavior'] ?? 'merchant_absorb';
         $data['payment_accounts'] = $this->paymentAccountsFromRequest($request);
         $paymentMethods = $data['payment_accounts'] !== []
             ? collect($data['payment_accounts'])->where('is_active', true)->pluck('method')->all()

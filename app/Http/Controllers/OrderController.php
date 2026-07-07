@@ -15,6 +15,7 @@ use App\Services\CrmSyncService;
 use App\Services\PaymentSlipStorageService;
 use App\Services\QrCodeService;
 use App\Services\SlipQrDecoderService;
+use App\Services\SurveyGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -25,13 +26,13 @@ use Illuminate\View\View;
 
 class OrderController extends Controller
 {
-    public function store(Request $request, CrmSyncService $crm, SlipQrDecoderService $slipQrDecoder, CustomerNotificationService $notifications, QrCodeService $qrCode, PaymentSlipStorageService $slips): RedirectResponse
+    public function store(Request $request, CrmSyncService $crm, SlipQrDecoderService $slipQrDecoder, CustomerNotificationService $notifications, QrCodeService $qrCode, PaymentSlipStorageService $slips, SurveyGate $surveys): RedirectResponse
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:40'],
             'customer_email' => ['nullable', 'email'],
-            'payment_method' => ['required', 'in:bank_transfer,qr_payment,cash'],
+            'payment_method' => ['required', 'in:bank_transfer,qr_payment,cash,beam'],
             'payment_account_key' => ['nullable', 'string', 'max:80'],
             'payment_note' => ['nullable', 'string', 'max:1000'],
             'terms_accepted' => ['required', 'accepted'],
@@ -48,6 +49,26 @@ class OrderController extends Controller
 
         if ($selected->isEmpty()) {
             return back()->withErrors(['items' => 'Please select at least one ticket. / กรุณาเลือกตั๋วอย่างน้อย 1 ใบ'])->withInput();
+        }
+
+        $checkoutEvent = TicketType::query()
+            ->with('event')
+            ->whereIn('id', $selected->pluck('ticket_type_id'))
+            ->get()
+            ->pluck('event')
+            ->first();
+
+        if ($checkoutEvent && ($survey = $surveys->due('before_payment', $request, $checkoutEvent))) {
+            $surveys->rememberReturn($survey, $request, url()->previous().'#checkout');
+
+            $request->session()->put('checkout_user_info', [
+                'name' => $request->input('customer_name'),
+                'phone' => $request->input('customer_phone'),
+                'email' => $request->input('customer_email'),
+            ]);
+
+            return redirect()->route('surveys.show', $survey)
+                ->with('status', 'Please complete this survey before checkout. / กรุณาทำแบบสอบถามก่อนดำเนินการสั่งซื้อ');
         }
 
         $slipPath = $request->file('slip') ? $slips->store($request->file('slip')) : null;
@@ -72,11 +93,23 @@ class OrderController extends Controller
             }
 
             $subtotal = 0;
+            $freeTicketsCount = 0;
             foreach ($selected as $item) {
                 $ticketType = $ticketTypes[(int) $item['ticket_type_id']];
                 abort_unless($ticketType->isOnSale(), 422, 'Ticket type is not available. / ประเภทตั๋วนี้ยังไม่เปิดขาย');
                 abort_if($ticketType->availableQuantity() < (int) $item['quantity'], 422, 'Not enough tickets available. / จำนวนตั๋วไม่เพียงพอ');
+                
+                if ($ticketType->price_thb == 0) {
+                    $freeTicketsCount += (int) $item['quantity'];
+                }
+
                 $subtotal += $ticketType->price_thb * (int) $item['quantity'];
+            }
+
+            if ($freeTicketsCount > 1) {
+                throw ValidationException::withMessages([
+                    'items' => 'Free tickets are limited to 1 ticket per order. / ตั๋วฟรีจำกัด 1 ใบต่อออเดอร์เท่านั้น',
+                ]);
             }
 
             $coupon = null;
@@ -112,9 +145,19 @@ class OrderController extends Controller
 
             $discount = $couponDiscount + $promotionDiscount;
             $total = max(0, $subtotal - $discount);
+            $beamFeeThb = 0;
+
+            if ($data['payment_method'] === 'beam' && $total > 0) {
+                $event = $checkoutEvent;
+                if ($event->beam_fee_behavior === 'customer_pay' && $event->beamFeePercent()) {
+                    $beamFeeThb = (int) ceil($total * $event->beamFeePercent() / 100);
+                    $total += $beamFeeThb;
+                }
+            }
+
             $autoApprove = $total === 0;
 
-            if ($total > 0 && $data['payment_method'] !== 'cash' && ! $slipPath) {
+            if ($total > 0 && ! in_array($data['payment_method'], ['cash', 'beam'], true) && ! $slipPath) {
                 throw ValidationException::withMessages([
                     'slip' => 'Please attach a payment slip for QR payment or bank transfer. / กรุณาแนบสลิปสำหรับการชำระด้วย QR หรือโอนธนาคาร',
                 ]);
@@ -130,6 +173,7 @@ class OrderController extends Controller
                 'status' => $autoApprove ? 'approved' : 'pending',
                 'subtotal_thb' => $subtotal,
                 'discount_thb' => $discount,
+                'beam_fee_thb' => $beamFeeThb ?: null,
                 'total_thb' => $total,
                 'payment_method' => $data['payment_method'],
                 'payment_note' => $data['payment_note'] ?? null,
@@ -173,6 +217,13 @@ class OrderController extends Controller
                 ? $qrCode->promptPayIdentifier((string) $selectedPaymentAccount['account_number'])
                 : null;
 
+            $paymentStatus = match (true) {
+                $autoApprove => 'waived',
+                $data['payment_method'] === 'cash' => 'cash_pending',
+                $data['payment_method'] === 'beam' => 'pending',
+                default => 'submitted',
+            };
+
             $payment = Payment::create([
                 'ticket_order_id' => $order->id,
                 'method' => $data['payment_method'],
@@ -183,12 +234,54 @@ class OrderController extends Controller
                 'amount_thb' => $order->total_thb,
                 'expected_amount_thb' => $order->total_thb,
                 'expected_promptpay_id' => $expectedPromptPayId,
-                'status' => $autoApprove ? 'waived' : ($data['payment_method'] === 'cash' ? 'cash_pending' : 'submitted'),
+                'status' => $paymentStatus,
                 'slip_path' => $slipPath,
                 'note' => $data['payment_note'] ?? null,
             ]);
 
-            if (! $autoApprove && $data['payment_method'] !== 'cash') {
+            if ($data['payment_method'] === 'beam' && $total > 0) {
+                try {
+                    $beamService = app(\App\Services\BeamService::class);
+                    $charge = $beamService->createCharge([
+                        'amount' => (int) round($total * 100),
+                        'currency' => 'THB',
+                        'referenceId' => $order->order_number,
+                        'sourceType' => 'PROMPTPAY',
+                        'description' => 'Order '.$order->order_number,
+                        'metadata' => [
+                            'order_id' => (string) $order->id,
+                            'order_number' => $order->order_number,
+                        ],
+                    ]);
+
+                    $chargeId = $charge['id'] ?? null;
+
+                    $qrImage = null;
+                    if (isset($charge['actions']) && is_array($charge['actions'])) {
+                        foreach ($charge['actions'] as $action) {
+                            if (($action['type'] ?? null) === 'ENCODED_IMAGE' && ! empty($action['value'])) {
+                                $qrImage = $action['value'];
+                                break;
+                            }
+                        }
+                    }
+
+                    $payment->update([
+                        'beam_charge_id' => $chargeId,
+                        'beam_qr_image' => $qrImage,
+                    ]);
+
+                    if ($chargeId) {
+                        $order->update(['beam_charge_id' => $chargeId]);
+                    }
+                } catch (\Exception $e) {
+                    throw ValidationException::withMessages([
+                        'payment_method' => 'Beam payment failed to initialize. / การชำระด้วย Beam ล้มเหลว กรุณาลองใหม่อีกครั้ง',
+                    ]);
+                }
+            }
+
+            if (! $autoApprove && ! in_array($data['payment_method'], ['cash', 'beam'], true)) {
                 $payment->update($slipQrDecoder->review($slipPath, $payment->fresh()->toArray(), $payment));
             }
 
@@ -202,6 +295,21 @@ class OrderController extends Controller
 
         if (! $request->user()) {
             $parameters['phone'] = $order->customer_phone;
+        }
+
+        $autoApprove = $order->status === 'approved';
+        if ($autoApprove) {
+            $parameters['auto_completed'] = 1;
+        }
+
+        if ($checkoutEvent && ($survey = $surveys->due('after_payment', $request, $checkoutEvent))) {
+            $surveys->rememberReturn($survey, $request, route('orders.show', $parameters, false));
+
+            return redirect()->route('surveys.show', $survey);
+        }
+
+        if ($autoApprove) {
+            return redirect()->route('orders.show', $parameters)->with('status', 'Order completed successfully. / ทำรายการสั่งซื้อเสร็จสมบูรณ์แล้ว');
         }
 
         return redirect()->route('orders.show', $parameters)->with('status', 'Order created. Admin approval will activate tickets. / สร้างออเดอร์แล้ว รอแอดมินอนุมัติเพื่อเปิดใช้งานตั๋ว');
@@ -247,7 +355,7 @@ class OrderController extends Controller
     {
         abort_unless(auth()->id() === $order->user_id || request('phone') === $order->customer_phone || auth()->user()?->isAdmin(), 403);
 
-        $order->load(['user', 'items.event', 'items.ticketType', 'tickets.event', 'tickets.ticketType']);
+        $order->load(['user', 'items.event', 'items.ticketType', 'tickets.event', 'tickets.ticketType', 'payments']);
 
         return view('orders.show', compact('order'));
     }

@@ -24,6 +24,8 @@ class Payment extends Model
         'slip_deleted_at',
         'slip_image_sha256',
         'note',
+        'beam_charge_id',
+        'beam_qr_image',
         'slip_qr_status',
         'slip_qr_payload',
         'slip_qr_payload_sha256',

@@ -8,14 +8,45 @@
                 </div>
                 <span class="rounded bg-zinc-100 dark:bg-white/10 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-200">{{ str_replace('_', ' ', $order->status) }}</span>
             </div>
-            <div class="mt-5 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
-                <div class="font-semibold"><x-t en="Order received" th="ได้รับคำสั่งซื้อแล้ว" /></div>
-                <p class="mt-1">
-                    <x-t en="Please keep this order number for future lookup:" th="กรุณาเก็บเลขออเดอร์นี้ไว้สำหรับค้นหาภายหลัง:" />
-                    <span class="font-mono font-semibold border p-1 rounded-sm">{{ $order->order_number }}</span>.
-                    <x-t en="Admin approval will activate the tickets after payment review." th="แอดมินจะอนุมัติตั๋วหลังตรวจสอบการชำระเงิน" />
-                </p>
-            </div>
+            @if(request()->query('auto_completed') && $order->status === 'approved' && $order->tickets->isNotEmpty())
+                @php
+                    $firstTicket = $order->tickets->first();
+                    $ticketUrl = route('tickets.show', ['uuid' => $firstTicket->uuid, 'phone' => $firstTicket->holder_phone]);
+                @endphp
+                <div class="mt-5 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50"
+                     x-data="{
+                         countdown: 5,
+                         init() {
+                             let interval = setInterval(() => {
+                                 this.countdown--;
+                                 if (this.countdown <= 0) {
+                                     clearInterval(interval);
+                                     window.location.href = '{{ $ticketUrl }}';
+                                 }
+                             }, 1000);
+                         }
+                     }">
+                    <div class="font-semibold text-base"><x-t en="Order Completed!" th="สั่งซื้อสำเร็จแล้ว!" /></div>
+                    <p class="mt-1">
+                        <x-t en="You will be redirected to your ticket page in" th="ระบบกำลังนำคุณไปยังหน้าตั๋วภายใน" />
+                        <span class="font-bold text-lg text-emerald-600 dark:text-emerald-400" x-text="countdown">5</span>
+                        <x-t en="seconds..." th="วินาที..." />
+                    </p>
+                    <p class="mt-2 text-xs opacity-90">
+                        <x-t en="Or click here to go directly to your ticket:" th="หรือคลิกที่นี่เพื่อไปยังตั๋วโดยตรง:" />
+                        <a href="{{ $ticketUrl }}" class="font-semibold text-emerald-700 underline dark:text-emerald-200 hover:text-emerald-800"><x-t en="Go to Ticket" th="ไปยังตั๋วของคุณ" /></a>
+                    </p>
+                </div>
+            @else
+                <div class="mt-5 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-950 dark:text-emerald-50">
+                    <div class="font-semibold"><x-t en="Order received" th="ได้รับคำสั่งซื้อแล้ว" /></div>
+                    <p class="mt-1">
+                        <x-t en="Please keep this order number for future lookup:" th="กรุณาเก็บเลขออเดอร์นี้ไว้สำหรับค้นหาภายหลัง:" />
+                        <span class="font-mono font-semibold border p-1 rounded-sm">{{ $order->order_number }}</span>.
+                        <x-t en="Admin approval will activate the tickets after payment review." th="แอดมินจะอนุมัติตั๋วหลังตรวจสอบการชำระเงิน" />
+                    </p>
+                </div>
+            @endif
             @guest
                 <div class="mt-4 rounded-md border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-900 dark:text-amber-100">
                     <div class="font-semibold"><x-t en="Save this order to your account" th="บันทึกออเดอร์นี้ไว้ในบัญชี" /></div>
@@ -72,7 +103,24 @@
                 <div class="flex justify-between"><dt class="text-zinc-600 dark:text-zinc-400"><x-t en="Subtotal" th="ยอดรวม" /></dt><dd>THB {{ number_format($order->subtotal_thb) }}</dd></div>
                 <div class="flex justify-between"><dt class="text-zinc-600 dark:text-zinc-400"><x-t en="Discount" th="ส่วนลด" /></dt><dd>THB {{ number_format($order->discount_thb) }}</dd></div>
                 <div class="flex justify-between text-lg font-semibold text-zinc-950 dark:text-white"><dt><x-t en="Total" th="ยอดสุทธิ" /></dt><dd>THB {{ number_format($order->total_thb) }}</dd></div>
+                @if($order->beam_fee_thb)
+                    <div class="flex justify-between text-sm text-zinc-600 dark:text-zinc-400"><dt><x-t en="Beam fee included" th="รวมค่าธรรมเนียม Beam" /></dt><dd>THB {{ number_format($order->beam_fee_thb) }}</dd></div>
+                @endif
             </dl>
+            @php
+                $beamPayment = $order->payments->first(fn ($p) => $p->method === 'beam');
+            @endphp
+            @if($beamPayment?->beam_qr_image && $order->status === 'pending')
+                <div class="mt-5 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4">
+                    <div class="font-semibold text-emerald-950 dark:text-emerald-50"><x-t en="Scan with your banking app to pay" th="สแกนด้วยแอปธนาคารเพื่อชำระเงิน" /></div>
+                    <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-100"><x-t en="Use your mobile banking app to scan the QR code below." th="ใช้แอปธนาคารสแกน QR ด้านล่างเพื่อชำระเงิน" /></p>
+                    <div class="mt-4 grid place-items-center">
+                        <img class="h-64 w-64 rounded-md bg-white p-2" src="data:image/png;base64,{{ $beamPayment->beam_qr_image }}" alt="Beam QR code">
+                    </div>
+                    <p class="mt-3 text-sm text-emerald-800 dark:text-emerald-100"><x-t en="Amount: THB" th="จำนวนเงิน: THB" /> {{ number_format($order->total_thb) }}</p>
+                    <p class="mt-2 text-xs text-emerald-700 dark:text-emerald-300"><x-t en="Tickets will be activated automatically once the payment is confirmed." th="ตั๋วจะเปิดใช้งานอัตโนมัติเมื่อการชำระเงินได้รับการยืนยัน" /></p>
+                </div>
+            @endif
         </section>
         <section class="rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-6">
             <h2 class="inline-flex items-center gap-2 text-xl font-semibold text-zinc-950 dark:text-white"><x-icon name="ticket" class="h-5 w-5 text-emerald-500" /><x-t en="Tickets" th="ตั๋ว" /></h2>

@@ -564,11 +564,15 @@ Alpine.data('checkout', (config) => ({
     holderNames: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, []])),
     holderTouched: Object.fromEntries(config.tickets.map((ticket) => [ticket.id, []])),
     payment: config.payment,
+    beamEnabled: config.beamEnabled || false,
+    beamFeeBehavior: config.beamFeeBehavior || 'merchant_absorb',
+    beamFeePercent: config.beamFeePercent || 0,
     paymentMethodLabel(method) {
         return {
             qr_payment: TicketFlowLanguage.format({ en: 'QR payment', th: 'ชำระด้วย QR' }),
             bank_transfer: TicketFlowLanguage.format({ en: 'Direct bank transfer', th: 'โอนผ่านธนาคาร' }),
             cash: TicketFlowLanguage.format({ en: 'Cash sale', th: 'ชำระเงินสด' }),
+            beam: TicketFlowLanguage.format({ en: 'Beam Checkout', th: 'ชำระด้วย Beam' }),
         }[method] || method;
     },
     selectedPayment() {
@@ -588,14 +592,16 @@ Alpine.data('checkout', (config) => ({
         this.slipPreviewUrl = file ? URL.createObjectURL(file) : '';
     },
     increment(ticketId) {
-        this.quantities[ticketId] = Math.min(20, Number(this.quantities[ticketId] || 0) + 1);
+        const ticket = this.tickets.find((t) => t.id === ticketId);
+        const maxQty = (ticket && Number(ticket.price) === 0) ? 1 : 20;
+        this.quantities[ticketId] = Math.min(maxQty, Number(this.quantities[ticketId] || 0) + 1);
         this.syncHolderNames(ticketId);
-        this.notifyCart();
+        this.notifyCart(ticketId);
     },
     decrement(ticketId) {
         this.quantities[ticketId] = Math.max(0, Number(this.quantities[ticketId] || 0) - 1);
         this.syncHolderNames(ticketId);
-        this.notifyCart();
+        this.notifyCart(ticketId);
     },
     syncHolderNames(ticketId) {
         const quantity = Number(this.quantities[ticketId] || 0);
@@ -634,7 +640,37 @@ Alpine.data('checkout', (config) => ({
     cartQuantity() {
         return config.tickets.reduce((sum, ticket) => sum + Number(this.quantities[ticket.id] || 0), 0);
     },
-    notifyCart() {
+    notifyCart(changedTicketId) {
+        if (changedTicketId) {
+            const changedTicket = this.tickets.find((t) => t.id === changedTicketId);
+            if (changedTicket && Number(changedTicket.price) === 0) {
+                if (Number(this.quantities[changedTicketId] || 0) > 0) {
+                    this.quantities[changedTicketId] = 1;
+                    this.syncHolderNames(changedTicketId);
+                    this.tickets.forEach((ticket) => {
+                        if (ticket.id !== changedTicketId && Number(ticket.price) === 0) {
+                            this.quantities[ticket.id] = 0;
+                            this.syncHolderNames(ticket.id);
+                        }
+                    });
+                }
+            }
+        } else {
+            let freeSelectedId = null;
+            this.tickets.forEach((ticket) => {
+                if (Number(ticket.price) === 0 && Number(this.quantities[ticket.id] || 0) > 0) {
+                    if (freeSelectedId === null) {
+                        freeSelectedId = ticket.id;
+                        this.quantities[ticket.id] = 1;
+                        this.syncHolderNames(ticket.id);
+                    } else {
+                        this.quantities[ticket.id] = 0;
+                        this.syncHolderNames(ticket.id);
+                    }
+                }
+            });
+        }
+
         window.dispatchEvent(new CustomEvent('checkout-cart-updated', {
             detail: { quantity: this.cartQuantity() },
         }));
@@ -893,7 +929,7 @@ Alpine.data('checkout', (config) => ({
         return `/payments/events/${config.eventId}/qr?amount=${this.total()}&account=${encodeURIComponent(this.paymentAccountKey || '')}`;
     },
     slipRequired() {
-        return this.total() > 0 && this.paymentMethod !== 'cash';
+        return this.total() > 0 && !['cash', 'beam'].includes(this.paymentMethod);
     },
     paymentInstructions() {
         if (this.total() === 0) {
@@ -902,6 +938,10 @@ Alpine.data('checkout', (config) => ({
 
         if (this.paymentMethod === 'cash') {
             return TicketFlowLanguage.format({ en: 'Cash sale does not require a slip. Admin approval will activate tickets.', th: 'ชำระเงินสดไม่ต้องแนบสลิป แอดมินจะอนุมัติเพื่อเปิดใช้งานตั๋ว' });
+        }
+
+        if (this.paymentMethod === 'beam') {
+            return TicketFlowLanguage.format({ en: 'Complete payment via Beam Checkout. Tickets will be activated automatically after payment.', th: 'ชำระเงินผ่าน Beam Checkout ตั๋วจะเปิดใช้งานอัตโนมัติหลังชำระเงิน' });
         }
 
         return this.selectedPayment().instructions || this.payment.instructions || TicketFlowLanguage.format({ en: 'Scan/pay first, then upload the completed bank payment slip image. Admin approval will activate tickets.', th: 'สแกนและชำระเงินก่อน แล้วอัปโหลดรูปสลิปจากธนาคาร แอดมินจะตรวจสอบและอนุมัติตั๋ว' });
@@ -956,6 +996,12 @@ Alpine.data('checkout', (config) => ({
         if (this.cartQuantity() <= 0) {
             event.preventDefault();
             this.errorMessage = TicketFlowLanguage.format({ en: 'Please select at least one ticket.', th: 'กรุณาเลือกตั๋วอย่างน้อย 1 ใบ' });
+            return;
+        }
+
+        if (this.total() === 0 && config.freeApprovalSurveyUrl) {
+            event.preventDefault();
+            window.location.href = config.freeApprovalSurveyUrl;
             return;
         }
 
@@ -1569,6 +1615,42 @@ Alpine.data('lineLiffLogin', (config) => ({
             this.loading = false;
             this.message = error.message || TicketFlowLanguage.format({ en: 'LINE login failed. Please try again.', th: 'เข้าสู่ระบบ LINE ไม่สำเร็จ กรุณาลองอีกครั้ง' });
         }
+    },
+}));
+
+Alpine.data('surveyBuilder', (initialQuestions = []) => ({
+    questions: initialQuestions.length
+        ? initialQuestions.map((question, index) => ({
+            localId: index + 1,
+            key: '',
+            label: '',
+            type: 'text',
+            help: '',
+            options: '',
+            required: false,
+            hasOther: false,
+            otherLabel: '',
+            searchable: false,
+            ...question,
+        }))
+        : [],
+    nextId: initialQuestions.length + 1,
+    addQuestion() {
+        this.questions.push({
+            localId: this.nextId++,
+            key: '',
+            label: '',
+            type: 'text',
+            help: '',
+            options: '',
+            required: false,
+            hasOther: false,
+            otherLabel: '',
+            searchable: false,
+        });
+    },
+    removeQuestion(index) {
+        this.questions.splice(index, 1);
     },
 }));
 

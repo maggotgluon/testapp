@@ -178,8 +178,8 @@ class OrderController extends Controller
         $order->loadMissing(['items.event', 'payments']);
         $this->authorizeOrder($request, $order);
 
-        if ($order->payment_method === 'cash') {
-            return back()->with('status', 'Cash orders do not need slip QR review. / ออเดอร์เงินสดไม่ต้องตรวจ QR สลิป');
+        if (in_array($order->payment_method, ['cash', 'beam'], true)) {
+            return back()->with('status', 'Cash or Beam orders do not need slip QR review. / ออเดอร์เงินสดหรือ Beam ไม่ต้องตรวจ QR สลิป');
         }
 
         if (! $order->payment_slip_path) {
@@ -209,8 +209,8 @@ class OrderController extends Controller
         $order->loadMissing(['items.event', 'payments']);
         $this->authorizeOrder($request, $order);
 
-        if ($order->payment_method === 'cash') {
-            return back()->with('status', 'Cash orders do not need a payment slip. / ออเดอร์เงินสดไม่ต้องอัปโหลดสลิป');
+        if (in_array($order->payment_method, ['cash', 'beam'], true)) {
+            return back()->with('status', 'Cash or Beam orders do not need a payment slip. / ออเดอร์เงินสดหรือ Beam ไม่ต้องอัปโหลดสลิป');
         }
 
         $data = $request->validate([

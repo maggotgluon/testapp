@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Models\Promotion;
+use App\Models\Survey;
+use App\Models\SurveyResponse;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\User;
 use App\Services\EventDescriptionService;
+use App\Services\SurveyGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -37,9 +41,17 @@ class EventController extends Controller
         return view('events.index', compact('events'));
     }
 
-    public function show(Event $event): View
+    public function show(Request $request, Event $event, SurveyGate $surveys): View|RedirectResponse
     {
         abort_if(! $event->is_published || $event->ends_at->isPast(), 404);
+
+        foreach (['before_event_view', 'before_ticket_selection'] as $placement) {
+            if ($survey = $surveys->due($placement, $request, $event)) {
+                $surveys->rememberReturn($survey, $request, $request->getRequestUri());
+
+                return redirect()->route('surveys.show', $survey);
+            }
+        }
 
         $event->load([
             'ticketTypes' => fn ($query) => $query
@@ -73,8 +85,75 @@ class EventController extends Controller
             fn ($promotion) => $promotion->ticket_type_id === null || $availableTicketTypeIds->contains($promotion->ticket_type_id)
         )->values());
         $eventDescriptionHtml = $this->descriptions->render($event->description, $event->description_format ?? 'html');
+        $freeApprovalSurvey = $surveys->due('before_free_order_approval', $request, $event);
+        $freeApprovalSurveyUrl = $freeApprovalSurvey
+            ? route('surveys.show', ['survey' => $freeApprovalSurvey, 'return' => $request->getRequestUri().'#checkout'])
+            : null;
 
-        return view('events.show', compact('event', 'eventDescriptionHtml'));
+        // Extract name/email/phone from completed survey answers for this event to pre-fill checkout
+        $surveyPrefill = $this->extractSurveyPrefill($event, $request);
+
+        return view('events.show', compact('event', 'eventDescriptionHtml', 'freeApprovalSurveyUrl', 'surveyPrefill'));
+    }
+
+    /**
+     * Extract name/email/phone from the user's completed survey answers for this event,
+     * so the checkout form can be pre-filled with info the user already provided.
+     */
+    private function extractSurveyPrefill(Event $event, Request $request): array
+    {
+        $surveyIds = Survey::query()
+            ->where('is_active', true)
+            ->where(fn ($q) => $q->whereNull('event_id')->orWhere('event_id', $event->id))
+            ->pluck('id');
+
+        if ($surveyIds->isEmpty()) {
+            return [];
+        }
+
+        $responseQuery = SurveyResponse::query()
+            ->whereIn('survey_id', $surveyIds)
+            ->where('status', 'completed')
+            ->with('survey')
+            ->where(function ($q) use ($request) {
+                if ($request->user()) {
+                    $q->where('user_id', $request->user()->id);
+                }
+                $q->orWhere('session_id', $request->session()->getId());
+            })
+            ->latest('completed_at');
+
+        $prefill = ['name' => null, 'email' => null, 'phone' => null];
+
+        foreach ($responseQuery->get() as $response) {
+            $answers = $response->answers ?? [];
+            $questions = $response->survey?->questions ?? [];
+
+            foreach ($questions as $question) {
+                $key = $question['key'] ?? Str::slug($question['label'] ?? '', '_');
+                $label = strtolower((string) ($question['label'] ?? ''));
+                $keyLower = strtolower($key);
+                $value = trim((string) ($answers[$key] ?? ''));
+
+                if (! $value) {
+                    continue;
+                }
+
+                if (! $prefill['name'] && (str_contains($keyLower, 'name') || str_contains($label, 'name') || str_contains($label, 'ชื่อ'))) {
+                    $prefill['name'] = $value;
+                } elseif (! $prefill['email'] && (str_contains($keyLower, 'email') || str_contains($label, 'email') || str_contains($label, 'อีเมล'))) {
+                    $prefill['email'] = $value;
+                } elseif (! $prefill['phone'] && (str_contains($keyLower, 'phone') || str_contains($keyLower, 'tel') || str_contains($keyLower, 'mobile') || str_contains($label, 'phone') || str_contains($label, 'โทร') || str_contains($label, 'เบอร์'))) {
+                    $prefill['phone'] = $value;
+                }
+            }
+
+            if ($prefill['name'] && $prefill['email'] && $prefill['phone']) {
+                break;
+            }
+        }
+
+        return array_filter($prefill);
     }
 
     public function profile(Request $request, ?User $user = null): View

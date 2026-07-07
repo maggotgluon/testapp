@@ -157,8 +157,12 @@
                 'bank_logo' => $bank ? asset($bank['logo']) : null,
                 'bank_display_name' => $bank ? $bank['name'].' / '.$bank['thai_name'] : $event->bank_name,
             ]),
-            customerName: @js(auth()->user()->name ?? old('customer_name', '')),
-            customerPhone: @js(auth()->user()->phone ?? old('customer_phone', '')),
+            customerName: @js(auth()->user()->name ?? old('customer_name', $surveyPrefill['name'] ?? '')),
+            customerPhone: @js(auth()->user()->phone ?? old('customer_phone', $surveyPrefill['phone'] ?? '')),
+            freeApprovalSurveyUrl: @js($freeApprovalSurveyUrl),
+            beamEnabled: @js((bool) $event->beam_enabled),
+            beamFeeBehavior: @js($event->beam_fee_behavior),
+            beamFeePercent: @js($event->beamFeePercent()),
         })">
             @csrf
             @guest
@@ -211,7 +215,7 @@
                             <div class="grid grid-cols-[40px_40px_40px] overflow-hidden rounded-md border border-zinc-200 dark:border-white/10">
                                 <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="decrement({{ $ticket->id }})" aria-label="Remove ticket"><x-icon name="minus" /></button>
                                 <input class="border-x border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-2 py-2 text-center text-zinc-950 dark:text-white" name="items[{{ $loop->index }}][quantity]" 
-                                    type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]" @input="syncHolderNames({{ $ticket->id }}); notifyCart()">
+                                    type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]" @input="syncHolderNames({{ $ticket->id }}); notifyCart({{ $ticket->id }})">
                                 <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="increment({{ $ticket->id }})" aria-label="Add ticket"><x-icon name="plus" /></button>
                             </div>
                         </div>
@@ -233,7 +237,7 @@
                 <div class="mt-5 grid gap-4 rounded-md transition sm:grid-cols-2" data-checkout-section="customer" :class="validationAttempted && invalidSection === 'customer' ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950' : ''">
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200"><x-t en="Name" th="ชื่อ" /> <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200"><x-t en="required" th="จำเป็น" /></span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_name" x-model="customerName" @input="syncDefaultHolderNames()" required></label>
                     <label class="text-sm font-medium text-zinc-700 dark:text-zinc-200"><x-t en="Phone" th="เบอร์โทร" /> <span class="rounded bg-rose-400/20 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-200"><x-t en="required" th="จำเป็น" /></span><input class="mt-1 w-full rounded-md border border-emerald-400/40 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white focus:border-emerald-300 focus:outline-none" name="customer_phone" x-model="customerPhone" required></label>
-                    <label class="text-sm text-zinc-700 dark:text-zinc-300"><x-t en="Email" th="อีเมล" /><input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="customer_email" value="{{ auth()->user()->email ?? old('customer_email') }}"></label>
+                    <label class="text-sm text-zinc-700 dark:text-zinc-300"><x-t en="Email" th="อีเมล" /><input class="mt-1 w-full rounded-md border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-950 dark:text-white" name="customer_email" value="{{ auth()->user()->email ?? old('customer_email', $surveyPrefill['email'] ?? '') }}"></label>
                     @if($event->coupons->isNotEmpty())
                         <label class="text-sm text-zinc-700 dark:text-zinc-300"><x-t en="Coupon" th="คูปอง" />
                             <div class="mt-1 grid gap-2 sm:grid-cols-[1fr_auto]">
@@ -323,6 +327,19 @@
                             <div><dt class="text-emerald-700 dark:text-emerald-200"><x-t en="Account name" th="ชื่อบัญชี" /></dt><dd x-text="selectedPayment().account_name || payment.bank_account_name || '-'"></dd></div>
                             <div><dt class="text-emerald-700 dark:text-emerald-200"><x-t en="Account number" th="เลขบัญชี" /></dt><dd class="font-mono" x-text="selectedPayment().account_number || payment.bank_account_number || '-'"></dd></div>
                         </dl>
+                    </template>
+                    <template x-if="total() > 0 && paymentMethod === 'beam'">
+                        <div class="mt-3 rounded-md border border-emerald-400/30 bg-white/70 p-3 dark:bg-zinc-950/60">
+                            <div class="font-semibold"><x-t en="Beam Checkout" th="ชำระด้วย Beam" /></div>
+                            <p class="mt-1 text-sm text-emerald-800 dark:text-emerald-100"><x-t en="You'll complete payment via Beam Checkout. No slip is required. After payment, your tickets will be activated automatically." th="คุณจะชำระเงินผ่าน Beam Checkout ไม่ต้องแนบสลิป หลังชำระเงิน ตั๋วจะเปิดใช้งานอัตโนมัติ" /></p>
+                            <template x-if="beamFeeBehavior === 'customer_pay' && total() > 0 && beamFeePercent > 0">
+                                <p class="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+                                    <x-t en="A Beam processing fee of" th="ค่าธรรมเนียม Beam" />
+                                    <span x-text="beamFeePercent"></span>%
+                                    <x-t en="will be added to the total." th="จะถูกเพิ่มในยอดรวม" />
+                                </p>
+                            </template>
+                        </div>
                     </template>
                     <template x-if="total() > 0 && paymentMethod === 'cash'">
                         <div class="mt-3 rounded-md border border-emerald-400/30 bg-white/70 p-3 dark:bg-zinc-950/60">

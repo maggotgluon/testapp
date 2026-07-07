@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\TicketOrder;
 use App\Services\CrmSyncService;
+use App\Services\SurveyGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -49,7 +50,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function login(Request $request, CrmSyncService $crm): RedirectResponse
+    public function login(Request $request, CrmSyncService $crm, SurveyGate $surveys): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -83,9 +84,16 @@ class AuthController extends Controller
             'provider' => $data['provider'] ?? $user->provider,
         ]);
 
+        $surveys->claimGuestResponses($user, $request);
         Auth::login($user, true);
         $this->attachGuestOrdersToUser($user);
         $crm->pushCustomer($user->fresh(), 'manual_login');
+
+        if ($survey = $surveys->due('on_login', $request)) {
+            $surveys->rememberReturn($survey, $request, redirect()->intended(route('profile'))->getTargetUrl());
+
+            return redirect()->route('surveys.show', $survey);
+        }
 
         return redirect()->intended(route('profile'))->with('status', 'Welcome back.');
     }
@@ -143,7 +151,7 @@ class AuthController extends Controller
         return Socialite::driver($provider)->redirect();
     }
 
-    public function socialCallback(Request $request, string $provider, CrmSyncService $crm): RedirectResponse
+    public function socialCallback(Request $request, string $provider, CrmSyncService $crm, SurveyGate $surveys): RedirectResponse
     {
         abort_unless(in_array($provider, ['line', 'facebook', 'instagram'], true), 404);
 
@@ -185,14 +193,21 @@ class AuthController extends Controller
 
         $user->update($updates);
 
+        $surveys->claimGuestResponses($user, $request);
         Auth::login($user, true);
         $this->attachGuestOrdersToUser($user, $request);
         $crm->pushCustomer($user->fresh(), $provider.'_login');
 
+        if ($survey = $surveys->due('on_login', $request)) {
+            $surveys->rememberReturn($survey, $request, redirect()->intended(route('profile'))->getTargetUrl());
+
+            return redirect()->route('surveys.show', $survey);
+        }
+
         return redirect()->intended(route('profile'))->with('status', 'Logged in with '.strtoupper($provider).'.');
     }
 
-    public function lineLiff(Request $request, CrmSyncService $crm): JsonResponse
+    public function lineLiff(Request $request, CrmSyncService $crm, SurveyGate $surveys): JsonResponse
     {
         $data = $request->validate([
             'id_token' => ['required', 'string'],
@@ -265,10 +280,20 @@ class AuthController extends Controller
             'line_friend_status' => $user->line_friend_status ?: 'connected',
         ]);
 
+        $surveys->claimGuestResponses($user, $request);
         Auth::login($user, true);
         $request->session()->regenerate();
         $this->attachGuestOrdersToUser($user, $request);
         $crm->pushCustomer($user->fresh(), 'line_liff_login');
+
+        if ($survey = $surveys->due('on_login', $request)) {
+            $redirect = $this->safeRedirect($data['redirect'] ?? null);
+            $surveys->rememberReturn($survey, $request, $redirect);
+
+            return response()->json([
+                'redirect' => route('surveys.show', $survey),
+            ]);
+        }
 
         return response()->json([
             'redirect' => $this->safeRedirect($data['redirect'] ?? null),
