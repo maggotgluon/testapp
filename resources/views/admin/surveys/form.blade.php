@@ -1,7 +1,7 @@
 @php
-    $questionSeed = old('questions', collect($survey->questions ?? [])->map(fn ($question) => $question + [
+    $questionSeed = old('questions', collect($survey->questions ?? [])->map(fn ($question) => array_merge($question, [
         'options' => implode("\n", $question['options'] ?? []),
-    ])->values()->all());
+    ]))->values()->all());
 @endphp
 <x-layouts.app :title="$survey->exists ? 'Edit survey' : 'New survey'">
     <form method="POST" action="{{ $survey->exists ? route('admin.surveys.update', $survey) : route('admin.surveys.store') }}" class="mx-auto max-w-4xl rounded-lg border border-zinc-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]" x-data="surveyBuilder(@js($questionSeed))">

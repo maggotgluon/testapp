@@ -135,6 +135,16 @@ class SurveyController extends Controller
         return $response;
     }
 
+    public function destroyResponse(Request $request, Survey $survey, SurveyResponse $response): RedirectResponse
+    {
+        abort_unless($this->canManageSurvey($request, $survey), 403);
+        abort_unless($response->survey_id === $survey->id, 404);
+
+        $response->delete();
+
+        return back()->with('status', 'Response deleted. / ลบคำตอบแล้ว');
+    }
+
     public function exportPdf(Request $request, Survey $survey): \Illuminate\Http\Response
     {
         abort_unless($this->canManageSurvey($request, $survey), 403);

@@ -337,6 +337,7 @@ CREATE TABLE IF NOT EXISTS `survey_responses` (
     `session_id` VARCHAR(255) NULL,
     `status` VARCHAR(255) NOT NULL DEFAULT 'draft',
     `answers` JSON NULL,
+    `meta` JSON NULL,
     `started_at` TIMESTAMP NULL,
     `completed_at` TIMESTAMP NULL,
     `created_at` TIMESTAMP NULL,

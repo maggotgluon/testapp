@@ -34,6 +34,7 @@ Route::get('/legal/event-admission-policy', [LegalDocumentController::class, 'sh
 Route::get('/legal/cookie-policy', [LegalDocumentController::class, 'show'])->defaults('document', 'cookies')->name('legal.cookies');
 Route::get('/events/{event}', [EventController::class, 'show'])->name('events.show');
 Route::get('/surveys/{survey}', [SurveyController::class, 'show'])->name('surveys.show');
+Route::get('/surveys/{survey}/granted', [SurveyController::class, 'granted'])->name('surveys.granted');
 Route::post('/surveys/{survey}', [SurveyController::class, 'store'])->name('surveys.store');
 
 Route::get('/login', [AuthController::class, 'show'])->name('login');
@@ -86,6 +87,7 @@ Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->na
     Route::resource('promotions', PromotionController::class)->except(['show']);
     Route::resource('surveys', AdminSurveyController::class)->except(['show']);
     Route::get('/surveys/{survey}/responses', [AdminSurveyController::class, 'responses'])->name('surveys.responses');
+    Route::delete('/surveys/{survey}/responses/{response}', [AdminSurveyController::class, 'destroyResponse'])->name('surveys.responses.destroy');
     Route::get('/surveys/{survey}/responses/export/csv', [AdminSurveyController::class, 'exportCsv'])->name('surveys.responses.export.csv');
     Route::get('/surveys/{survey}/responses/export/pdf', [AdminSurveyController::class, 'exportPdf'])->name('surveys.responses.export.pdf');
     Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');

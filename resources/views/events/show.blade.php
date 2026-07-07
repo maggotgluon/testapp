@@ -50,6 +50,7 @@
             'itemIndex' => $index,
             'name' => $ticket->name,
             'price' => $ticket->price_thb,
+            'maxQty' => $ticket->price_thb == 0 ? 1 : 20,
         ])->values();
         $visibleCheckoutCoupons = $event->coupons->filter->show_on_checkout;
         $visibleEventPromotions = $event->promotions->filter->show_on_event_page;
@@ -138,6 +139,18 @@
             </div>
         </section>
 
+        @if($freeTicketGateSurveyUrl)
+            <div class="scroll-mt-6 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-8 text-center">
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400/20">
+                    <x-icon name="file-text" class="h-8 w-8 text-emerald-600 dark:text-emerald-300" />
+                </div>
+                <h2 class="mt-4 text-2xl font-bold text-zinc-950 dark:text-white"><x-t en="Get Your Free Ticket" th="รับตั๋วฟรี" /></h2>
+                <p class="mt-2 text-zinc-700 dark:text-zinc-300"><x-t en="Complete a short survey to receive your free ticket instantly." th="ทำแบบสอบถามสั้นๆ เพื่อรับตั๋วฟรีทันที" /></p>
+                <a class="mt-6 inline-flex items-center gap-2 rounded-md bg-emerald-400 px-6 py-3 text-lg font-semibold text-zinc-950 hover:bg-emerald-300" href="{{ $freeTicketGateSurveyUrl }}">
+                    <x-icon name="file-text" /><x-t en="Take Survey &amp; Get Ticket" th="ทำแบบสอบถามและรับตั๋ว" />
+                </a>
+            </div>
+        @else
         <form id="checkout" method="POST" action="{{ route('orders.store') }}" enctype="multipart/form-data" class="scroll-mt-6 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/[0.04] p-5" @submit="prepareSubmit($event)" x-data="checkout({
             eventId: {{ $event->id }},
             tickets: @js($checkoutTickets),
@@ -212,11 +225,16 @@
                                 </div>
                             </div>
                             <input type="hidden" name="items[{{ $loop->index }}][ticket_type_id]" value="{{ $ticket->id }}">
-                            <div class="grid grid-cols-[40px_40px_40px] overflow-hidden rounded-md border border-zinc-200 dark:border-white/10">
-                                <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="decrement({{ $ticket->id }})" aria-label="Remove ticket"><x-icon name="minus" /></button>
-                                <input class="border-x border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-2 py-2 text-center text-zinc-950 dark:text-white" name="items[{{ $loop->index }}][quantity]" 
-                                    type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]" @input="syncHolderNames({{ $ticket->id }}); notifyCart({{ $ticket->id }})">
-                                <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="increment({{ $ticket->id }})" aria-label="Add ticket"><x-icon name="plus" /></button>
+                            <div class="flex items-center gap-2">
+                                @if($ticket->price_thb == 0)
+                                    <span class="text-xs text-zinc-400"><x-t en="max 1" th="สูงสุด 1" /></span>
+                                @endif
+                                <div class="grid grid-cols-[40px_40px_40px] overflow-hidden rounded-md border border-zinc-200 dark:border-white/10">
+                                    <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10" type="button" @click="decrement({{ $ticket->id }})" aria-label="Remove ticket"><x-icon name="minus" /></button>
+                                    <input class="border-x border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-2 py-2 text-center text-zinc-950 dark:text-white" name="items[{{ $loop->index }}][quantity]" 
+                                        type="text" inputmode="numeric" pattern="\d*" x-model.number="quantities[{{ $ticket->id }}]" @input="syncHolderNames({{ $ticket->id }}); notifyCart({{ $ticket->id }})" @blur="if (Number(quantities[{{ $ticket->id }}]) > maxQty({{ $ticket->id }})) { quantities[{{ $ticket->id }}] = maxQty({{ $ticket->id }}); syncHolderNames({{ $ticket->id }}); notifyCart({{ $ticket->id }}); }">
+                                    <button class="grid place-items-center bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-800 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed" type="button" @click="increment({{ $ticket->id }})" :disabled="atMax({{ $ticket->id }})" aria-label="Add ticket"><x-icon name="plus" /></button>
+                                </div>
                             </div>
                         </div>
                         <div>
@@ -466,9 +484,12 @@
             </div>
         </form>
     </div>
+    @endif
 
+    @unless($freeTicketGateSurveyUrl)
     <a class="fixed bottom-4 left-1/2 z-40 inline-flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center justify-center gap-2 rounded-lg border border-emerald-300/70 bg-emerald-400 px-4 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:border-emerald-300/30 sm:bottom-6 sm:right-6 sm:left-auto sm:w-auto sm:translate-x-0" href="#checkout" x-data="floatingReserve()" x-init="init()" x-show="visible()" x-transition.opacity>
         <x-icon name="ticket" class="h-5 w-5" />
         <span><x-t en="Reserve Your Spot" th="เลือกตั๋ว" /></span>
     </a>
+    @endunless
 </x-layouts.app>

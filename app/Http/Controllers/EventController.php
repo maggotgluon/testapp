@@ -90,10 +90,41 @@ class EventController extends Controller
             ? route('surveys.show', ['survey' => $freeApprovalSurvey, 'return' => $request->getRequestUri().'#checkout'])
             : null;
 
+        // Check if the event qualifies for "free ticket gate" flow
+        $freeTicketGateSurveyUrl = null;
+        $hasFreeTicketOnly = $event->ticketTypes->isNotEmpty() && $event->ticketTypes->every(fn ($t) => $t->price_thb === 0);
+
+        // If user already has a free ticket for this event, send them straight to it
+        if ($hasFreeTicketOnly) {
+            $existingUuid = $request->session()->get('survey_free_ticket_uuid_'.$event->id);
+            if ($existingUuid) {
+                return redirect()->route('tickets.show', $existingUuid);
+            }
+
+            if ($request->user()) {
+                $existingTicket = Ticket::query()
+                    ->where('event_id', $event->id)
+                    ->where('user_id', $request->user()->id)
+                    ->where('status', 'approved')
+                    ->latest()
+                    ->first();
+
+                if ($existingTicket) {
+                    return redirect()->route('tickets.show', $existingTicket->uuid);
+                }
+            }
+        }
+
+        if ($hasFreeTicketOnly && ($survey = $surveys->due('free_ticket_gate', $request, $event))) {
+            $request->session()->put('survey_free_ticket_event_id', $event->id);
+            $surveys->rememberReturn($survey, $request, $request->getRequestUri());
+            $freeTicketGateSurveyUrl = route('surveys.show', $survey);
+        }
+
         // Extract name/email/phone from completed survey answers for this event to pre-fill checkout
         $surveyPrefill = $this->extractSurveyPrefill($event, $request);
 
-        return view('events.show', compact('event', 'eventDescriptionHtml', 'freeApprovalSurveyUrl', 'surveyPrefill'));
+        return view('events.show', compact('event', 'eventDescriptionHtml', 'freeApprovalSurveyUrl', 'freeTicketGateSurveyUrl', 'hasFreeTicketOnly', 'surveyPrefill'));
     }
 
     /**

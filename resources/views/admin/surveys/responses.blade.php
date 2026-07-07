@@ -20,7 +20,7 @@
     @php $questions = $survey->questions ?? []; @endphp
 
     <section class="mt-6 overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/[0.04]">
-        <table class="w-full text-sm">
+        <table class="w-full text-sm" x-data="{ metaRow: null }">
             <thead>
                 <tr class="border-b border-zinc-200 dark:border-white/10">
                     <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-zinc-950 dark:text-white">#</th>
@@ -29,13 +29,14 @@
                     @foreach($questions as $question)
                         <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-zinc-950 dark:text-white">{{ $question['label'] }}</th>
                     @endforeach
+                    <th class="whitespace-nowrap px-4 py-3 text-left font-semibold text-zinc-950 dark:text-white"><x-t en="Actions" th="จัดการ" /></th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-zinc-200 dark:divide-white/10">
                 @forelse($responses as $response)
                     <tr class="hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
                         <td class="px-4 py-3 text-zinc-600 dark:text-zinc-400">{{ $loop->iteration }}</td>
-                        <td class="px-4 py-3 text-zinc-950 dark:text-white">{{ $response->user?->name ?? 'Guest' }}</td>
+                        <td class="px-4 py-3 text-zinc-950 dark:text-white">{{ $response->user?->name ?? $response->session_id ?? 'Guest' }}</td>
                         <td class="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">{{ $response->completed_at?->format('Y-m-d H:i') ?? '-' }}</td>
                         @foreach($questions as $question)
                             <td class="px-4 py-3 text-zinc-950 dark:text-white">
@@ -49,10 +50,39 @@
                                 @endif
                             </td>
                         @endforeach
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-1">
+                                @if($response->meta)
+                                    <button class="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-600 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-400 dark:hover:bg-white/10"
+                                        type="button"
+                                        @click="metaRow = metaRow === {{ $loop->index }} ? null : {{ $loop->index }}">
+                                        <x-icon name="info" class="h-3.5 w-3.5" />
+                                    </button>
+                                @endif
+                                <form method="POST" action="{{ route('admin.surveys.responses.destroy', [$survey, $response]) }}" onsubmit="return confirm('Delete this response? / ลบคำตอบนี้?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-400/30 dark:text-rose-200 dark:hover:bg-rose-400/10">
+                                        <x-icon name="trash-2" class="h-3.5 w-3.5" /><x-t en="Delete" th="ลบ" />
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
                     </tr>
+                    @if($response->meta)
+                        <tr x-cloak x-show="metaRow === {{ $loop->index }}" x-transition>
+                            <td colspan="{{ count($questions) + 4 }}" class="bg-zinc-50 px-6 py-3 dark:bg-zinc-900">
+                                <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-zinc-600 dark:text-zinc-400 sm:grid-cols-3 lg:grid-cols-4">
+                                    @foreach($response->meta as $key => $value)
+                                        <div><span class="font-semibold text-zinc-950 dark:text-white">{{ $key }}:</span> {{ $value }}</div>
+                                    @endforeach
+                                </div>
+                            </td>
+                        </tr>
+                    @endif
                 @empty
                     <tr>
-                        <td class="px-4 py-6 text-center text-zinc-600 dark:text-zinc-400" colspan="{{ count($questions) + 3 }}">
+                        <td class="px-4 py-6 text-center text-zinc-600 dark:text-zinc-400" colspan="{{ count($questions) + 4 }}">
                             <x-t en="No responses yet." th="ยังไม่มีคำตอบ" />
                         </td>
                     </tr>

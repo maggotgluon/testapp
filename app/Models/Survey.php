@@ -14,6 +14,7 @@ class Survey extends Model
         'before_ticket_selection' => 'Before ticket selection / ก่อนเลือกตั๋ว',
         'before_payment' => 'Before proceed to payment / ก่อนชำระเงิน',
         'before_free_order_approval' => 'Before free ticket approval / ก่อนอนุมัติตั๋วฟรี',
+        'free_ticket_gate' => 'Free ticket gate / รับตั๋วฟรีผ่านแบบสอบถาม',
         'after_payment' => 'After payment/order / หลังชำระเงินหรือส่งออเดอร์',
         'on_login' => 'When login / ตอนเข้าสู่ระบบ',
     ];

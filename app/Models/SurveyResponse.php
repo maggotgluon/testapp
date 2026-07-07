@@ -13,6 +13,7 @@ class SurveyResponse extends Model
         'session_id',
         'status',
         'answers',
+        'meta',
         'started_at',
         'completed_at',
     ];
@@ -21,6 +22,7 @@ class SurveyResponse extends Model
     {
         return [
             'answers' => 'array',
+            'meta' => 'array',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];

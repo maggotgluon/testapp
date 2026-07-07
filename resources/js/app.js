@@ -592,9 +592,7 @@ Alpine.data('checkout', (config) => ({
         this.slipPreviewUrl = file ? URL.createObjectURL(file) : '';
     },
     increment(ticketId) {
-        const ticket = this.tickets.find((t) => t.id === ticketId);
-        const maxQty = (ticket && Number(ticket.price) === 0) ? 1 : 20;
-        this.quantities[ticketId] = Math.min(maxQty, Number(this.quantities[ticketId] || 0) + 1);
+        this.quantities[ticketId] = Math.min(this.maxQty(ticketId), Number(this.quantities[ticketId] || 0) + 1);
         this.syncHolderNames(ticketId);
         this.notifyCart(ticketId);
     },
@@ -636,6 +634,13 @@ Alpine.data('checkout', (config) => ({
         return config.tickets.reduce((sum, ticket) => {
             return sum + (Number(this.quantities[ticket.id] || 0) * Number(ticket.price));
         }, 0);
+    },
+    maxQty(ticketId) {
+        const ticket = this.tickets.find((t) => t.id === ticketId);
+        return ticket ? ticket.maxQty : 20;
+    },
+    atMax(ticketId) {
+        return Number(this.quantities[ticketId] || 0) >= this.maxQty(ticketId);
     },
     cartQuantity() {
         return config.tickets.reduce((sum, ticket) => sum + Number(this.quantities[ticket.id] || 0), 0);

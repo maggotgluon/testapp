@@ -1,6 +1,11 @@
 <x-layouts.app :title="$survey->title">
-    <form method="POST" action="{{ route('surveys.store', $survey) }}" class="mx-auto max-w-2xl rounded-lg border border-zinc-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]">
+    <form method="POST" action="{{ route('surveys.store', $survey) }}" class="mx-auto max-w-2xl rounded-lg border border-zinc-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]" x-data="{ meta: { screen: '', timezone: '', language: '', platform: '', cookies_enabled: '' } }" x-init="meta = { screen: screen.width+'x'+screen.height, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, language: navigator.language, platform: navigator.platform, cookies_enabled: navigator.cookieEnabled ? '1' : '0' }">
         @csrf
+        <input type="hidden" name="meta[screen]" x-model="meta.screen">
+        <input type="hidden" name="meta[timezone]" x-model="meta.timezone">
+        <input type="hidden" name="meta[language]" x-model="meta.language">
+        <input type="hidden" name="meta[platform]" x-model="meta.platform">
+        <input type="hidden" name="meta[cookies_enabled]" x-model="meta.cookies_enabled">
         <div class="flex items-start justify-between gap-4">
             <div>
                 <p class="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-200"><x-icon name="clipboard-list" /><x-t en="Survey" th="แบบสอบถาม" /></p>
