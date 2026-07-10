@@ -98,7 +98,10 @@ class EventController extends Controller
         if ($hasFreeTicketOnly) {
             $existingUuid = $request->session()->get('survey_free_ticket_uuid_'.$event->id);
             if ($existingUuid) {
-                return redirect()->route('tickets.show', $existingUuid);
+                if (Ticket::where('uuid', $existingUuid)->exists()) {
+                    return redirect()->route('tickets.show', $existingUuid);
+                }
+                $request->session()->forget('survey_free_ticket_uuid_'.$event->id);
             }
 
             if ($request->user()) {

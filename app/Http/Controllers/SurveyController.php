@@ -27,10 +27,14 @@ class SurveyController extends Controller
         }
 
         if ($gate->hasCompleted($survey, $request)) {
-            return view('surveys.completed', [
-                'survey' => $survey,
-                'returnTo' => $gate->returnTo($survey, $request),
-            ]);
+            if ($survey->placement === 'free_ticket_gate' && ! $this->userHasValidFreeTicket($survey, $request)) {
+                $request->session()->forget('survey_completed.'.$survey->id);
+            } else {
+                return view('surveys.completed', [
+                    'survey' => $survey,
+                    'returnTo' => $gate->returnTo($survey, $request),
+                ]);
+            }
         }
 
         $response = $gate->responseFor($survey, $request);
@@ -441,5 +445,31 @@ class SurveyController extends Controller
                 'answers' => 'Please answer: '.$missing->join(', '),
             ]);
         }
+    }
+
+    private function userHasValidFreeTicket(Survey $survey, Request $request): bool
+    {
+        $eventId = $survey->event_id ?: $request->session()->get('survey_free_ticket_event_id');
+
+        if (! $eventId || ! ($event = Event::find($eventId))) {
+            return false;
+        }
+
+        $freeTypeId = $event->ticketTypes()->where('price_thb', 0)->value('id');
+
+        if (! $freeTypeId) {
+            return false;
+        }
+
+        $query = Ticket::query()
+            ->where('event_id', $event->id)
+            ->where('ticket_type_id', $freeTypeId)
+            ->where('status', 'approved');
+
+        if ($request->user()) {
+            $query->where('user_id', $request->user()->id);
+        }
+
+        return $query->exists();
     }
 }
