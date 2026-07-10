@@ -168,7 +168,8 @@ class SurveyController extends Controller
         $data = $request->validate([
             'event_id' => ['nullable', 'exists:events,id'],
             'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:1000'],
+            'description' => ['nullable', 'string', 'max:10000'],
+            'description_format' => ['nullable', 'in:html,markdown'],
             'placement' => ['required', 'in:'.implode(',', array_keys(Survey::PLACEMENTS))],
             'questions' => ['nullable', 'array'],
             'questions.*.key' => ['nullable', 'string', 'max:80'],
@@ -187,6 +188,7 @@ class SurveyController extends Controller
 
         $data['event_id'] = $data['event_id'] ?? null;
         $data['is_active'] = $request->boolean('is_active');
+        $data['description_format'] = $data['description_format'] ?? 'html';
         $data['questions'] = $this->questionsFromRequest($request);
 
         return $data;

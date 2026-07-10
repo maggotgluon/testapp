@@ -24,6 +24,7 @@ class Survey extends Model
         'created_by',
         'title',
         'description',
+        'description_format',
         'placement',
         'questions',
         'is_active',
@@ -36,6 +37,7 @@ class Survey extends Model
         return [
             'questions' => 'array',
             'is_active' => 'boolean',
+            'description_format' => 'string',
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
         ];

@@ -4,7 +4,7 @@
     ]))->values()->all());
 @endphp
 <x-layouts.app :title="$survey->exists ? 'Edit survey' : 'New survey'">
-    <form method="POST" action="{{ $survey->exists ? route('admin.surveys.update', $survey) : route('admin.surveys.store') }}" class="mx-auto max-w-4xl rounded-lg border border-zinc-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]" x-data="surveyBuilder(@js($questionSeed))">
+    <form method="POST" action="{{ $survey->exists ? route('admin.surveys.update', $survey) : route('admin.surveys.store') }}" class="mx-auto max-w-4xl rounded-lg border border-zinc-200 bg-white p-6 dark:border-white/10 dark:bg-white/[0.04]" x-data="{ ...surveyBuilder(@js($questionSeed)), description: @js(old('description', $survey->description)), descriptionFormat: @js(old('description_format', $survey->description_format ?: 'html')) }">
         @csrf
         @if($survey->exists) @method('PUT') @endif
 
@@ -12,7 +12,17 @@
 
         <div class="mt-5 grid gap-4 sm:grid-cols-2">
             <label class="text-sm text-zinc-700 dark:text-zinc-300 sm:col-span-2"><x-t en="Title" th="ชื่อแบบสอบถาม" /><input class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="title" value="{{ old('title', $survey->title) }}" required></label>
-            <label class="text-sm text-zinc-700 dark:text-zinc-300 sm:col-span-2"><x-t en="Description" th="คำอธิบาย" /><textarea class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="description" rows="3">{{ old('description', $survey->description) }}</textarea></label>
+            <div class="sm:col-span-2">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <label class="text-sm text-zinc-700 dark:text-zinc-300"><x-t en="Description" th="คำอธิบาย" /></label>
+                    <div class="inline-grid grid-cols-2 overflow-hidden rounded-md border border-zinc-200 text-sm dark:border-white/10">
+                        <label class="px-3 py-2" x-bind:class="descriptionFormat === 'html' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 dark:text-zinc-200'"><input class="sr-only" type="radio" name="description_format" value="html" x-model="descriptionFormat">Safe HTML</label>
+                        <label class="px-3 py-2" x-bind:class="descriptionFormat === 'markdown' ? 'bg-emerald-400 text-zinc-950' : 'text-zinc-700 dark:text-zinc-200'"><input class="sr-only" type="radio" name="description_format" value="markdown" x-model="descriptionFormat">Markdown</label>
+                    </div>
+                </div>
+                <textarea class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="description" rows="5" x-model="description">{{ old('description', $survey->description) }}</textarea>
+                <div class="mt-1 text-xs text-zinc-500" x-text="descriptionFormat === 'markdown' ? TicketFlowLanguage.format({ en: 'Markdown supported: headings, links, lists, bold, italic.', th: 'รองรับ Markdown เช่น หัวข้อ ลิงก์ รายการ ตัวหนา ตัวเอียง' }) : 'Allowed HTML tags: p, br, strong, em, u, ul, ol, li, a, h2, h3, blockquote.'"></div>
+            </div>
             <label class="text-sm text-zinc-700 dark:text-zinc-300"><x-t en="Event" th="อีเวนต์" />
                 <select class="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-zinc-950 dark:border-white/10 dark:bg-zinc-950 dark:text-white" name="event_id">
                     <option value=""><x-t en="All events" th="ทุกอีเวนต์" /></option>

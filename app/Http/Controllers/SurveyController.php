@@ -9,6 +9,7 @@ use App\Models\Survey;
 use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
+use App\Services\EventDescriptionService;
 use App\Services\SurveyGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,10 @@ use Illuminate\View\View;
 
 class SurveyController extends Controller
 {
+    public function __construct(private EventDescriptionService $descriptions)
+    {
+    }
+
     public function show(Request $request, Survey $survey, SurveyGate $gate): View
     {
         abort_unless($survey->is_active, 404);
@@ -47,9 +52,12 @@ class SurveyController extends Controller
             }
         }
 
+        $descriptionHtml = $this->descriptions->render($survey->description, $survey->description_format ?? 'html');
+
         return view('surveys.show', [
             'survey' => $survey,
             'response' => $response,
+            'descriptionHtml' => $descriptionHtml,
         ]);
     }
 
