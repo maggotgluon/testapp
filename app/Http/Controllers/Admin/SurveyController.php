@@ -116,10 +116,10 @@ class SurveyController extends Controller
                 ->where('status', 'completed')
                 ->chunk(100, function ($responses) use ($handle, $questions) {
                     foreach ($responses as $r) {
-                        $row = [
-                            $r->user?->name ?? 'Guest',
-                            $r->completed_at?->format('Y-m-d H:i:s') ?? '',
-                        ];
+                    $row = [
+                        $r->user?->name ?? 'Guest',
+                        $r->completed_at?->inDisplayTimezone()->format('Y-m-d H:i:s') ?? '',
+                    ];
                         foreach ($questions as $question) {
                             $row[] = $r->answers[$question['key']] ?? '';
                         }

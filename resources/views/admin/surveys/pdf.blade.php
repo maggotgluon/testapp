@@ -28,7 +28,7 @@
 </head>
 <body>
     <h1>{{ $survey->title }}</h1>
-    <p class="subtitle">{{ $survey->description }}<br>{{ count($responses) }} responses · {{ now()->format('Y-m-d H:i') }}</p>
+    <p class="subtitle">{{ $survey->description }}<br>{{ count($responses) }} responses · {{ now()->inDisplayTimezone()->format('Y-m-d H:i') }}</p>
 
     <table>
         <thead>
@@ -46,7 +46,7 @@
                 <tr>
                     <td>{{ $i + 1 }}</td>
                     <td>{{ $response->user?->name ?? 'Guest / แขก' }}</td>
-                    <td>{{ $response->completed_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                    <td>{{ $response->completed_at?->inDisplayTimezone()->format('Y-m-d H:i') ?? '-' }}</td>
                     @foreach($questions as $question)
                         <td>
                             @php $answer = $response->answers[$question['key']] ?? ''; @endphp

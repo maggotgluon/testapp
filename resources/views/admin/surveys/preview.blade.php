@@ -34,7 +34,7 @@
                     <tr class="hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
                         <td class="px-4 py-3 text-zinc-600 dark:text-zinc-400">{{ $i + 1 }}</td>
                         <td class="px-4 py-3 text-zinc-950 dark:text-white">{{ $response->user?->name ?? 'Guest' }}</td>
-                        <td class="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">{{ $response->completed_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                        <td class="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">{{ $response->completed_at?->inDisplayTimezone()->format('Y-m-d H:i') ?? '-' }}</td>
                         @foreach($questions as $question)
                             <td class="max-w-xs break-words px-4 py-3 text-zinc-950 dark:text-white" style="word-break: break-word; overflow-wrap: break-word;">
                                 @php $answer = $response->answers[$question['key']] ?? ''; @endphp

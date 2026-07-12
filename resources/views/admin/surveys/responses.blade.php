@@ -40,7 +40,7 @@
                     <tr class="hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
                         <td class="px-4 py-3 text-zinc-600 dark:text-zinc-400">{{ $loop->iteration }}</td>
                         <td class="px-4 py-3 text-zinc-950 dark:text-white">{{ $response->user?->name ?? $response->session_id ?? 'Guest' }}</td>
-                        <td class="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">{{ $response->completed_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                        <td class="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">{{ $response->completed_at?->inDisplayTimezone()->format('Y-m-d H:i') ?? '-' }}</td>
                         @foreach($questions as $question)
                             <td class="px-4 py-3 text-zinc-950 dark:text-white">
                                 @php

@@ -69,6 +69,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Display Timezone
+    |--------------------------------------------------------------------------
+    |
+    | The timezone used when displaying timestamps to users. The DB stores
+    | timestamps in UTC (app.timezone) but can be shown in a local timezone.
+    |
+    */
+
+    'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'UTC'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |
