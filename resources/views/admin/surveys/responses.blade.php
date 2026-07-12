@@ -11,6 +11,9 @@
             <a class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 font-semibold text-zinc-950" href="{{ route('admin.surveys.responses.export.pdf', $survey) }}">
                 <x-icon name="file-down" /><x-t en="Export PDF" th="ส่งออก PDF" />
             </a>
+            <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 dark:border-white/10 dark:text-zinc-200" href="{{ route('admin.surveys.responses.export.preview', $survey) }}">
+                <x-icon name="eye" /><x-t en="Preview" th="ดูตัวอย่าง" />
+            </a>
             <a class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-700 dark:border-white/10 dark:text-zinc-200" href="{{ route('admin.surveys.index') }}">
                 <x-icon name="arrow-left" /><x-t en="Back" th="กลับ" />
             </a>

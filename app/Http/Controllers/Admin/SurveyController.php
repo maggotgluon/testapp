@@ -107,6 +107,7 @@ class SurveyController extends Controller
         $response = new \Symfony\Component\HttpFoundation\StreamedResponse(function () use ($survey, $questions, $headers) {
             $handle = fopen('php://output', 'w+b');
 
+            fwrite($handle, "\xEF\xBB\xBF");
             fputcsv($handle, $headers);
 
             SurveyResponse::query()
@@ -143,6 +144,22 @@ class SurveyController extends Controller
         $response->delete();
 
         return back()->with('status', 'Response deleted. / ลบคำตอบแล้ว');
+    }
+
+    public function exportPreview(Request $request, Survey $survey): View
+    {
+        abort_unless($this->canManageSurvey($request, $survey), 403);
+
+        $questions = $survey->questions ?? [];
+
+        $responses = SurveyResponse::query()
+            ->with('user')
+            ->where('survey_id', $survey->id)
+            ->where('status', 'completed')
+            ->orderBy('completed_at')
+            ->get();
+
+        return view('admin.surveys.preview', compact('survey', 'questions', 'responses'));
     }
 
     public function exportPdf(Request $request, Survey $survey): \Illuminate\Http\Response

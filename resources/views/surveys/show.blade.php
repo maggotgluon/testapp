@@ -160,6 +160,9 @@
         <div class="mt-6 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-500 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-400">
             <x-t
                 en="By clicking 'Complete survey', you acknowledge that your responses will be used to improve our services. No personal data is shared with third parties. Only the organizer and beneficiaries have access."
+            /><br>
+            <x-t
+                en="By clicking 'Complete survey', you acknowledge that your responses will be used to improve our services. No personal data is shared with third parties. Only the organizer and beneficiaries have access."
                 th="การคลิก 'ส่งแบบสอบถาม' แสดงว่าคุณรับทราบว่าคำตอบของคุณจะถูกนำไปใช้เพื่อพัฒนาบริการของเรา ข้อมูลส่วนบุคคลจะไม่ถูกแชร์กับบุคคลที่สาม เฉพาะผู้จัดงานและผู้รับประโยชน์เท่านั้นที่สามารถเข้าถึงได้"
             />
         </div>
@@ -177,8 +180,13 @@
                     default => 'ส่งแบบสอบถาม',
                 };
             @endphp
-            <button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950" name="action" value="complete"><x-icon name="check" /><x-t :en="$submitEn" :th="$submitTh" /></button>
-            <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-3 font-semibold text-zinc-700 dark:border-white/10 dark:text-zinc-200" name="action" value="draft"><x-icon name="save" /><x-t en="Save progress" th="บันทึกไว้ก่อน" /></button>
+            <button class="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-3 font-semibold text-zinc-950" name="action" value="complete">
+                <x-icon name="check" /><x-t :en="$submitEn" :th="$submitTh" />
+            </button>
+            <button class="inline-flex items-center gap-2 rounded-md border border-zinc-200 px-4 py-3 font-semibold text-zinc-700 dark:border-white/10 dark:text-zinc-200" name="action" value="draft">
+                <x-icon name="save" />
+                <!-- <x-t en="Save progress" th="บันทึกไว้ก่อน" /> -->
+            </button>
         </div>
     </form>
 </x-layouts.app>

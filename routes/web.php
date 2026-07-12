@@ -90,6 +90,7 @@ Route::middleware(['auth', 'role:super_admin,event_admin'])->prefix('admin')->na
     Route::delete('/surveys/{survey}/responses/{response}', [AdminSurveyController::class, 'destroyResponse'])->name('surveys.responses.destroy');
     Route::get('/surveys/{survey}/responses/export/csv', [AdminSurveyController::class, 'exportCsv'])->name('surveys.responses.export.csv');
     Route::get('/surveys/{survey}/responses/export/pdf', [AdminSurveyController::class, 'exportPdf'])->name('surveys.responses.export.pdf');
+    Route::get('/surveys/{survey}/responses/export/preview', [AdminSurveyController::class, 'exportPreview'])->name('surveys.responses.export.preview');
     Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/approve', [AdminOrderController::class, 'approve'])->name('orders.approve');

@@ -147,7 +147,7 @@
                 <h2 class="mt-4 text-2xl font-bold text-zinc-950 dark:text-white"><x-t en="Get Your Free Ticket" th="รับตั๋วฟรี" /></h2>
                 <p class="mt-2 text-zinc-700 dark:text-zinc-300"><x-t en="Complete a short survey to receive your free ticket instantly." th="ทำแบบสอบถามสั้นๆ เพื่อรับตั๋วฟรีทันที" /></p>
                 <a class="mt-6 inline-flex items-center gap-2 rounded-md bg-emerald-400 px-6 py-3 text-lg font-semibold text-zinc-950 hover:bg-emerald-300" href="{{ $freeTicketGateSurveyUrl }}">
-                    <x-icon name="file-text" /><x-t en="Take Survey &amp; Get Ticket" th="ทำแบบสอบถามและรับตั๋ว" />
+                    <x-icon name="file-text" /><x-t en="Take Survey & Get Ticket" th="ทำแบบสอบถามและรับตั๋ว" />
                 </a>
             </div>
         @else

@@ -18,9 +18,10 @@
         body { font-family: 'Noto Sans Thai', DejaVu Sans, sans-serif; font-size: 10px; color: #1a1a2e; }
         h1 { font-size: 18px; margin-bottom: 4px; }
         .subtitle { font-size: 11px; color: #666; margin-bottom: 16px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; page-break-inside: auto; }
         th { background: #f0f0f0; text-align: left; padding: 6px 8px; font-size: 9px; text-transform: uppercase; border: 1px solid #ddd; }
-        td { padding: 5px 8px; border: 1px solid #ddd; vertical-align: top; }
+        td { padding: 5px 8px; border: 1px solid #ddd; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
+        tr { page-break-inside: avoid; }
         tr:nth-child(even) { background: #fafafa; }
         .page-break { page-break-after: always; }
     </style>

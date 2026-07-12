@@ -110,7 +110,7 @@ return [
         /**
          * Whether to enable font subsetting or not.
          */
-        'enable_font_subsetting' => false,
+        'enable_font_subsetting' => true,
 
         /**
          * The PDF rendering backend to use
@@ -180,6 +180,17 @@ return [
          * @var string
          */
         'default_font' => 'serif',
+
+        /**
+         * Custom font families registered with DomPDF.
+         * Font files must exist in the font_dir directory.
+         */
+        'font_family' => [
+            'noto-sans-thai' => [
+                'R' => 'NotoSansThai-Regular.ttf',
+                'B' => 'NotoSansThai-Bold.ttf',
+            ],
+        ],
 
         /**
          * Image DPI setting
